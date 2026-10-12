@@ -114,3 +114,25 @@ dialog th, dialog td { text-align: left; padding: 6px; border-bottom: 1px solid 
 dialog h3 { font-size: 14px; margin: 16px 0 6px; }
 blockquote { margin: 12px 0; padding: 8px 12px; border-left: 3px solid var(--accent); background: var(--bg); }
 blockquote cite { display: block; margin-top: 4px; color: var(--text-muted); font-size: 12px; }
+
+.install summary { list-style: none; display: flex; align-items: center; gap: 8px; }
+.install summary::-webkit-details-marker { display: none; }
+.install summary::before { content: "\25B8"; color: var(--accent); transition: transform .15s; }
+.install[open] > summary::before { transform: rotate(90deg); }
+.install[open] .advanced:not([open]) > summary::before { transform: none; }
+.install[open] .advanced[open] > summary::before { transform: rotate(90deg); }
+.install summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+.install p { margin: 0; }
+.install a { color: var(--accent); }
+.steps { list-style: none; counter-reset: step; margin: 8px 0; padding: 0; display: grid; gap: 10px; }
+.steps li { counter-increment: step; display: grid; min-width: 0; gap: 4px; font-size: 13px; }
+.steps li > span::before { content: counter(step) ". "; color: var(--accent); font-weight: 600; }
+.steps.alt li > span::before { content: counter(step, upper-alpha) ". "; }
+.advanced { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; }
+.advanced > summary { font-weight: 500; color: var(--text-muted); }
+.advanced[open] > summary { color: var(--text); }
+.advanced > p { margin-top: 6px; }
+.copy { display: flex; align-items: flex-start; gap: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 6px 4px 6px 8px; }
+.copy code { flex: 1; min-width: 0; overflow-wrap: anywhere; line-height: 1.5; }
+.copy button { flex: none; font-size: 12px; padding: 2px 8px; color: var(--text-muted); background: none; border: 0; }
+.copy button:hover { color: var(--text); }

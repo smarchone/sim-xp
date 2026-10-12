@@ -168,6 +168,23 @@ $('file').addEventListener('change', async () => {
   if (errors.length) alert(`This playbook doesn't validate:\n- ${errors.join('\n- ')}`);
   $('file').value = '';
 });
+// Install tip: open by default, remembers being collapsed
+const TIP_KEY = 'sim-xp-install-tip';
+try { if (localStorage.getItem(TIP_KEY) === 'closed') $('install').open = false; } catch {}
+$('install').addEventListener('toggle', () => {
+  try { localStorage.setItem(TIP_KEY, $('install').open ? 'open' : 'closed'); } catch {}
+});
+for (const btn of document.querySelectorAll('[data-copy]')) {
+  btn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText($(btn.dataset.copy).textContent);
+      btn.textContent = 'Copied';
+    } catch {
+      btn.textContent = 'Select and copy';
+    }
+    setTimeout(() => (btn.textContent = 'Copy'), 1500);
+  });
+}
 $('debrief-close').addEventListener('click', () => $('debrief').close());
 $('debrief-again').addEventListener('click', () => load(sim.pb.id));
 

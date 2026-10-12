@@ -32,6 +32,34 @@
     </section>
 
     <aside class="side">
+      <details class="card install" id="install" open>
+        <summary>Let Claude Code play this</summary>
+        <ol class="steps">
+          <li>
+            <span>Add the WebMCP bridge to Claude Code</span>
+            <div class="copy"><code id="cmd-add">claude mcp add webmcp -- npx -y @smarchone/webmcp-bridge</code><button data-copy="cmd-add" aria-label="Copy bridge command">Copy</button></div>
+          </li>
+          <li>
+            <span>Ask Claude to play a drill</span>
+            <div class="copy"><code id="cmd-play">claude "Open https://smarchone.github.io/sim-xp/ with the webmcp tools and play the gc-death-spiral drill"</code><button data-copy="cmd-play" aria-label="Copy play command">Copy</button></div>
+          </li>
+        </ol>
+        <p class="muted small">Run both in the same folder. Requires Node 22+ and Chrome. Other MCP agents (Codex, Gemini CLI, Cursor, VS Code) work too: <a href="https://github.com/smarchone/webmcp-apps#other-agents">add the bridge to their MCP config</a>.</p>
+        <details class="advanced">
+          <summary>Advanced: slash commands</summary>
+          <p class="muted small">Install these, then run <code>/run-drill</code> to play, or <code>/write-playbook "your incident story"</code> to turn your experience into a new drill.</p>
+          <ol class="steps alt">
+            <li>
+              <span><code>/run-drill</code></span>
+              <div class="copy"><code id="cmd-run-drill">mkdir -p .claude/commands &amp;&amp; curl -fsSL https://smarchone.github.io/sim-xp/commands/run-drill.md -o .claude/commands/run-drill.md</code><button data-copy="cmd-run-drill" aria-label="Copy run-drill install">Copy</button></div>
+            </li>
+            <li>
+              <span><code>/write-playbook</code></span>
+              <div class="copy"><code id="cmd-write">mkdir -p .claude/commands &amp;&amp; curl -fsSL https://smarchone.github.io/sim-xp/commands/write-playbook.md -o .claude/commands/write-playbook.md</code><button data-copy="cmd-write" aria-label="Copy write-playbook install">Copy</button></div>
+            </li>
+          </ol>
+        </details>
+      </details>
       <details class="card" open>
         <summary>Briefing</summary>
         <div id="briefing"></div>
@@ -53,12 +81,6 @@
         <summary>Share or write a playbook</summary>
         <p class="small">A playbook is one JSON file: a story, a fault timeline, alerts, the actions on offer, the author's runbook and what they actually did. See <code>PLAYBOOKS.md</code>.</p>
         <p class="row"><a id="download" class="button">Download this one</a><label class="button">Load a playbook… <input type="file" id="file" accept=".json,application/json" hidden /></label></p>
-      </details>
-      <details class="card">
-        <summary>Let an agent play or write drills</summary>
-        <p class="small">This page registers WebMCP tools (<code>start_drill</code>, <code>advance</code>, <code>take_action</code>, <code>get_debrief</code>, <code>install_playbook</code>…). With the WebMCP bridge, Claude Code can play a drill or turn a war story into a new one:</p>
-        <pre>claude mcp add webmcp -- npx -y @smarchone/webmcp-bridge
-claude "Open https://smarchone.github.io/sim-xp/ with the webmcp tools and play the gc-death-spiral drill"</pre>
       </details>
     </aside>
   </main>
