@@ -1,0 +1,197 @@
+{
+  "id": "flash-sale-pool-exhaustion",
+  "title": "Flash sale at 2.5x: the pool that wasn't big enough",
+  "author": {
+    "name": "Sample senior SRE",
+    "note": "Example mod written for the MVP"
+  },
+  "rung": "junior to senior",
+  "tags": [
+    "capacity",
+    "flash-sale",
+    "connection-pool",
+    "retries"
+  ],
+  "duration_s": 900,
+  "seed": 42,
+  "scrape_lag_s": 15,
+  "slo": {
+    "availability": 0.98
+  },
+  "story": "You are on call for the checkout API. Marketing is running a surprise flash sale this morning; nobody told the platform team the expected traffic. The API runs 4 pods behind an edge proxy, with a read-through cache in front of Postgres (max 100 connections, each pod holds a pool of 20). Watch the dashboard, decide, act. Changes take time to land, just like in prod.",
+  "system": {
+    "api": {
+      "rps_per_replica": 600
+    }
+  },
+  "timeline": [
+    {
+      "at": 60,
+      "message": "Heads up, the flash sale banner goes live in a couple of minutes!",
+      "from": "PM (Priya)"
+    },
+    {
+      "at": 150,
+      "deploy": "marketing: homepage banner + 400 new SKUs published"
+    },
+    {
+      "at": 170,
+      "fault": "traffic_spike",
+      "params": {
+        "multiplier": 2.5,
+        "ramp_s": 60
+      }
+    },
+    {
+      "at": 170,
+      "fault": "cache_degrade",
+      "params": {
+        "hit_ratio": 0.6
+      }
+    },
+    {
+      "at": 300,
+      "message": "Disk 86% on logs-02. Is that related?",
+      "from": "#ops-alerts bot"
+    },
+    {
+      "at": 360,
+      "message": "Customers on Twitter say checkout is spinning. What's the ETA?",
+      "from": "VP Eng (Marcus)",
+      "unless_action": "post_update"
+    },
+    {
+      "at": 600,
+      "message": "Sale traffic is holding steady, it should stay like this for the rest of the hour.",
+      "from": "PM (Priya)"
+    }
+  ],
+  "alerts": [
+    {
+      "id": "high-errors",
+      "metric": "error_pct",
+      "op": ">",
+      "value": 2,
+      "for_s": 30,
+      "severity": "critical",
+      "summary": "checkout-api error rate > 2%"
+    },
+    {
+      "id": "slow-p99",
+      "metric": "p99_ms",
+      "op": ">",
+      "value": 800,
+      "for_s": 30,
+      "severity": "warning",
+      "summary": "checkout-api p99 > 800ms"
+    },
+    {
+      "id": "db-conns",
+      "metric": "db_conns",
+      "op": ">",
+      "value": 70,
+      "for_s": 20,
+      "severity": "warning",
+      "summary": "postgres connections > 70"
+    },
+    {
+      "id": "cpu",
+      "metric": "api_cpu_pct",
+      "op": ">",
+      "value": 85,
+      "for_s": 60,
+      "severity": "warning",
+      "summary": "checkout-api CPU > 85%"
+    }
+  ],
+  "actions": [
+    "declare_incident",
+    "post_update",
+    "rate_limit",
+    "remove_rate_limit",
+    "scale_api",
+    "right_size_pool",
+    "disable_retries",
+    "warm_cache",
+    "restart_api"
+  ],
+  "action_defaults": {
+    "rate_limit": {
+      "rps": 1750
+    }
+  },
+  "runbook": [
+    {
+      "title": "Stop the bleeding before you understand it",
+      "detail": "Errors are burning the budget every second. Shed load at the edge first: a clean 429 for some users beats timeouts for all of them."
+    },
+    {
+      "title": "Find the actual bottleneck",
+      "detail": "CPU high? DB connections at the limit? Look at both. The tier that is saturated is the one to fix, not the one that alerted first."
+    },
+    {
+      "title": "Check what retries are doing",
+      "detail": "If offered load is higher than real user traffic, clients are retrying into a full system. That turns a slowdown into an outage."
+    },
+    {
+      "title": "Before scaling pods, do the connection math",
+      "detail": "pods x pool_size must stay under the DB's max_connections. More pods can mean fewer working connections."
+    },
+    {
+      "title": "Fix the cause, then lift the limit",
+      "detail": "Cold cache after a big catalog publish is common. Warm it, then raise or remove the rate limit and watch."
+    },
+    {
+      "title": "Say something",
+      "detail": "Declare the incident and post an update before anyone has to ask."
+    }
+  ],
+  "debrief": {
+    "expert_path": [
+      {
+        "action": "declare_incident",
+        "why": "Name it early. It gets you help and stops side conversations."
+      },
+      {
+        "action": "rate_limit",
+        "why": "Bought time within a minute. Users got fast 429s instead of 3s timeouts."
+      },
+      {
+        "action": "disable_retries",
+        "why": "Offered load was ~1.6x real traffic. Retries were the second wave."
+      },
+      {
+        "action": "post_update",
+        "why": "One sentence to stakeholders: impact, what we're doing, next update time."
+      },
+      {
+        "action": "warm_cache",
+        "why": "The real cause: 400 new SKUs meant a cold cache, so 4x more DB queries per request."
+      },
+      {
+        "action": "right_size_pool",
+        "why": "Only needed if you scale pods. Keep pods x pool under max_connections."
+      },
+      {
+        "action": "remove_rate_limit",
+        "why": "Once the cache is warm, let the traffic back in and watch the error rate."
+      }
+    ],
+    "pitfalls": [
+      {
+        "action": "scale_api",
+        "text": "Scaling the API is the reflex. Here it added connections the DB didn't have: 6 pods x 20 > 100, so the DB thrashed and got slower. If you scaled, did you right-size the pool too?"
+      },
+      {
+        "action": "restart_api",
+        "text": "A restart drops half your capacity at the worst moment. Nothing was wrong with the pods themselves."
+      }
+    ],
+    "lessons": [
+      "Saturation shows up in the cheapest-to-measure place first (CPU), not always where it starts (DB connections).",
+      "Retries are load. A system at 100% with naive retries settles at an error rate far worse than the overload alone.",
+      "The disk alert on logs-02 was noise. Real incidents always have one."
+    ],
+    "senior_note": "The first time this happened to me I scaled the API from 4 to 12 pods and took Postgres down with connection churn. The fix that actually worked was boring: shed load, warm the cache, then slowly let traffic back."
+  }
+}
