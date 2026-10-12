@@ -19,7 +19,9 @@ what the author did and why.
 
 ## Run it
 
-No build step and no dependencies. Serve the folder over http:
+Live at **https://smarchone.github.io/sim-xp/** (deployed from `main` by `.github/workflows/pages.yml`).
+
+Locally there's no build step and no dependencies. Serve the folder over http:
 
 ```sh
 cd mvp
@@ -76,7 +78,7 @@ With the [WebMCP bridge](https://github.com/smarchone/webmcp-apps):
 
 ```sh
 claude mcp add webmcp -- npx -y @smarchone/webmcp-bridge
-claude "Open http://localhost:3000 with the webmcp tools and play the gc-death-spiral drill"
+claude "Open https://smarchone.github.io/sim-xp/ with the webmcp tools and play the gc-death-spiral drill"
 ```
 
 `commands/run-drill.md` and `commands/write-playbook.md` are slash commands for the two loops: playing, and

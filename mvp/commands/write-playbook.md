@@ -7,7 +7,7 @@ Turn the user's experience into a playable sim-xp drill.
 
 1. Read the story: $ARGUMENTS. If it's thin, ask the user for the three things only they know: the misleading
    signal, the move they got wrong, and what finally worked.
-2. Open `http://localhost:3000` with the webmcp tools and call `get_playbook_format`.
+2. Open `https://smarchone.github.io/sim-xp/` (or `http://localhost:3000` for local changes) with the webmcp tools and call `get_playbook_format`.
 3. Draft the playbook: faults and timing that reproduce the dynamics (not scripted graphs), one red herring,
    the actions a responder would reach for, the author's runbook, and a debrief with `expert_path`, `pitfalls`
    and `lessons` in the user's own words.
