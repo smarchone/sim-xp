@@ -1,0 +1,152 @@
+{
+  "id": "gc-death-spiral",
+  "title": "The deploy that ate the heap",
+  "author": {
+    "name": "Sample staff engineer",
+    "note": "Example mod written for the MVP"
+  },
+  "rung": "junior to senior",
+  "tags": [
+    "jvm",
+    "gc",
+    "memory-leak",
+    "deploys"
+  ],
+  "duration_s": 900,
+  "seed": 7,
+  "scrape_lag_s": 15,
+  "slo": {
+    "availability": 0.98
+  },
+  "story": "You are on call for the orders API, a JVM service on 4 pods. Traffic is a normal Tuesday. CI deploys several times a day and nobody watches the deploys closely. Something will go wrong; your job is to notice, find out why, and fix it with the least damage.",
+  "timeline": [
+    {
+      "at": 90,
+      "deploy": "orders-api v2.14.0 rolled out by ci-bot (\"add per-request audit context\")"
+    },
+    {
+      "at": 90,
+      "fault": "memory_leak",
+      "params": {
+        "mb_per_s": 3
+      }
+    },
+    {
+      "at": 320,
+      "message": "Seeing some slow queries alerts from the DB side, anything changed on your end?",
+      "from": "DBA (Lena)"
+    },
+    {
+      "at": 480,
+      "message": "Order confirmations are slow for EU customers, is something going on?",
+      "from": "Support (Tom)",
+      "unless_action": "post_update"
+    }
+  ],
+  "alerts": [
+    {
+      "id": "p99",
+      "metric": "p99_ms",
+      "op": ">",
+      "value": 600,
+      "for_s": 30,
+      "severity": "warning",
+      "summary": "orders-api p99 > 600ms"
+    },
+    {
+      "id": "errors",
+      "metric": "error_pct",
+      "op": ">",
+      "value": 2,
+      "for_s": 30,
+      "severity": "critical",
+      "summary": "orders-api error rate > 2%"
+    },
+    {
+      "id": "gc",
+      "metric": "gc_pause_ms",
+      "op": ">",
+      "value": 75,
+      "for_s": 30,
+      "severity": "warning",
+      "summary": "orders-api GC pause > 75ms"
+    },
+    {
+      "id": "dbq",
+      "metric": "db_query_ms",
+      "op": ">",
+      "value": 25,
+      "for_s": 20,
+      "severity": "warning",
+      "summary": "postgres query time > 25ms"
+    }
+  ],
+  "actions": [
+    "declare_incident",
+    "post_update",
+    "restart_api",
+    "scale_api",
+    "rollback",
+    "rate_limit",
+    "remove_rate_limit",
+    "add_index"
+  ],
+  "runbook": [
+    {
+      "title": "What changed?",
+      "detail": "Most incidents follow a change. Look at the deploy markers on the graphs before anything else."
+    },
+    {
+      "title": "Read the heap graph as a slope, not a level",
+      "detail": "A heap that only goes up between deploys is a leak. GC pauses climb once it passes ~75%."
+    },
+    {
+      "title": "Restarts buy time, they don't fix",
+      "detail": "Restarting resets the heap but the leak comes straight back. Use it to stabilise while you roll back."
+    },
+    {
+      "title": "Don't chase the loudest alert",
+      "detail": "Slow DB queries can be a symptom: GC-paused pods hold connections longer."
+    },
+    {
+      "title": "Roll back first, debug later",
+      "detail": "If the timing points at a deploy, roll back. You can find the leak in staging tomorrow."
+    }
+  ],
+  "debrief": {
+    "expert_path": [
+      {
+        "action": "declare_incident",
+        "why": "p99 doubling with no traffic change is worth a name."
+      },
+      {
+        "action": "rollback",
+        "why": "Heap slope started exactly at the v2.14.0 marker. Roll back, ask questions later."
+      },
+      {
+        "action": "restart_api",
+        "why": "Optional: stabilises the pods while the rollback rolls out."
+      },
+      {
+        "action": "post_update",
+        "why": "Support was already hearing from customers."
+      }
+    ],
+    "pitfalls": [
+      {
+        "action": "scale_api",
+        "text": "More pods spread the load, so each leaks slower, but they all still leak. You delayed the cliff and paid for it."
+      },
+      {
+        "action": "add_index",
+        "text": "The slow-query alert was a symptom: paused pods held DB connections longer. There was no missing index."
+      }
+    ],
+    "lessons": [
+      "Correlate with change first. Deploy markers are the cheapest signal you have.",
+      "GC trouble looks like everything else: slow DB, high CPU, timeouts. The heap slope is the tell.",
+      "A restart that 'fixes' things for 5 minutes is evidence, not a fix."
+    ],
+    "senior_note": "I restarted pods three times over a night before anyone looked at the deploy timeline. The fourth on-call rolled back in two minutes."
+  }
+}
