@@ -82,7 +82,8 @@ claude "Open https://smarchone.github.io/sim-xp/ with the webmcp tools and play 
 ```
 
 `commands/run-drill.md` and `commands/write-playbook.md` are slash commands for the two loops: playing, and
-turning a senior's story into a new playbook that the engine validates.
+turning a senior's story into a new playbook that the engine validates. The page's "Let Claude Code play this"
+tip has copy-paste install commands for both.
 
 ## Not in the MVP
 
