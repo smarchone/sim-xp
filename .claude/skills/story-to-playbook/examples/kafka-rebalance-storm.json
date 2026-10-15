@@ -1,1652 +1,2145 @@
 {
- "schema": "sim-xp/playbook@2",
- "meta": {
-  "id": "kafka-rebalance-storm",
-  "title": "The rebalance storm: when slow looks dead",
-  "story": "A payments team consumes an orders topic with three workers. A database migration makes each record slower to process. Nobody's consumer crashes, yet within minutes the group is stuck in a loop of rebalances and lag is climbing.",
-  "duration_s": 420,
-  "tags": [
-   "kafka",
-   "consumer-groups",
-   "rebalancing",
-   "backpressure"
-  ],
-  "background": [
-   {
-    "title": "The system",
-    "body": "checkout-api publishes every order to a 6-partition orders topic. Three payments workers form one consumer group and charge the orders, each polling a batch of up to 500 records, processing them one by one against Postgres, then committing."
-   },
-   {
-    "title": "How it normally works",
-    "body": "A worker must call poll() again within max.poll.interval.ms (5 minutes). If it does not, the group coordinator decides it is dead, removes it, and rebalances: partitions are reassigned to whoever is left. Normally a batch takes seconds and this never comes up."
-   },
-   {
-    "title": "Today",
-    "body": "A database migration adds a fraud_score lookup with no index yet, which makes each record about 650 ms slower. Nothing crashes and nothing alerts."
-   }
-  ],
-  "cast": [
-   {
-    "name": "checkout-api",
-    "role": "produces about 1,200 orders a second"
-   },
-   {
-    "name": "orders topic",
-    "role": "6 partitions, two per worker"
-   },
-   {
-    "name": "payments-worker-1, -2, -3",
-    "role": "one consumer group, one batch each"
-   },
-   {
-    "name": "payments-db",
-    "role": "looked up for every record"
-   }
-  ],
-  "watch": [
-   {
-    "label": "Consumer lag",
-    "normal": "normal: near 0"
-   },
-   {
-    "label": "Group rebalances",
-    "normal": "normal: almost never"
-   },
-   {
-    "label": "DB query p99",
-    "normal": "normal: about 45 ms"
-   }
-  ],
-  "learn": [
-   "why a slow worker can look dead to Kafka",
-   "why a rebalance makes the next one more likely",
-   "how batch size, timeouts and rebalancing mode fit together"
-  ],
-  "layout": {
-   "columns": 2,
-   "rows": 4
-  }
- },
- "components": {
-  "nodes": [
-   {
-    "id": "checkout",
-    "label": "checkout-api",
-    "kind": "service"
-   },
-   {
-    "id": "topic",
-    "label": "orders topic",
-    "kind": "kafka-topic",
-    "part_cols": 2,
-    "parts": [
-     {
-      "id": "p0"
-     },
-     {
-      "id": "p1"
-     },
-     {
-      "id": "p2"
-     },
-     {
-      "id": "p3"
-     },
-     {
-      "id": "p4"
-     },
-     {
-      "id": "p5"
-     }
+  "schema": "sim-xp/playbook@2",
+  "meta": {
+    "id": "kafka-rebalance-storm",
+    "title": "The rebalance storm: when slow looks dead",
+    "story": "A payments team consumes an orders topic with three workers. A database migration makes each record slower to process. Nobody's consumer crashes, yet within minutes the group is stuck in a loop of rebalances and lag is climbing.",
+    "duration_s": 420,
+    "tags": [
+      "kafka",
+      "consumer-groups",
+      "rebalancing",
+      "backpressure"
+    ],
+    "background": [
+      {
+        "title": "The system",
+        "body": "checkout-api publishes every order to a 6-partition orders topic. Three payments workers form one consumer group and charge the orders, each polling a batch of up to 500 records, processing them one by one against Postgres, then committing."
+      },
+      {
+        "title": "How it normally works",
+        "body": "A worker must call poll() again within max.poll.interval.ms (5 minutes). If it does not, the group coordinator decides it is dead, removes it, and rebalances: partitions are reassigned to whoever is left. Normally a batch takes seconds and this never comes up."
+      },
+      {
+        "title": "Today",
+        "body": "A database migration adds a fraud_score lookup with no index yet, which makes each record about 650 ms slower. Nothing crashes and nothing alerts."
+      }
+    ],
+    "cast": [
+      {
+        "name": "checkout-api",
+        "role": "produces about 1,200 orders a second"
+      },
+      {
+        "name": "orders topic",
+        "role": "6 partitions, two per worker"
+      },
+      {
+        "name": "payments-worker-1, -2, -3",
+        "role": "one consumer group, one batch each"
+      },
+      {
+        "name": "payments-db",
+        "role": "looked up for every record"
+      }
+    ],
+    "watch": [
+      {
+        "label": "Consumer lag",
+        "normal": "normal: near 0"
+      },
+      {
+        "label": "Group rebalances",
+        "normal": "normal: almost never"
+      },
+      {
+        "label": "DB query p99",
+        "normal": "normal: about 45 ms"
+      }
+    ],
+    "learn": [
+      "why a slow worker can look dead to Kafka",
+      "why a rebalance makes the next one more likely",
+      "how batch size, timeouts and rebalancing mode fit together"
+    ],
+    "layout": {
+      "columns": 2,
+      "rows": 4
+    }
+  },
+  "components": {
+    "nodes": [
+      {
+        "id": "checkout",
+        "label": "checkout-api",
+        "kind": "service",
+        "details": [
+          {
+            "label": "Produce rate",
+            "metric": "produced"
+          },
+          {
+            "label": "Producer acks",
+            "text": "all",
+            "level": "deep"
+          },
+          {
+            "label": "Linger",
+            "text": "5 ms",
+            "level": "deep"
+          }
+        ]
+      },
+      {
+        "id": "topic",
+        "label": "orders topic",
+        "kind": "kafka-topic",
+        "part_cols": 2,
+        "parts": [
+          {
+            "id": "p0"
+          },
+          {
+            "id": "p1"
+          },
+          {
+            "id": "p2"
+          },
+          {
+            "id": "p3"
+          },
+          {
+            "id": "p4"
+          },
+          {
+            "id": "p5"
+          }
+        ],
+        "details": [
+          {
+            "label": "In",
+            "metric": "produced"
+          },
+          {
+            "label": "Out",
+            "metric": "consumed"
+          },
+          {
+            "label": "Lag",
+            "metric": "lag"
+          },
+          {
+            "label": "Partitions",
+            "text": "6 · RF 3",
+            "level": "deep"
+          },
+          {
+            "label": "Join / sync time",
+            "metric": "join_s",
+            "level": "deep"
+          },
+          {
+            "label": "Assignor",
+            "text": "range (eager)",
+            "level": "deep"
+          }
+        ]
+      },
+      {
+        "id": "w1",
+        "label": "payments-worker-1",
+        "kind": "consumer",
+        "details": [
+          {
+            "label": "Batch duration",
+            "metric": "batch_s"
+          },
+          {
+            "label": "CPU",
+            "metric": "worker_cpu"
+          },
+          {
+            "label": "Poll limit",
+            "text": "300 s",
+            "level": "deep"
+          },
+          {
+            "label": "Commit failures",
+            "metric": "commit_fail",
+            "level": "deep"
+          },
+          {
+            "label": "GC pause p99",
+            "metric": "gc_ms",
+            "level": "deep"
+          }
+        ]
+      },
+      {
+        "id": "w2",
+        "label": "payments-worker-2",
+        "kind": "consumer",
+        "details": [
+          {
+            "label": "Batch duration",
+            "metric": "batch_s"
+          },
+          {
+            "label": "CPU",
+            "metric": "worker_cpu"
+          },
+          {
+            "label": "Poll limit",
+            "text": "300 s",
+            "level": "deep"
+          },
+          {
+            "label": "Commit failures",
+            "metric": "commit_fail",
+            "level": "deep"
+          },
+          {
+            "label": "GC pause p99",
+            "metric": "gc_ms",
+            "level": "deep"
+          }
+        ]
+      },
+      {
+        "id": "w3",
+        "label": "payments-worker-3",
+        "kind": "consumer",
+        "details": [
+          {
+            "label": "Batch duration",
+            "metric": "batch_s"
+          },
+          {
+            "label": "CPU",
+            "metric": "worker_cpu"
+          },
+          {
+            "label": "Poll limit",
+            "text": "300 s",
+            "level": "deep"
+          },
+          {
+            "label": "Commit failures",
+            "metric": "commit_fail",
+            "level": "deep"
+          },
+          {
+            "label": "GC pause p99",
+            "metric": "gc_ms",
+            "level": "deep"
+          }
+        ]
+      },
+      {
+        "id": "db",
+        "label": "payments-db",
+        "kind": "postgres",
+        "details": [
+          {
+            "label": "Query p99",
+            "metric": "db_p99"
+          },
+          {
+            "label": "CPU",
+            "metric": "db_cpu"
+          },
+          {
+            "label": "Pool in use",
+            "metric": "pool",
+            "level": "deep"
+          },
+          {
+            "label": "Rows scanned / query",
+            "metric": "seq_rows",
+            "level": "deep"
+          },
+          {
+            "label": "Last change",
+            "text": "migration 0042",
+            "level": "deep"
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-in",
+        "from": "checkout",
+        "to": "topic"
+      },
+      {
+        "id": "e-w1",
+        "from": "topic",
+        "to": "w1"
+      },
+      {
+        "id": "e-w2",
+        "from": "topic",
+        "to": "w2"
+      },
+      {
+        "id": "e-w3",
+        "from": "topic",
+        "to": "w3"
+      },
+      {
+        "id": "e-d1",
+        "from": "w1",
+        "to": "db"
+      },
+      {
+        "id": "e-d2",
+        "from": "w2",
+        "to": "db"
+      },
+      {
+        "id": "e-d3",
+        "from": "w3",
+        "to": "db"
+      }
     ]
-   },
-   {
-    "id": "w1",
-    "label": "payments-worker-1",
-    "kind": "consumer"
-   },
-   {
-    "id": "w2",
-    "label": "payments-worker-2",
-    "kind": "consumer"
-   },
-   {
-    "id": "w3",
-    "label": "payments-worker-3",
-    "kind": "consumer"
-   },
-   {
-    "id": "db",
-    "label": "payments-db",
-    "kind": "postgres"
-   }
+  },
+  "metrics": [
+    {
+      "id": "lag",
+      "label": "Consumer lag",
+      "unit": "msgs",
+      "start": 300,
+      "noise": 0.04,
+      "normal": [
+        0,
+        2000
+      ]
+    },
+    {
+      "id": "produced",
+      "label": "Produced",
+      "unit": "msg/s",
+      "start": 1200,
+      "noise": 0.05
+    },
+    {
+      "id": "consumed",
+      "label": "Consumed",
+      "unit": "msg/s",
+      "start": 1200,
+      "noise": 0.05
+    },
+    {
+      "id": "db_p99",
+      "label": "DB query p99",
+      "unit": "ms",
+      "start": 45,
+      "noise": 0.08,
+      "normal": [
+        20,
+        80
+      ]
+    },
+    {
+      "id": "rebalances",
+      "label": "Rebalances",
+      "unit": "count",
+      "start": 0,
+      "noise": 0
+    },
+    {
+      "id": "dupes",
+      "label": "Reprocessed records",
+      "unit": "msg/s",
+      "start": 0,
+      "noise": 0.1,
+      "normal": [
+        0,
+        5
+      ]
+    },
+    {
+      "id": "worker_cpu",
+      "label": "Worker CPU",
+      "unit": "%",
+      "start": 35,
+      "noise": 0.05
+    },
+    {
+      "id": "db_cpu",
+      "label": "DB CPU",
+      "unit": "%",
+      "start": 25,
+      "noise": 0.05
+    },
+    {
+      "id": "batch_s",
+      "label": "Batch duration",
+      "unit": "s",
+      "start": 4,
+      "noise": 0.05
+    },
+    {
+      "id": "paused",
+      "label": "Workers paused",
+      "unit": "workers",
+      "start": 0,
+      "noise": 0.0
+    },
+    {
+      "id": "join_s",
+      "label": "Join / sync time",
+      "unit": "s",
+      "start": 0.4,
+      "noise": 0.05
+    },
+    {
+      "id": "pool",
+      "label": "DB pool in use",
+      "unit": "conns",
+      "start": 9,
+      "noise": 0.04
+    },
+    {
+      "id": "commit_fail",
+      "label": "Commit failures",
+      "unit": "fails/min",
+      "start": 0,
+      "noise": 0.05
+    },
+    {
+      "id": "gc_ms",
+      "label": "Worker GC pause p99",
+      "unit": "ms",
+      "start": 18,
+      "noise": 0.08
+    },
+    {
+      "id": "seq_rows",
+      "label": "Rows scanned per query",
+      "unit": "rows",
+      "start": 40,
+      "noise": 0.04
+    }
   ],
-  "edges": [
-   {
-    "id": "e-in",
-    "from": "checkout",
-    "to": "topic"
-   },
-   {
-    "id": "e-w1",
-    "from": "topic",
-    "to": "w1"
-   },
-   {
-    "id": "e-w2",
-    "from": "topic",
-    "to": "w2"
-   },
-   {
-    "id": "e-w3",
-    "from": "topic",
-    "to": "w3"
-   },
-   {
-    "id": "e-d1",
-    "from": "w1",
-    "to": "db"
-   },
-   {
-    "id": "e-d2",
-    "from": "w2",
-    "to": "db"
-   },
-   {
-    "id": "e-d3",
-    "from": "w3",
-    "to": "db"
-   }
-  ]
- },
- "metrics": [
-  {
-   "id": "lag",
-   "label": "Consumer lag",
-   "unit": "msgs",
-   "start": 300,
-   "noise": 0.04,
-   "normal": [
-    0,
-    2000
-   ]
+  "dashboard": [
+    {
+      "id": "lag",
+      "title": "Consumer lag",
+      "metrics": [
+        "lag"
+      ],
+      "threshold": {
+        "value": 20000,
+        "label": "alert 20k"
+      },
+      "why": "Messages waiting to be processed. Sustained growth means consumers are not keeping up.",
+      "component": "topic"
+    },
+    {
+      "id": "flow",
+      "title": "Throughput",
+      "metrics": [
+        "produced",
+        "consumed"
+      ],
+      "why": "Produced vs consumed. When consumed drops to zero, the whole group has stopped.",
+      "component": "topic"
+    },
+    {
+      "id": "db_p99",
+      "title": "DB query p99",
+      "metrics": [
+        "db_p99"
+      ],
+      "threshold": {
+        "value": 600,
+        "label": "per-record budget 600ms"
+      },
+      "why": "The slow dependency. Per-record time here decides how long a batch takes.",
+      "component": "db"
+    },
+    {
+      "id": "rebalances",
+      "title": "Group rebalances",
+      "metrics": [
+        "rebalances"
+      ],
+      "why": "Each rebalance stops every worker. Several close together is the storm.",
+      "component": "topic"
+    },
+    {
+      "id": "dupes",
+      "title": "Reprocessed records",
+      "metrics": [
+        "dupes"
+      ],
+      "why": "Records processed again after an uncommitted batch was lost: extra load on the database."
+    },
+    {
+      "id": "worker_cpu",
+      "title": "Worker CPU",
+      "metrics": [
+        "worker_cpu"
+      ],
+      "max": 100,
+      "why": "Workers are waiting on the database, not working, so CPU falls instead of rising."
+    },
+    {
+      "id": "db_cpu",
+      "title": "DB CPU",
+      "metrics": [
+        "db_cpu"
+      ],
+      "max": 100,
+      "why": "The real bottleneck. Replays and catch-up push it toward saturation.",
+      "component": "db"
+    },
+    {
+      "id": "batch_s",
+      "title": "Batch duration",
+      "metrics": [
+        "batch_s"
+      ],
+      "threshold": {
+        "value": 300,
+        "label": "max.poll.interval"
+      },
+      "why": "The number that triggers the failure: a batch longer than max.poll.interval gets the worker evicted."
+    },
+    {
+      "id": "paused",
+      "title": "Workers paused",
+      "metrics": [
+        "paused"
+      ],
+      "max": 3,
+      "why": "How many workers are stopped by a rebalance at once. Eager rebalancing pauses all of them."
+    },
+    {
+      "id": "join_s",
+      "title": "Rebalance join / sync time",
+      "metrics": [
+        "join_s"
+      ],
+      "component": "topic",
+      "level": "deep",
+      "why": "How long every worker stands still in an eager rebalance. Long syncs mean all consumption stops, not just the evicted worker's."
+    },
+    {
+      "id": "commit_fail",
+      "title": "Offset commit failures",
+      "metrics": [
+        "commit_fail"
+      ],
+      "component": "topic",
+      "level": "deep",
+      "why": "A commit that fails after a rebalance means the batch was processed but will be processed again: pure wasted work."
+    },
+    {
+      "id": "pool",
+      "title": "DB connection pool",
+      "metrics": [
+        "pool"
+      ],
+      "component": "db",
+      "level": "deep",
+      "max": 50,
+      "threshold": {
+        "value": 40,
+        "label": "pool max 40"
+      },
+      "why": "Replays and catch-up open more concurrent queries; a full pool makes every query wait, which slows batches further."
+    },
+    {
+      "id": "seq_rows",
+      "title": "Rows scanned per query",
+      "metrics": [
+        "seq_rows"
+      ],
+      "component": "db",
+      "level": "deep",
+      "why": "The missing index forces a scan of the fraud_score table on each record. This is the root of the slow query."
+    },
+    {
+      "id": "gc_ms",
+      "title": "Worker GC pause p99",
+      "metrics": [
+        "gc_ms"
+      ],
+      "level": "deep",
+      "why": "Rules out the usual suspect: if GC were the problem, pauses would be in seconds. They stay small, so the workers are not dead, just waiting on the DB."
+    }
+  ],
+  "alerts": [
+    {
+      "id": "lag-high",
+      "metric": "lag",
+      "op": ">",
+      "value": 20000,
+      "for_s": 20,
+      "severity": "critical",
+      "component": "topic",
+      "summary": "payments consumer lag > 20k"
+    },
+    {
+      "id": "db-slow",
+      "metric": "db_p99",
+      "op": ">",
+      "value": 500,
+      "for_s": 30,
+      "severity": "warning",
+      "component": "db",
+      "summary": "payments-db p99 > 500ms"
+    }
+  ],
+  "initial": {
+    "effects": [
+      {
+        "target": "topic/p0",
+        "color": "teal",
+        "intensity": 0.5,
+        "label": "w1"
+      },
+      {
+        "target": "topic/p1",
+        "color": "teal",
+        "intensity": 0.5,
+        "label": "w1"
+      },
+      {
+        "target": "topic/p2",
+        "color": "violet",
+        "intensity": 0.5,
+        "label": "w2"
+      },
+      {
+        "target": "topic/p3",
+        "color": "violet",
+        "intensity": 0.5,
+        "label": "w2"
+      },
+      {
+        "target": "topic/p4",
+        "color": "pink",
+        "intensity": 0.5,
+        "label": "w3"
+      },
+      {
+        "target": "topic/p5",
+        "color": "pink",
+        "intensity": 0.5,
+        "label": "w3"
+      },
+      {
+        "target": "w1",
+        "color": "teal",
+        "intensity": 0.15,
+        "badge": "p0 p1"
+      },
+      {
+        "target": "w2",
+        "color": "violet",
+        "intensity": 0.15,
+        "badge": "p2 p3"
+      },
+      {
+        "target": "w3",
+        "color": "pink",
+        "intensity": 0.15,
+        "badge": "p4 p5"
+      },
+      {
+        "target": "db",
+        "label": "v0041"
+      },
+      {
+        "target": "e-in",
+        "flow": 0.6
+      },
+      {
+        "target": "e-w1",
+        "flow": 0.4,
+        "color": "teal"
+      },
+      {
+        "target": "e-w2",
+        "flow": 0.4,
+        "color": "violet"
+      },
+      {
+        "target": "e-w3",
+        "flow": 0.4,
+        "color": "pink"
+      },
+      {
+        "target": "e-d1",
+        "flow": 0.3
+      },
+      {
+        "target": "e-d2",
+        "flow": 0.3
+      },
+      {
+        "target": "e-d3",
+        "flow": 0.3
+      }
+    ]
   },
-  {
-   "id": "produced",
-   "label": "Produced",
-   "unit": "msg/s",
-   "start": 1200,
-   "noise": 0.05
-  },
-  {
-   "id": "consumed",
-   "label": "Consumed",
-   "unit": "msg/s",
-   "start": 1200,
-   "noise": 0.05
-  },
-  {
-   "id": "db_p99",
-   "label": "DB query p99",
-   "unit": "ms",
-   "start": 45,
-   "noise": 0.08,
-   "normal": [
-    20,
-    80
-   ]
-  },
-  {
-   "id": "rebalances",
-   "label": "Rebalances",
-   "unit": "count",
-   "start": 0,
-   "noise": 0
-  },
-  {
-   "id": "dupes",
-   "label": "Reprocessed records",
-   "unit": "msg/s",
-   "start": 0,
-   "noise": 0.1,
-   "normal": [
-    0,
-    5
-   ]
-  },
-  {
-   "id": "worker_cpu",
-   "label": "Worker CPU",
-   "unit": "%",
-   "start": 35,
-   "noise": 0.05
-  },
-  {
-   "id": "db_cpu",
-   "label": "DB CPU",
-   "unit": "%",
-   "start": 25,
-   "noise": 0.05
-  },
-  {
-   "id": "batch_s",
-   "label": "Batch duration",
-   "unit": "s",
-   "start": 4,
-   "noise": 0.05
-  },
-  {
-   "id": "paused",
-   "label": "Workers paused",
-   "unit": "workers",
-   "start": 0,
-   "noise": 0.0
+  "timeline": [
+    {
+      "t": 3,
+      "title": "Meet the system",
+      "beat": {
+        "notes": [
+          {
+            "panel": "flow",
+            "text": "Produced and consumed both near 1,000 msg/s: workers keep pace"
+          },
+          {
+            "panel": "lag",
+            "text": "Lag near zero: every batch commits well inside the deadline"
+          }
+        ],
+        "focus": [
+          "topic",
+          "w1",
+          "w2",
+          "w3"
+        ],
+        "hint": "Orders land on a 6-partition topic. Three payment workers share the partitions, two each, shown by colour. Each worker polls a batch of up to 500 records, processes them one by one against Postgres, then commits its offset.",
+        "deep": "Each worker polls 500 records, then must poll again within max.poll.interval.ms=300000. Heartbeats run on a separate thread, so a slow loop is the only way to look dead."
+      }
+    },
+    {
+      "t": 40,
+      "title": "Migration 0042 deployed",
+      "feed": {
+        "from": "deploy-bot",
+        "kind": "deploy",
+        "text": "payments-db: migration 0042 adds fraud_score lookup (no index yet)"
+      },
+      "effects": [
+        {
+          "target": "db",
+          "label": "v0042"
+        }
+      ],
+      "metrics": [
+        {
+          "id": "db_p99",
+          "to": 650,
+          "over_s": 45,
+          "shape": "ease"
+        },
+        {
+          "id": "worker_cpu",
+          "to": 22,
+          "over_s": 30
+        },
+        {
+          "id": "db_cpu",
+          "to": 78,
+          "over_s": 30
+        },
+        {
+          "id": "batch_s",
+          "to": 290,
+          "over_s": 55,
+          "shape": "linear"
+        },
+        {
+          "id": "seq_rows",
+          "to": 180000,
+          "over_s": 10,
+          "shape": "step"
+        },
+        {
+          "id": "pool",
+          "to": 16,
+          "over_s": 30
+        }
+      ]
+    },
+    {
+      "t": 44,
+      "feed": {
+        "from": "postgres",
+        "kind": "log",
+        "text": "LOG: duration: 612.4 ms  statement: SELECT score FROM fraud_score WHERE order_id = $1  (Seq Scan on fraud_score, rows=181,204)",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 55,
+      "feed": {
+        "from": "Ana · terminal",
+        "kind": "chat",
+        "text": "$ psql -c \"EXPLAIN ANALYZE SELECT score FROM fraud_score WHERE order_id = 42\"  → Seq Scan, 611 ms",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 62,
+      "feed": {
+        "from": "Ana · #payments-oncall",
+        "kind": "chat",
+        "text": "db looks a bit slower since the migration, but nothing is failing. keeping an eye on it"
+      },
+      "effects": [
+        {
+          "target": "db",
+          "color": "amber",
+          "intensity": 0.5
+        }
+      ],
+      "metrics": [
+        {
+          "id": "consumed",
+          "to": 900,
+          "over_s": 30
+        },
+        {
+          "id": "lag",
+          "to": 6000,
+          "over_s": 38,
+          "shape": "linear"
+        },
+        {
+          "id": "gc_ms",
+          "to": 24,
+          "over_s": 30
+        }
+      ]
+    },
+    {
+      "t": 85,
+      "title": "Worker 2's batch runs long",
+      "effects": [
+        {
+          "target": "w2",
+          "color": "amber",
+          "intensity": 0.6,
+          "pulse": true,
+          "label": "batch: 5m 20s of 5m limit"
+        }
+      ],
+      "feed": {
+        "from": "payments-worker-2",
+        "kind": "log",
+        "text": "WARN batch of 500 still processing after 280s"
+      }
+    },
+    {
+      "t": 92,
+      "feed": {
+        "from": "payments-worker-2",
+        "kind": "log",
+        "text": "DEBUG poll() not called for 291s (max.poll.interval.ms=300000); heartbeat thread still alive",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 100,
+      "title": "Worker 2 evicted, rebalance #1",
+      "feed": {
+        "from": "kafka coordinator",
+        "kind": "log",
+        "text": "Member payments-worker-2 removed from group: max.poll.interval.ms (300000) exceeded. Rebalancing (eager)."
+      },
+      "effects": [
+        {
+          "target": "w2",
+          "color": "red",
+          "intensity": 0.7,
+          "pulse": false,
+          "label": "evicted",
+          "badge": "—"
+        },
+        {
+          "target": "w1",
+          "color": "grey",
+          "intensity": 0.4,
+          "label": "paused: rebalancing",
+          "badge": "—"
+        },
+        {
+          "target": "w3",
+          "color": "grey",
+          "intensity": 0.4,
+          "label": "paused: rebalancing",
+          "badge": "—"
+        },
+        {
+          "target": "topic/p0",
+          "color": "grey",
+          "intensity": 0.3,
+          "label": "revoked"
+        },
+        {
+          "target": "topic/p1",
+          "color": "grey",
+          "intensity": 0.3,
+          "label": "revoked"
+        },
+        {
+          "target": "topic/p2",
+          "color": "grey",
+          "intensity": 0.3,
+          "label": "revoked"
+        },
+        {
+          "target": "topic/p3",
+          "color": "grey",
+          "intensity": 0.3,
+          "label": "revoked"
+        },
+        {
+          "target": "topic/p4",
+          "color": "grey",
+          "intensity": 0.3,
+          "label": "revoked"
+        },
+        {
+          "target": "topic/p5",
+          "color": "grey",
+          "intensity": 0.3,
+          "label": "revoked"
+        },
+        {
+          "target": "e-w1",
+          "flow": 0
+        },
+        {
+          "target": "e-w2",
+          "flow": 0
+        },
+        {
+          "target": "e-w3",
+          "flow": 0
+        },
+        {
+          "target": "e-d1",
+          "flow": 0
+        },
+        {
+          "target": "e-d2",
+          "flow": 0
+        },
+        {
+          "target": "e-d3",
+          "flow": 0
+        }
+      ],
+      "metrics": [
+        {
+          "id": "consumed",
+          "to": 0,
+          "over_s": 3,
+          "shape": "linear"
+        },
+        {
+          "id": "rebalances",
+          "to": 1,
+          "shape": "step"
+        },
+        {
+          "id": "lag",
+          "to": 24000,
+          "over_s": 25,
+          "shape": "linear"
+        },
+        {
+          "id": "db_p99",
+          "to": 300,
+          "over_s": 15
+        },
+        {
+          "id": "db_cpu",
+          "to": 92,
+          "over_s": 40
+        },
+        {
+          "id": "paused",
+          "to": 3,
+          "over_s": 1,
+          "shape": "step"
+        },
+        {
+          "id": "join_s",
+          "to": 22,
+          "over_s": 4,
+          "shape": "step"
+        },
+        {
+          "id": "commit_fail",
+          "to": 160,
+          "over_s": 6
+        }
+      ],
+      "beat": {
+        "notes": [
+          {
+            "panel": "flow",
+            "metric": "consumed",
+            "text": "Consumed drops to 0: eager rebalance revoked every partition"
+          },
+          {
+            "panel": "rebalances",
+            "text": "Rebalance #1: worker 2 missed max.poll.interval.ms, not a crash"
+          },
+          {
+            "panel": "lag",
+            "text": "Lag climbs fast: producers continue while nobody consumes"
+          },
+          {
+            "panel": "join_s",
+            "text": "every worker stops ~22 s to re-sync"
+          }
+        ],
+        "focus": [
+          "w2",
+          "topic",
+          "w1",
+          "w3",
+          "panel:flow",
+          "panel:rebalances"
+        ],
+        "hint": "Worker 2 didn't crash. It took longer than max.poll.interval.ms (5 minutes) to finish its batch, so the coordinator assumed it was dead. With the eager protocol, every worker then gives up all its partitions, not just worker 2. Consumption drops to zero for the whole group.",
+        "deep": "Range assignor + eager protocol: all 6 partitions are revoked from all 3 workers, the group re-joins and syncs (≈22 s here) before anyone consumes again."
+      }
+    },
+    {
+      "t": 104,
+      "feed": {
+        "from": "payments-worker-1",
+        "kind": "log",
+        "text": "INFO Revoking previously assigned partitions [orders-0, orders-1] (generation 7)",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 125,
+      "title": "Rebalance #1 done, work is redone",
+      "feed": {
+        "from": "kafka coordinator",
+        "kind": "log",
+        "text": "Group stabilised (generation 8). payments-worker-2 rejoined. Resuming from last committed offsets."
+      },
+      "effects": [
+        {
+          "target": "w1",
+          "color": "teal",
+          "intensity": 0.15,
+          "label": null,
+          "badge": "p0 p1"
+        },
+        {
+          "target": "w2",
+          "color": "violet",
+          "intensity": 0.15,
+          "label": "replaying uncommitted batch",
+          "badge": "p2 p3"
+        },
+        {
+          "target": "w3",
+          "color": "pink",
+          "intensity": 0.15,
+          "label": null,
+          "badge": "p4 p5"
+        },
+        {
+          "target": "topic/p0",
+          "color": "teal",
+          "intensity": 0.5,
+          "label": "w1"
+        },
+        {
+          "target": "topic/p1",
+          "color": "teal",
+          "intensity": 0.5,
+          "label": "w1"
+        },
+        {
+          "target": "topic/p2",
+          "color": "violet",
+          "intensity": 0.8,
+          "label": "w2 ↺"
+        },
+        {
+          "target": "topic/p3",
+          "color": "violet",
+          "intensity": 0.8,
+          "label": "w2 ↺"
+        },
+        {
+          "target": "topic/p4",
+          "color": "pink",
+          "intensity": 0.5,
+          "label": "w3"
+        },
+        {
+          "target": "topic/p5",
+          "color": "pink",
+          "intensity": 0.5,
+          "label": "w3"
+        },
+        {
+          "target": "e-w1",
+          "flow": 0.5
+        },
+        {
+          "target": "e-w2",
+          "flow": 0.6,
+          "reverse": 0.3
+        },
+        {
+          "target": "e-w3",
+          "flow": 0.5
+        },
+        {
+          "target": "e-d1",
+          "flow": 0.5
+        },
+        {
+          "target": "e-d2",
+          "flow": 0.7
+        },
+        {
+          "target": "e-d3",
+          "flow": 0.5
+        },
+        {
+          "target": "db",
+          "color": "red",
+          "intensity": 0.6,
+          "pulse": true
+        }
+      ],
+      "metrics": [
+        {
+          "id": "consumed",
+          "to": 1050,
+          "over_s": 10
+        },
+        {
+          "id": "dupes",
+          "to": 420,
+          "over_s": 8
+        },
+        {
+          "id": "db_p99",
+          "to": 920,
+          "over_s": 25
+        },
+        {
+          "id": "lag",
+          "to": 29000,
+          "over_s": 70,
+          "shape": "linear"
+        },
+        {
+          "id": "paused",
+          "to": 0,
+          "over_s": 1,
+          "shape": "step"
+        },
+        {
+          "id": "join_s",
+          "to": 0.4,
+          "over_s": 2,
+          "shape": "step"
+        },
+        {
+          "id": "pool",
+          "to": 36,
+          "over_s": 15
+        },
+        {
+          "id": "commit_fail",
+          "to": 20,
+          "over_s": 20
+        }
+      ]
+    },
+    {
+      "t": 128,
+      "feed": {
+        "from": "payments-worker-2",
+        "kind": "log",
+        "text": "ERROR CommitFailedException: group has already rebalanced and assigned the partitions to another member",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 140,
+      "title": "The redo makes it worse",
+      "beat": {
+        "notes": [
+          {
+            "panel": "dupes",
+            "text": "500 uncommitted records replayed after the rebalance"
+          },
+          {
+            "panel": "db_p99",
+            "text": "p99 past budget: replay and catch-up pile onto a slow DB"
+          },
+          {
+            "panel": "pool",
+            "text": "replays push the pool toward its 40 max"
+          }
+        ],
+        "focus": [
+          "db",
+          "w2",
+          "panel:db_p99",
+          "panel:dupes"
+        ],
+        "hint": "Worker 2 never committed that batch, so after the rebalance those 500 records are processed again. Replay plus catch-up pushes extra load into an already slow database, and every batch now takes even longer.",
+        "deep": "The replayed records hit the same unindexed query. Pool use climbs toward its 40-connection limit, so queries also queue for a connection."
+      }
+    },
+    {
+      "t": 150,
+      "feed": {
+        "from": "postgres",
+        "kind": "log",
+        "text": "FATAL: remaining connection slots are reserved for non-replication superuser connections",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 170,
+      "effects": [
+        {
+          "target": "w3",
+          "color": "amber",
+          "intensity": 0.6,
+          "pulse": true,
+          "label": "batch: 5m 40s of 5m limit"
+        }
+      ],
+      "feed": {
+        "from": "payments-worker-3",
+        "kind": "log",
+        "text": "WARN batch of 500 still processing after 290s"
+      }
+    },
+    {
+      "t": 195,
+      "title": "Worker 3 evicted, rebalance #2",
+      "feed": {
+        "from": "kafka coordinator",
+        "kind": "log",
+        "text": "Member payments-worker-3 removed from group: max.poll.interval.ms exceeded. Rebalancing (eager)."
+      },
+      "effects": [
+        {
+          "target": "w3",
+          "color": "red",
+          "intensity": 0.7,
+          "pulse": false,
+          "label": "evicted",
+          "badge": "—"
+        },
+        {
+          "target": "w1",
+          "color": "grey",
+          "intensity": 0.4,
+          "label": "paused: rebalancing",
+          "badge": "—"
+        },
+        {
+          "target": "w2",
+          "color": "grey",
+          "intensity": 0.4,
+          "label": "paused: rebalancing",
+          "badge": "—"
+        },
+        {
+          "target": "topic/p0",
+          "color": "grey",
+          "intensity": 0.3,
+          "label": "revoked"
+        },
+        {
+          "target": "topic/p1",
+          "color": "grey",
+          "intensity": 0.3,
+          "label": "revoked"
+        },
+        {
+          "target": "topic/p2",
+          "color": "grey",
+          "intensity": 0.3,
+          "label": "revoked"
+        },
+        {
+          "target": "topic/p3",
+          "color": "grey",
+          "intensity": 0.3,
+          "label": "revoked"
+        },
+        {
+          "target": "topic/p4",
+          "color": "grey",
+          "intensity": 0.3,
+          "label": "revoked"
+        },
+        {
+          "target": "topic/p5",
+          "color": "grey",
+          "intensity": 0.3,
+          "label": "revoked"
+        },
+        {
+          "target": "e-w1",
+          "flow": 0,
+          "reverse": 0
+        },
+        {
+          "target": "e-w2",
+          "flow": 0,
+          "reverse": 0
+        },
+        {
+          "target": "e-w3",
+          "flow": 0
+        },
+        {
+          "target": "e-d1",
+          "flow": 0
+        },
+        {
+          "target": "e-d2",
+          "flow": 0
+        },
+        {
+          "target": "e-d3",
+          "flow": 0
+        }
+      ],
+      "metrics": [
+        {
+          "id": "consumed",
+          "to": 0,
+          "over_s": 3,
+          "shape": "linear"
+        },
+        {
+          "id": "rebalances",
+          "to": 2,
+          "shape": "step"
+        },
+        {
+          "id": "dupes",
+          "to": 0,
+          "over_s": 4
+        },
+        {
+          "id": "lag",
+          "to": 52000,
+          "over_s": 30,
+          "shape": "linear"
+        },
+        {
+          "id": "paused",
+          "to": 3,
+          "over_s": 1,
+          "shape": "step"
+        },
+        {
+          "id": "join_s",
+          "to": 28,
+          "over_s": 4,
+          "shape": "step"
+        },
+        {
+          "id": "commit_fail",
+          "to": 210,
+          "over_s": 6
+        },
+        {
+          "id": "pool",
+          "to": 39,
+          "over_s": 20
+        }
+      ]
+    },
+    {
+      "t": 205,
+      "feed": {
+        "from": "Ana · terminal",
+        "kind": "chat",
+        "text": "$ kafka-consumer-groups --describe --group payments  → 3 members, state PreparingRebalance, lag 52,112",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 212,
+      "feed": {
+        "from": "Ana · #payments-oncall",
+        "kind": "chat",
+        "text": "workers keep dropping out and rejoining. should I scale the group to 6 workers to burn down the lag?"
+      }
+    },
+    {
+      "t": 225,
+      "title": "Rebalance #2 done",
+      "feed": {
+        "from": "kafka coordinator",
+        "kind": "log",
+        "text": "Group stabilised (generation 9). payments-worker-3 rejoined."
+      },
+      "effects": [
+        {
+          "target": "w1",
+          "color": "amber",
+          "intensity": 0.5,
+          "pulse": true,
+          "label": "batch: 4m 50s of 5m limit",
+          "badge": "p0 p1"
+        },
+        {
+          "target": "w2",
+          "color": "violet",
+          "intensity": 0.15,
+          "label": null,
+          "badge": "p2 p3"
+        },
+        {
+          "target": "w3",
+          "color": "pink",
+          "intensity": 0.15,
+          "label": "replaying uncommitted batch",
+          "badge": "p4 p5"
+        },
+        {
+          "target": "topic/p0",
+          "color": "teal",
+          "intensity": 0.5,
+          "label": "w1"
+        },
+        {
+          "target": "topic/p1",
+          "color": "teal",
+          "intensity": 0.5,
+          "label": "w1"
+        },
+        {
+          "target": "topic/p2",
+          "color": "violet",
+          "intensity": 0.5,
+          "label": "w2"
+        },
+        {
+          "target": "topic/p3",
+          "color": "violet",
+          "intensity": 0.5,
+          "label": "w2"
+        },
+        {
+          "target": "topic/p4",
+          "color": "pink",
+          "intensity": 0.8,
+          "label": "w3 ↺"
+        },
+        {
+          "target": "topic/p5",
+          "color": "pink",
+          "intensity": 0.8,
+          "label": "w3 ↺"
+        },
+        {
+          "target": "e-w1",
+          "flow": 0.5
+        },
+        {
+          "target": "e-w2",
+          "flow": 0.5
+        },
+        {
+          "target": "e-w3",
+          "flow": 0.6,
+          "reverse": 0.3
+        },
+        {
+          "target": "e-d1",
+          "flow": 0.6
+        },
+        {
+          "target": "e-d2",
+          "flow": 0.5
+        },
+        {
+          "target": "e-d3",
+          "flow": 0.7
+        }
+      ],
+      "metrics": [
+        {
+          "id": "consumed",
+          "to": 1000,
+          "over_s": 10
+        },
+        {
+          "id": "dupes",
+          "to": 450,
+          "over_s": 8
+        },
+        {
+          "id": "db_p99",
+          "to": 1100,
+          "over_s": 20
+        },
+        {
+          "id": "lag",
+          "to": 56000,
+          "over_s": 25,
+          "shape": "linear"
+        },
+        {
+          "id": "paused",
+          "to": 0,
+          "over_s": 1,
+          "shape": "step"
+        },
+        {
+          "id": "join_s",
+          "to": 0.4,
+          "over_s": 2,
+          "shape": "step"
+        },
+        {
+          "id": "commit_fail",
+          "to": 30,
+          "over_s": 20
+        }
+      ]
+    },
+    {
+      "t": 232,
+      "feed": {
+        "from": "payments-worker-3",
+        "kind": "log",
+        "text": "INFO GC pause (G1 Young) 21ms; heap 41% — not the cause",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 250,
+      "title": "Worker 1 evicted, rebalance #3",
+      "feed": {
+        "from": "kafka coordinator",
+        "kind": "log",
+        "text": "Member payments-worker-1 removed from group: max.poll.interval.ms exceeded. Rebalancing (eager)."
+      },
+      "effects": [
+        {
+          "target": "w1",
+          "color": "red",
+          "intensity": 0.7,
+          "pulse": false,
+          "label": "evicted",
+          "badge": "—"
+        },
+        {
+          "target": "w2",
+          "color": "grey",
+          "intensity": 0.4,
+          "label": "paused: rebalancing",
+          "badge": "—"
+        },
+        {
+          "target": "w3",
+          "color": "grey",
+          "intensity": 0.4,
+          "label": "paused: rebalancing",
+          "badge": "—"
+        },
+        {
+          "target": "topic/p0",
+          "color": "grey",
+          "intensity": 0.3,
+          "label": "revoked"
+        },
+        {
+          "target": "topic/p1",
+          "color": "grey",
+          "intensity": 0.3,
+          "label": "revoked"
+        },
+        {
+          "target": "topic/p2",
+          "color": "grey",
+          "intensity": 0.3,
+          "label": "revoked"
+        },
+        {
+          "target": "topic/p3",
+          "color": "grey",
+          "intensity": 0.3,
+          "label": "revoked"
+        },
+        {
+          "target": "topic/p4",
+          "color": "grey",
+          "intensity": 0.3,
+          "label": "revoked"
+        },
+        {
+          "target": "topic/p5",
+          "color": "grey",
+          "intensity": 0.3,
+          "label": "revoked"
+        },
+        {
+          "target": "e-w1",
+          "flow": 0
+        },
+        {
+          "target": "e-w2",
+          "flow": 0
+        },
+        {
+          "target": "e-w3",
+          "flow": 0,
+          "reverse": 0
+        },
+        {
+          "target": "e-d1",
+          "flow": 0
+        },
+        {
+          "target": "e-d2",
+          "flow": 0
+        },
+        {
+          "target": "e-d3",
+          "flow": 0
+        }
+      ],
+      "metrics": [
+        {
+          "id": "consumed",
+          "to": 0,
+          "over_s": 3,
+          "shape": "linear"
+        },
+        {
+          "id": "rebalances",
+          "to": 3,
+          "shape": "step"
+        },
+        {
+          "id": "dupes",
+          "to": 0,
+          "over_s": 4
+        },
+        {
+          "id": "lag",
+          "to": 80000,
+          "over_s": 30,
+          "shape": "linear"
+        },
+        {
+          "id": "paused",
+          "to": 3,
+          "over_s": 1,
+          "shape": "step"
+        },
+        {
+          "id": "join_s",
+          "to": 31,
+          "over_s": 4,
+          "shape": "step"
+        },
+        {
+          "id": "commit_fail",
+          "to": 240,
+          "over_s": 6
+        },
+        {
+          "id": "pool",
+          "to": 40,
+          "over_s": 10
+        }
+      ],
+      "beat": {
+        "notes": [
+          {
+            "panel": "rebalances",
+            "text": "Third rebalance in 150s: each eviction slows the next batch"
+          },
+          {
+            "panel": "lag",
+            "text": "Lag ratchets up with every stall and never drains"
+          },
+          {
+            "panel": "commit_fail",
+            "text": "done work thrown away, then redone"
+          }
+        ],
+        "focus": [
+          "panel:rebalances",
+          "panel:lag",
+          "w1",
+          "feed"
+        ],
+        "hint": "This is a rebalance storm. Each rebalance creates more lag and more replayed work, which makes the next batch slower, which gets the next worker evicted. Scaling to 6 workers, as Ana suggested, would trigger yet another rebalance and add load to the database that is the real bottleneck.",
+        "deep": "Commits after each eviction fail with CommitFailedException: the work was done, then handed to another member and done again."
+      }
+    },
+    {
+      "t": 262,
+      "feed": {
+        "from": "Ana · terminal",
+        "kind": "chat",
+        "text": "$ grep max.poll /etc/payments/consumer.properties  → max.poll.records=500, max.poll.interval.ms=300000",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 270,
+      "metrics": [
+        {
+          "id": "paused",
+          "to": 0,
+          "over_s": 1,
+          "shape": "step"
+        },
+        {
+          "id": "join_s",
+          "to": 0.4,
+          "over_s": 2,
+          "shape": "step"
+        }
+      ]
+    },
+    {
+      "t": 280,
+      "title": "Smaller batches + missing index",
+      "feed": {
+        "from": "Ana · #payments-oncall",
+        "kind": "deploy",
+        "text": "max.poll.records 500 → 50, and CREATE INDEX CONCURRENTLY on fraud_score lookup"
+      },
+      "effects": [
+        {
+          "target": "w1",
+          "color": "teal",
+          "intensity": 0.15,
+          "label": "batch: 3s of 5m limit",
+          "badge": "p0 p1"
+        },
+        {
+          "target": "w2",
+          "color": "violet",
+          "intensity": 0.15,
+          "label": "batch: 3s of 5m limit",
+          "badge": "p2 p3"
+        },
+        {
+          "target": "w3",
+          "color": "pink",
+          "intensity": 0.15,
+          "label": "batch: 3s of 5m limit",
+          "badge": "p4 p5"
+        },
+        {
+          "target": "topic/p0",
+          "color": "teal",
+          "intensity": 0.5,
+          "label": "w1"
+        },
+        {
+          "target": "topic/p1",
+          "color": "teal",
+          "intensity": 0.5,
+          "label": "w1"
+        },
+        {
+          "target": "topic/p2",
+          "color": "violet",
+          "intensity": 0.5,
+          "label": "w2"
+        },
+        {
+          "target": "topic/p3",
+          "color": "violet",
+          "intensity": 0.5,
+          "label": "w2"
+        },
+        {
+          "target": "topic/p4",
+          "color": "pink",
+          "intensity": 0.5,
+          "label": "w3"
+        },
+        {
+          "target": "topic/p5",
+          "color": "pink",
+          "intensity": 0.5,
+          "label": "w3"
+        },
+        {
+          "target": "e-w1",
+          "flow": 0.9
+        },
+        {
+          "target": "e-w2",
+          "flow": 0.9
+        },
+        {
+          "target": "e-w3",
+          "flow": 0.9
+        },
+        {
+          "target": "e-d1",
+          "flow": 0.7
+        },
+        {
+          "target": "e-d2",
+          "flow": 0.7
+        },
+        {
+          "target": "e-d3",
+          "flow": 0.7
+        },
+        {
+          "target": "db",
+          "color": "amber",
+          "intensity": 0.3,
+          "pulse": false,
+          "label": "v0042 + index"
+        }
+      ],
+      "metrics": [
+        {
+          "id": "db_p99",
+          "to": 60,
+          "over_s": 40
+        },
+        {
+          "id": "consumed",
+          "to": 2600,
+          "over_s": 25
+        },
+        {
+          "id": "lag",
+          "to": 400,
+          "over_s": 100
+        },
+        {
+          "id": "dupes",
+          "to": 0,
+          "over_s": 10
+        },
+        {
+          "id": "worker_cpu",
+          "to": 40,
+          "over_s": 15
+        },
+        {
+          "id": "db_cpu",
+          "to": 35,
+          "over_s": 20
+        },
+        {
+          "id": "batch_s",
+          "to": 33,
+          "over_s": 5
+        },
+        {
+          "id": "seq_rows",
+          "to": 40,
+          "over_s": 30
+        },
+        {
+          "id": "pool",
+          "to": 14,
+          "over_s": 40
+        },
+        {
+          "id": "commit_fail",
+          "to": 0,
+          "over_s": 20
+        }
+      ]
+    },
+    {
+      "t": 285,
+      "feed": {
+        "from": "postgres",
+        "kind": "log",
+        "text": "LOG: CREATE INDEX CONCURRENTLY fraud_score_order_id_idx ... done in 38s",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 290,
+      "title": "Why the fix works",
+      "beat": {
+        "notes": [
+          {
+            "panel": "flow",
+            "metric": "consumed",
+            "text": "Consumed overtakes produced: 50-record polls finish in seconds"
+          },
+          {
+            "panel": "lag",
+            "text": "Lag drains now that consumption outpaces production"
+          },
+          {
+            "panel": "db_p99",
+            "text": "p99 falls to ~60ms once the missing index exists"
+          },
+          {
+            "panel": "seq_rows",
+            "text": "index: 180k rows scanned → 40"
+          }
+        ],
+        "focus": [
+          "w1",
+          "w2",
+          "w3",
+          "panel:lag",
+          "panel:flow"
+        ],
+        "hint": "With 50 records per poll, a batch finishes in seconds, far inside the 5-minute deadline, so nobody is mistaken for dead. The index removes the real slowness. Consumption now runs above production, so the lag drains.",
+        "deep": "The index turns a 180k-row scan into an index lookup; 50 records × ~60 ms ≈ 3 s per batch, two orders of magnitude under the 300 s limit."
+      }
+    },
+    {
+      "t": 305,
+      "feed": {
+        "from": "payments-worker-1",
+        "kind": "log",
+        "text": "INFO batch of 50 committed in 3.1s (generation 10, no rebalance since fix)",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 330,
+      "metrics": [
+        {
+          "id": "gc_ms",
+          "to": 18,
+          "over_s": 30
+        }
+      ]
+    },
+    {
+      "t": 385,
+      "feed": {
+        "from": "Ana · #payments-oncall",
+        "kind": "chat",
+        "text": "lag is back to normal. writing up the postmortem"
+      },
+      "effects": [
+        {
+          "target": "db",
+          "color": null,
+          "intensity": 0
+        },
+        {
+          "target": "e-w1",
+          "flow": 0.4
+        },
+        {
+          "target": "e-w2",
+          "flow": 0.4
+        },
+        {
+          "target": "e-w3",
+          "flow": 0.4
+        },
+        {
+          "target": "e-d1",
+          "flow": 0.3
+        },
+        {
+          "target": "e-d2",
+          "flow": 0.3
+        },
+        {
+          "target": "e-d3",
+          "flow": 0.3
+        },
+        {
+          "target": "w1",
+          "label": null
+        },
+        {
+          "target": "w2",
+          "label": null
+        },
+        {
+          "target": "w3",
+          "label": null
+        }
+      ],
+      "metrics": [
+        {
+          "id": "consumed",
+          "to": 1200,
+          "over_s": 15
+        },
+        {
+          "id": "worker_cpu",
+          "to": 35,
+          "over_s": 15
+        }
+      ]
+    },
+    {
+      "t": 400,
+      "title": "Recovered",
+      "beat": {
+        "notes": [
+          {
+            "panel": "lag",
+            "text": "Lag back near zero: the group keeps up again"
+          },
+          {
+            "panel": "db_p99",
+            "text": "DB p99 steady within budget: the root cause is gone"
+          }
+        ],
+        "focus": [
+          "topic",
+          "w1",
+          "w2",
+          "w3",
+          "db"
+        ],
+        "hint": "Nothing crashed and no one made a bad call in the moment. A slower dependency quietly pushed batch time past a timeout, and the group's own recovery mechanism amplified it. The report has the takeaways.",
+        "deep": "Worth adding: partition.assignment.strategy=CooperativeStickyAssignor and group.instance.id (static membership) so one slow worker cannot stop the others."
+      }
+    }
+  ],
+  "report": {
+    "tldr": "A slow query made batches outlast the 5-minute poll deadline. Kafka evicted healthy workers, and each eager rebalance made the next eviction more likely: a storm.",
+    "fix_t": 280,
+    "chain": [
+      {
+        "id": "slow",
+        "kind": "cause",
+        "text": "Migration 0042: query ~650ms slower"
+      },
+      {
+        "id": "batch",
+        "kind": "effect",
+        "text": "500-record batch > max.poll.interval"
+      },
+      {
+        "id": "evict",
+        "kind": "effect",
+        "text": "Healthy worker evicted as dead"
+      },
+      {
+        "id": "stop",
+        "kind": "amp",
+        "text": "Eager rebalance stops every worker"
+      },
+      {
+        "id": "replay",
+        "kind": "amp",
+        "text": "Replay + lag load the slow DB"
+      },
+      {
+        "id": "fix",
+        "kind": "fix",
+        "text": "Fix: 50-record batches + index"
+      }
+    ],
+    "loop": {
+      "from": "replay",
+      "to": "batch",
+      "label": "storm: batches get slower"
+    },
+    "stats": [
+      {
+        "label": "Consumer lag",
+        "metric": "lag",
+        "unit": "msgs",
+        "agg": "max"
+      },
+      {
+        "label": "DB p99",
+        "metric": "db_p99",
+        "unit": "ms",
+        "agg": "max"
+      },
+      {
+        "label": "Rebalances",
+        "metric": "rebalances",
+        "unit": "count",
+        "agg": "delta"
+      }
+    ],
+    "learnings": [
+      {
+        "glyph": "⏱",
+        "title": "Size batches to the timeout",
+        "body": "Worst-case batch time must stay well under max.poll.interval.ms."
+      },
+      {
+        "glyph": "⇄",
+        "title": "Prefer cooperative rebalancing",
+        "body": "Cooperative-sticky and static membership keep unaffected workers consuming."
+      },
+      {
+        "glyph": "↻",
+        "title": "Make replays cheap",
+        "body": "Idempotent processing and frequent commits make redone work harmless."
+      },
+      {
+        "glyph": "✕",
+        "title": "Don't scale out mid-storm",
+        "body": "New consumers trigger another rebalance; fix the slow dependency first."
+      }
+    ],
+    "math": {
+      "title": "Why a batch outlasts the deadline",
+      "lines": [
+        "500 records x 650 ms extra   = 325 s of extra work per batch",
+        "max.poll.interval.ms         = 300 s",
+        "325 s > 300 s                -> the worker is evicted, with its batch half done"
+      ]
+    },
+    "myths": [
+      {
+        "myth": "Add more workers.",
+        "truth": "Every new worker triggers another rebalance, and more workers means more partitions reassigned while the group is already unstable."
+      },
+      {
+        "myth": "The workers are crashing.",
+        "truth": "They were healthy. Kafka removed them for being slow to call poll(), which looks identical to dead from the coordinator's side."
+      }
+    ],
+    "links": [
+      {
+        "label": "Kafka docs: max.poll.interval.ms",
+        "url": "https://kafka.apache.org/documentation/#consumerconfigs_max.poll.interval.ms"
+      }
+    ],
+    "deep": {
+      "config": [
+        "max.poll.records=500 → 50     # batch ≈ 33 s worst case",
+        "max.poll.interval.ms=300000   # keep; raising it hides a slow loop",
+        "partition.assignment.strategy=CooperativeStickyAssignor",
+        "group.instance.id=worker-N     # static membership",
+        "CREATE INDEX CONCURRENTLY ON fraud_score(order_id);"
+      ],
+      "runbook": [
+        "Do rebalances line up with lag jumps? Then consumption is stopping, not just slowing.",
+        "Compare per-record latency × max.poll.records with max.poll.interval.ms.",
+        "Look for CommitFailedException: it means work is being redone.",
+        "Check what changed on the downstream DB in the last hour (migrations, missing indexes).",
+        "Do not add consumers mid-storm: each join triggers another rebalance."
+      ]
+    }
   }
- ],
- "dashboard": [
-  {
-   "id": "lag",
-   "title": "Consumer lag",
-   "metrics": [
-    "lag"
-   ],
-   "threshold": {
-    "value": 20000,
-    "label": "alert 20k"
-   },
-   "why": "Messages waiting to be processed. Sustained growth means consumers are not keeping up."
-  },
-  {
-   "id": "flow",
-   "title": "Throughput",
-   "metrics": [
-    "produced",
-    "consumed"
-   ],
-   "why": "Produced vs consumed. When consumed drops to zero, the whole group has stopped."
-  },
-  {
-   "id": "db_p99",
-   "title": "DB query p99",
-   "metrics": [
-    "db_p99"
-   ],
-   "threshold": {
-    "value": 600,
-    "label": "per-record budget 600ms"
-   },
-   "why": "The slow dependency. Per-record time here decides how long a batch takes."
-  },
-  {
-   "id": "rebalances",
-   "title": "Group rebalances",
-   "metrics": [
-    "rebalances"
-   ],
-   "why": "Each rebalance stops every worker. Several close together is the storm."
-  },
-  {
-   "id": "dupes",
-   "title": "Reprocessed records",
-   "metrics": [
-    "dupes"
-   ],
-   "why": "Records processed again after an uncommitted batch was lost: extra load on the database."
-  },
-  {
-   "id": "worker_cpu",
-   "title": "Worker CPU",
-   "metrics": [
-    "worker_cpu"
-   ],
-   "max": 100,
-   "why": "Workers are waiting on the database, not working, so CPU falls instead of rising."
-  },
-  {
-   "id": "db_cpu",
-   "title": "DB CPU",
-   "metrics": [
-    "db_cpu"
-   ],
-   "max": 100,
-   "why": "The real bottleneck. Replays and catch-up push it toward saturation."
-  },
-  {
-   "id": "batch_s",
-   "title": "Batch duration",
-   "metrics": [
-    "batch_s"
-   ],
-   "threshold": {
-    "value": 300,
-    "label": "max.poll.interval"
-   },
-   "why": "The number that triggers the failure: a batch longer than max.poll.interval gets the worker evicted."
-  },
-  {
-   "id": "paused",
-   "title": "Workers paused",
-   "metrics": [
-    "paused"
-   ],
-   "max": 3,
-   "why": "How many workers are stopped by a rebalance at once. Eager rebalancing pauses all of them."
-  }
- ],
- "alerts": [
-  {
-   "id": "lag-high",
-   "metric": "lag",
-   "op": ">",
-   "value": 20000,
-   "for_s": 20,
-   "severity": "critical",
-   "component": "topic",
-   "summary": "payments consumer lag > 20k"
-  },
-  {
-   "id": "db-slow",
-   "metric": "db_p99",
-   "op": ">",
-   "value": 500,
-   "for_s": 30,
-   "severity": "warning",
-   "component": "db",
-   "summary": "payments-db p99 > 500ms"
-  }
- ],
- "initial": {
-  "effects": [
-   {
-    "target": "topic/p0",
-    "color": "teal",
-    "intensity": 0.5,
-    "label": "w1"
-   },
-   {
-    "target": "topic/p1",
-    "color": "teal",
-    "intensity": 0.5,
-    "label": "w1"
-   },
-   {
-    "target": "topic/p2",
-    "color": "violet",
-    "intensity": 0.5,
-    "label": "w2"
-   },
-   {
-    "target": "topic/p3",
-    "color": "violet",
-    "intensity": 0.5,
-    "label": "w2"
-   },
-   {
-    "target": "topic/p4",
-    "color": "pink",
-    "intensity": 0.5,
-    "label": "w3"
-   },
-   {
-    "target": "topic/p5",
-    "color": "pink",
-    "intensity": 0.5,
-    "label": "w3"
-   },
-   {
-    "target": "w1",
-    "color": "teal",
-    "intensity": 0.15,
-    "badge": "p0 p1"
-   },
-   {
-    "target": "w2",
-    "color": "violet",
-    "intensity": 0.15,
-    "badge": "p2 p3"
-   },
-   {
-    "target": "w3",
-    "color": "pink",
-    "intensity": 0.15,
-    "badge": "p4 p5"
-   },
-   {
-    "target": "db",
-    "label": "v0041"
-   },
-   {
-    "target": "e-in",
-    "flow": 0.6
-   },
-   {
-    "target": "e-w1",
-    "flow": 0.4,
-    "color": "teal"
-   },
-   {
-    "target": "e-w2",
-    "flow": 0.4,
-    "color": "violet"
-   },
-   {
-    "target": "e-w3",
-    "flow": 0.4,
-    "color": "pink"
-   },
-   {
-    "target": "e-d1",
-    "flow": 0.3
-   },
-   {
-    "target": "e-d2",
-    "flow": 0.3
-   },
-   {
-    "target": "e-d3",
-    "flow": 0.3
-   }
-  ]
- },
- "timeline": [
-  {
-   "t": 3,
-   "title": "Meet the system",
-   "beat": {
-    "notes": [
-     {
-      "panel": "flow",
-      "text": "Produced and consumed both near 1,000 msg/s: workers keep pace"
-     },
-     {
-      "panel": "lag",
-      "text": "Lag near zero: every batch commits well inside the deadline"
-     }
-    ],
-    "focus": [
-     "topic",
-     "w1",
-     "w2",
-     "w3"
-    ],
-    "hint": "Orders land on a 6-partition topic. Three payment workers share the partitions, two each, shown by colour. Each worker polls a batch of up to 500 records, processes them one by one against Postgres, then commits its offset."
-   }
-  },
-  {
-   "t": 40,
-   "title": "Migration 0042 deployed",
-   "feed": {
-    "from": "deploy-bot",
-    "kind": "deploy",
-    "text": "payments-db: migration 0042 adds fraud_score lookup (no index yet)"
-   },
-   "effects": [
-    {
-     "target": "db",
-     "label": "v0042"
-    }
-   ],
-   "metrics": [
-    {
-     "id": "db_p99",
-     "to": 650,
-     "over_s": 45,
-     "shape": "ease"
-    },
-    {
-     "id": "worker_cpu",
-     "to": 22,
-     "over_s": 30
-    },
-    {
-     "id": "db_cpu",
-     "to": 78,
-     "over_s": 30
-    },
-    {
-     "id": "batch_s",
-     "to": 290,
-     "over_s": 55,
-     "shape": "linear"
-    }
-   ]
-  },
-  {
-   "t": 62,
-   "feed": {
-    "from": "Ana · #payments-oncall",
-    "kind": "chat",
-    "text": "db looks a bit slower since the migration, but nothing is failing. keeping an eye on it"
-   },
-   "effects": [
-    {
-     "target": "db",
-     "color": "amber",
-     "intensity": 0.5
-    }
-   ],
-   "metrics": [
-    {
-     "id": "consumed",
-     "to": 900,
-     "over_s": 30
-    },
-    {
-     "id": "lag",
-     "to": 6000,
-     "over_s": 38,
-     "shape": "linear"
-    }
-   ]
-  },
-  {
-   "t": 85,
-   "title": "Worker 2's batch runs long",
-   "effects": [
-    {
-     "target": "w2",
-     "color": "amber",
-     "intensity": 0.6,
-     "pulse": true,
-     "label": "batch: 5m 20s of 5m limit"
-    }
-   ],
-   "feed": {
-    "from": "payments-worker-2",
-    "kind": "log",
-    "text": "WARN batch of 500 still processing after 280s"
-   }
-  },
-  {
-   "t": 100,
-   "title": "Worker 2 evicted, rebalance #1",
-   "feed": {
-    "from": "kafka coordinator",
-    "kind": "log",
-    "text": "Member payments-worker-2 removed from group: max.poll.interval.ms (300000) exceeded. Rebalancing (eager)."
-   },
-   "effects": [
-    {
-     "target": "w2",
-     "color": "red",
-     "intensity": 0.7,
-     "pulse": false,
-     "label": "evicted",
-     "badge": "—"
-    },
-    {
-     "target": "w1",
-     "color": "grey",
-     "intensity": 0.4,
-     "label": "paused: rebalancing",
-     "badge": "—"
-    },
-    {
-     "target": "w3",
-     "color": "grey",
-     "intensity": 0.4,
-     "label": "paused: rebalancing",
-     "badge": "—"
-    },
-    {
-     "target": "topic/p0",
-     "color": "grey",
-     "intensity": 0.3,
-     "label": "revoked"
-    },
-    {
-     "target": "topic/p1",
-     "color": "grey",
-     "intensity": 0.3,
-     "label": "revoked"
-    },
-    {
-     "target": "topic/p2",
-     "color": "grey",
-     "intensity": 0.3,
-     "label": "revoked"
-    },
-    {
-     "target": "topic/p3",
-     "color": "grey",
-     "intensity": 0.3,
-     "label": "revoked"
-    },
-    {
-     "target": "topic/p4",
-     "color": "grey",
-     "intensity": 0.3,
-     "label": "revoked"
-    },
-    {
-     "target": "topic/p5",
-     "color": "grey",
-     "intensity": 0.3,
-     "label": "revoked"
-    },
-    {
-     "target": "e-w1",
-     "flow": 0
-    },
-    {
-     "target": "e-w2",
-     "flow": 0
-    },
-    {
-     "target": "e-w3",
-     "flow": 0
-    },
-    {
-     "target": "e-d1",
-     "flow": 0
-    },
-    {
-     "target": "e-d2",
-     "flow": 0
-    },
-    {
-     "target": "e-d3",
-     "flow": 0
-    }
-   ],
-   "metrics": [
-    {
-     "id": "consumed",
-     "to": 0,
-     "over_s": 3,
-     "shape": "linear"
-    },
-    {
-     "id": "rebalances",
-     "to": 1,
-     "shape": "step"
-    },
-    {
-     "id": "lag",
-     "to": 24000,
-     "over_s": 25,
-     "shape": "linear"
-    },
-    {
-     "id": "db_p99",
-     "to": 300,
-     "over_s": 15
-    },
-    {
-     "id": "db_cpu",
-     "to": 92,
-     "over_s": 40
-    },
-    {
-     "id": "paused",
-     "to": 3,
-     "over_s": 1,
-     "shape": "step"
-    }
-   ],
-   "beat": {
-    "notes": [
-     {
-      "panel": "flow",
-      "metric": "consumed",
-      "text": "Consumed drops to 0: eager rebalance revoked every partition"
-     },
-     {
-      "panel": "rebalances",
-      "text": "Rebalance #1: worker 2 missed max.poll.interval.ms, not a crash"
-     },
-     {
-      "panel": "lag",
-      "text": "Lag climbs fast: producers continue while nobody consumes"
-     }
-    ],
-    "focus": [
-     "w2",
-     "topic",
-     "w1",
-     "w3",
-     "panel:flow",
-     "panel:rebalances"
-    ],
-    "hint": "Worker 2 didn't crash. It took longer than max.poll.interval.ms (5 minutes) to finish its batch, so the coordinator assumed it was dead. With the eager protocol, every worker then gives up all its partitions, not just worker 2. Consumption drops to zero for the whole group."
-   }
-  },
-  {
-   "t": 125,
-   "title": "Rebalance #1 done, work is redone",
-   "feed": {
-    "from": "kafka coordinator",
-    "kind": "log",
-    "text": "Group stabilised (generation 8). payments-worker-2 rejoined. Resuming from last committed offsets."
-   },
-   "effects": [
-    {
-     "target": "w1",
-     "color": "teal",
-     "intensity": 0.15,
-     "label": null,
-     "badge": "p0 p1"
-    },
-    {
-     "target": "w2",
-     "color": "violet",
-     "intensity": 0.15,
-     "label": "replaying uncommitted batch",
-     "badge": "p2 p3"
-    },
-    {
-     "target": "w3",
-     "color": "pink",
-     "intensity": 0.15,
-     "label": null,
-     "badge": "p4 p5"
-    },
-    {
-     "target": "topic/p0",
-     "color": "teal",
-     "intensity": 0.5,
-     "label": "w1"
-    },
-    {
-     "target": "topic/p1",
-     "color": "teal",
-     "intensity": 0.5,
-     "label": "w1"
-    },
-    {
-     "target": "topic/p2",
-     "color": "violet",
-     "intensity": 0.8,
-     "label": "w2 ↺"
-    },
-    {
-     "target": "topic/p3",
-     "color": "violet",
-     "intensity": 0.8,
-     "label": "w2 ↺"
-    },
-    {
-     "target": "topic/p4",
-     "color": "pink",
-     "intensity": 0.5,
-     "label": "w3"
-    },
-    {
-     "target": "topic/p5",
-     "color": "pink",
-     "intensity": 0.5,
-     "label": "w3"
-    },
-    {
-     "target": "e-w1",
-     "flow": 0.5
-    },
-    {
-     "target": "e-w2",
-     "flow": 0.6,
-     "reverse": 0.3
-    },
-    {
-     "target": "e-w3",
-     "flow": 0.5
-    },
-    {
-     "target": "e-d1",
-     "flow": 0.5
-    },
-    {
-     "target": "e-d2",
-     "flow": 0.7
-    },
-    {
-     "target": "e-d3",
-     "flow": 0.5
-    },
-    {
-     "target": "db",
-     "color": "red",
-     "intensity": 0.6,
-     "pulse": true
-    }
-   ],
-   "metrics": [
-    {
-     "id": "consumed",
-     "to": 1050,
-     "over_s": 10
-    },
-    {
-     "id": "dupes",
-     "to": 420,
-     "over_s": 8
-    },
-    {
-     "id": "db_p99",
-     "to": 920,
-     "over_s": 25
-    },
-    {
-     "id": "lag",
-     "to": 29000,
-     "over_s": 70,
-     "shape": "linear"
-    },
-    {
-     "id": "paused",
-     "to": 0,
-     "over_s": 1,
-     "shape": "step"
-    }
-   ]
-  },
-  {
-   "t": 140,
-   "title": "The redo makes it worse",
-   "beat": {
-    "notes": [
-     {
-      "panel": "dupes",
-      "text": "500 uncommitted records replayed after the rebalance"
-     },
-     {
-      "panel": "db_p99",
-      "text": "p99 past budget: replay and catch-up pile onto a slow DB"
-     }
-    ],
-    "focus": [
-     "db",
-     "w2",
-     "panel:db_p99",
-     "panel:dupes"
-    ],
-    "hint": "Worker 2 never committed that batch, so after the rebalance those 500 records are processed again. Replay plus catch-up pushes extra load into an already slow database, and every batch now takes even longer."
-   }
-  },
-  {
-   "t": 170,
-   "effects": [
-    {
-     "target": "w3",
-     "color": "amber",
-     "intensity": 0.6,
-     "pulse": true,
-     "label": "batch: 5m 40s of 5m limit"
-    }
-   ],
-   "feed": {
-    "from": "payments-worker-3",
-    "kind": "log",
-    "text": "WARN batch of 500 still processing after 290s"
-   }
-  },
-  {
-   "t": 195,
-   "title": "Worker 3 evicted, rebalance #2",
-   "feed": {
-    "from": "kafka coordinator",
-    "kind": "log",
-    "text": "Member payments-worker-3 removed from group: max.poll.interval.ms exceeded. Rebalancing (eager)."
-   },
-   "effects": [
-    {
-     "target": "w3",
-     "color": "red",
-     "intensity": 0.7,
-     "pulse": false,
-     "label": "evicted",
-     "badge": "—"
-    },
-    {
-     "target": "w1",
-     "color": "grey",
-     "intensity": 0.4,
-     "label": "paused: rebalancing",
-     "badge": "—"
-    },
-    {
-     "target": "w2",
-     "color": "grey",
-     "intensity": 0.4,
-     "label": "paused: rebalancing",
-     "badge": "—"
-    },
-    {
-     "target": "topic/p0",
-     "color": "grey",
-     "intensity": 0.3,
-     "label": "revoked"
-    },
-    {
-     "target": "topic/p1",
-     "color": "grey",
-     "intensity": 0.3,
-     "label": "revoked"
-    },
-    {
-     "target": "topic/p2",
-     "color": "grey",
-     "intensity": 0.3,
-     "label": "revoked"
-    },
-    {
-     "target": "topic/p3",
-     "color": "grey",
-     "intensity": 0.3,
-     "label": "revoked"
-    },
-    {
-     "target": "topic/p4",
-     "color": "grey",
-     "intensity": 0.3,
-     "label": "revoked"
-    },
-    {
-     "target": "topic/p5",
-     "color": "grey",
-     "intensity": 0.3,
-     "label": "revoked"
-    },
-    {
-     "target": "e-w1",
-     "flow": 0,
-     "reverse": 0
-    },
-    {
-     "target": "e-w2",
-     "flow": 0,
-     "reverse": 0
-    },
-    {
-     "target": "e-w3",
-     "flow": 0
-    },
-    {
-     "target": "e-d1",
-     "flow": 0
-    },
-    {
-     "target": "e-d2",
-     "flow": 0
-    },
-    {
-     "target": "e-d3",
-     "flow": 0
-    }
-   ],
-   "metrics": [
-    {
-     "id": "consumed",
-     "to": 0,
-     "over_s": 3,
-     "shape": "linear"
-    },
-    {
-     "id": "rebalances",
-     "to": 2,
-     "shape": "step"
-    },
-    {
-     "id": "dupes",
-     "to": 0,
-     "over_s": 4
-    },
-    {
-     "id": "lag",
-     "to": 52000,
-     "over_s": 30,
-     "shape": "linear"
-    },
-    {
-     "id": "paused",
-     "to": 3,
-     "over_s": 1,
-     "shape": "step"
-    }
-   ]
-  },
-  {
-   "t": 212,
-   "feed": {
-    "from": "Ana · #payments-oncall",
-    "kind": "chat",
-    "text": "workers keep dropping out and rejoining. should I scale the group to 6 workers to burn down the lag?"
-   }
-  },
-  {
-   "t": 225,
-   "title": "Rebalance #2 done",
-   "feed": {
-    "from": "kafka coordinator",
-    "kind": "log",
-    "text": "Group stabilised (generation 9). payments-worker-3 rejoined."
-   },
-   "effects": [
-    {
-     "target": "w1",
-     "color": "amber",
-     "intensity": 0.5,
-     "pulse": true,
-     "label": "batch: 4m 50s of 5m limit",
-     "badge": "p0 p1"
-    },
-    {
-     "target": "w2",
-     "color": "violet",
-     "intensity": 0.15,
-     "label": null,
-     "badge": "p2 p3"
-    },
-    {
-     "target": "w3",
-     "color": "pink",
-     "intensity": 0.15,
-     "label": "replaying uncommitted batch",
-     "badge": "p4 p5"
-    },
-    {
-     "target": "topic/p0",
-     "color": "teal",
-     "intensity": 0.5,
-     "label": "w1"
-    },
-    {
-     "target": "topic/p1",
-     "color": "teal",
-     "intensity": 0.5,
-     "label": "w1"
-    },
-    {
-     "target": "topic/p2",
-     "color": "violet",
-     "intensity": 0.5,
-     "label": "w2"
-    },
-    {
-     "target": "topic/p3",
-     "color": "violet",
-     "intensity": 0.5,
-     "label": "w2"
-    },
-    {
-     "target": "topic/p4",
-     "color": "pink",
-     "intensity": 0.8,
-     "label": "w3 ↺"
-    },
-    {
-     "target": "topic/p5",
-     "color": "pink",
-     "intensity": 0.8,
-     "label": "w3 ↺"
-    },
-    {
-     "target": "e-w1",
-     "flow": 0.5
-    },
-    {
-     "target": "e-w2",
-     "flow": 0.5
-    },
-    {
-     "target": "e-w3",
-     "flow": 0.6,
-     "reverse": 0.3
-    },
-    {
-     "target": "e-d1",
-     "flow": 0.6
-    },
-    {
-     "target": "e-d2",
-     "flow": 0.5
-    },
-    {
-     "target": "e-d3",
-     "flow": 0.7
-    }
-   ],
-   "metrics": [
-    {
-     "id": "consumed",
-     "to": 1000,
-     "over_s": 10
-    },
-    {
-     "id": "dupes",
-     "to": 450,
-     "over_s": 8
-    },
-    {
-     "id": "db_p99",
-     "to": 1100,
-     "over_s": 20
-    },
-    {
-     "id": "lag",
-     "to": 56000,
-     "over_s": 25,
-     "shape": "linear"
-    },
-    {
-     "id": "paused",
-     "to": 0,
-     "over_s": 1,
-     "shape": "step"
-    }
-   ]
-  },
-  {
-   "t": 250,
-   "title": "Worker 1 evicted, rebalance #3",
-   "feed": {
-    "from": "kafka coordinator",
-    "kind": "log",
-    "text": "Member payments-worker-1 removed from group: max.poll.interval.ms exceeded. Rebalancing (eager)."
-   },
-   "effects": [
-    {
-     "target": "w1",
-     "color": "red",
-     "intensity": 0.7,
-     "pulse": false,
-     "label": "evicted",
-     "badge": "—"
-    },
-    {
-     "target": "w2",
-     "color": "grey",
-     "intensity": 0.4,
-     "label": "paused: rebalancing",
-     "badge": "—"
-    },
-    {
-     "target": "w3",
-     "color": "grey",
-     "intensity": 0.4,
-     "label": "paused: rebalancing",
-     "badge": "—"
-    },
-    {
-     "target": "topic/p0",
-     "color": "grey",
-     "intensity": 0.3,
-     "label": "revoked"
-    },
-    {
-     "target": "topic/p1",
-     "color": "grey",
-     "intensity": 0.3,
-     "label": "revoked"
-    },
-    {
-     "target": "topic/p2",
-     "color": "grey",
-     "intensity": 0.3,
-     "label": "revoked"
-    },
-    {
-     "target": "topic/p3",
-     "color": "grey",
-     "intensity": 0.3,
-     "label": "revoked"
-    },
-    {
-     "target": "topic/p4",
-     "color": "grey",
-     "intensity": 0.3,
-     "label": "revoked"
-    },
-    {
-     "target": "topic/p5",
-     "color": "grey",
-     "intensity": 0.3,
-     "label": "revoked"
-    },
-    {
-     "target": "e-w1",
-     "flow": 0
-    },
-    {
-     "target": "e-w2",
-     "flow": 0
-    },
-    {
-     "target": "e-w3",
-     "flow": 0,
-     "reverse": 0
-    },
-    {
-     "target": "e-d1",
-     "flow": 0
-    },
-    {
-     "target": "e-d2",
-     "flow": 0
-    },
-    {
-     "target": "e-d3",
-     "flow": 0
-    }
-   ],
-   "metrics": [
-    {
-     "id": "consumed",
-     "to": 0,
-     "over_s": 3,
-     "shape": "linear"
-    },
-    {
-     "id": "rebalances",
-     "to": 3,
-     "shape": "step"
-    },
-    {
-     "id": "dupes",
-     "to": 0,
-     "over_s": 4
-    },
-    {
-     "id": "lag",
-     "to": 80000,
-     "over_s": 30,
-     "shape": "linear"
-    },
-    {
-     "id": "paused",
-     "to": 3,
-     "over_s": 1,
-     "shape": "step"
-    }
-   ],
-   "beat": {
-    "notes": [
-     {
-      "panel": "rebalances",
-      "text": "Third rebalance in 150s: each eviction slows the next batch"
-     },
-     {
-      "panel": "lag",
-      "text": "Lag ratchets up with every stall and never drains"
-     }
-    ],
-    "focus": [
-     "panel:rebalances",
-     "panel:lag",
-     "w1",
-     "feed"
-    ],
-    "hint": "This is a rebalance storm. Each rebalance creates more lag and more replayed work, which makes the next batch slower, which gets the next worker evicted. Scaling to 6 workers, as Ana suggested, would trigger yet another rebalance and add load to the database that is the real bottleneck."
-   }
-  },
-  {
-   "t": 270,
-   "metrics": [
-    {
-     "id": "paused",
-     "to": 0,
-     "over_s": 1,
-     "shape": "step"
-    }
-   ]
-  },
-  {
-   "t": 280,
-   "title": "Smaller batches + missing index",
-   "feed": {
-    "from": "Ana · #payments-oncall",
-    "kind": "deploy",
-    "text": "max.poll.records 500 → 50, and CREATE INDEX CONCURRENTLY on fraud_score lookup"
-   },
-   "effects": [
-    {
-     "target": "w1",
-     "color": "teal",
-     "intensity": 0.15,
-     "label": "batch: 3s of 5m limit",
-     "badge": "p0 p1"
-    },
-    {
-     "target": "w2",
-     "color": "violet",
-     "intensity": 0.15,
-     "label": "batch: 3s of 5m limit",
-     "badge": "p2 p3"
-    },
-    {
-     "target": "w3",
-     "color": "pink",
-     "intensity": 0.15,
-     "label": "batch: 3s of 5m limit",
-     "badge": "p4 p5"
-    },
-    {
-     "target": "topic/p0",
-     "color": "teal",
-     "intensity": 0.5,
-     "label": "w1"
-    },
-    {
-     "target": "topic/p1",
-     "color": "teal",
-     "intensity": 0.5,
-     "label": "w1"
-    },
-    {
-     "target": "topic/p2",
-     "color": "violet",
-     "intensity": 0.5,
-     "label": "w2"
-    },
-    {
-     "target": "topic/p3",
-     "color": "violet",
-     "intensity": 0.5,
-     "label": "w2"
-    },
-    {
-     "target": "topic/p4",
-     "color": "pink",
-     "intensity": 0.5,
-     "label": "w3"
-    },
-    {
-     "target": "topic/p5",
-     "color": "pink",
-     "intensity": 0.5,
-     "label": "w3"
-    },
-    {
-     "target": "e-w1",
-     "flow": 0.9
-    },
-    {
-     "target": "e-w2",
-     "flow": 0.9
-    },
-    {
-     "target": "e-w3",
-     "flow": 0.9
-    },
-    {
-     "target": "e-d1",
-     "flow": 0.7
-    },
-    {
-     "target": "e-d2",
-     "flow": 0.7
-    },
-    {
-     "target": "e-d3",
-     "flow": 0.7
-    },
-    {
-     "target": "db",
-     "color": "amber",
-     "intensity": 0.3,
-     "pulse": false,
-     "label": "v0042 + index"
-    }
-   ],
-   "metrics": [
-    {
-     "id": "db_p99",
-     "to": 60,
-     "over_s": 40
-    },
-    {
-     "id": "consumed",
-     "to": 2600,
-     "over_s": 25
-    },
-    {
-     "id": "lag",
-     "to": 400,
-     "over_s": 100
-    },
-    {
-     "id": "dupes",
-     "to": 0,
-     "over_s": 10
-    },
-    {
-     "id": "worker_cpu",
-     "to": 40,
-     "over_s": 15
-    },
-    {
-     "id": "db_cpu",
-     "to": 35,
-     "over_s": 20
-    },
-    {
-     "id": "batch_s",
-     "to": 33,
-     "over_s": 5
-    }
-   ]
-  },
-  {
-   "t": 290,
-   "title": "Why the fix works",
-   "beat": {
-    "notes": [
-     {
-      "panel": "flow",
-      "metric": "consumed",
-      "text": "Consumed overtakes produced: 50-record polls finish in seconds"
-     },
-     {
-      "panel": "lag",
-      "text": "Lag drains now that consumption outpaces production"
-     },
-     {
-      "panel": "db_p99",
-      "text": "p99 falls to ~60ms once the missing index exists"
-     }
-    ],
-    "focus": [
-     "w1",
-     "w2",
-     "w3",
-     "panel:lag",
-     "panel:flow"
-    ],
-    "hint": "With 50 records per poll, a batch finishes in seconds, far inside the 5-minute deadline, so nobody is mistaken for dead. The index removes the real slowness. Consumption now runs above production, so the lag drains."
-   }
-  },
-  {
-   "t": 385,
-   "feed": {
-    "from": "Ana · #payments-oncall",
-    "kind": "chat",
-    "text": "lag is back to normal. writing up the postmortem"
-   },
-   "effects": [
-    {
-     "target": "db",
-     "color": null,
-     "intensity": 0
-    },
-    {
-     "target": "e-w1",
-     "flow": 0.4
-    },
-    {
-     "target": "e-w2",
-     "flow": 0.4
-    },
-    {
-     "target": "e-w3",
-     "flow": 0.4
-    },
-    {
-     "target": "e-d1",
-     "flow": 0.3
-    },
-    {
-     "target": "e-d2",
-     "flow": 0.3
-    },
-    {
-     "target": "e-d3",
-     "flow": 0.3
-    },
-    {
-     "target": "w1",
-     "label": null
-    },
-    {
-     "target": "w2",
-     "label": null
-    },
-    {
-     "target": "w3",
-     "label": null
-    }
-   ],
-   "metrics": [
-    {
-     "id": "consumed",
-     "to": 1200,
-     "over_s": 15
-    },
-    {
-     "id": "worker_cpu",
-     "to": 35,
-     "over_s": 15
-    }
-   ]
-  },
-  {
-   "t": 400,
-   "title": "Recovered",
-   "beat": {
-    "notes": [
-     {
-      "panel": "lag",
-      "text": "Lag back near zero: the group keeps up again"
-     },
-     {
-      "panel": "db_p99",
-      "text": "DB p99 steady within budget: the root cause is gone"
-     }
-    ],
-    "focus": [
-     "topic",
-     "w1",
-     "w2",
-     "w3",
-     "db"
-    ],
-    "hint": "Nothing crashed and no one made a bad call in the moment. A slower dependency quietly pushed batch time past a timeout, and the group's own recovery mechanism amplified it. The report has the takeaways."
-   }
-  }
- ],
- "report": {
-  "tldr": "A slow query made batches outlast the 5-minute poll deadline. Kafka evicted healthy workers, and each eager rebalance made the next eviction more likely: a storm.",
-  "fix_t": 280,
-  "chain": [
-   {
-    "id": "slow",
-    "kind": "cause",
-    "text": "Migration 0042: query ~650ms slower"
-   },
-   {
-    "id": "batch",
-    "kind": "effect",
-    "text": "500-record batch > max.poll.interval"
-   },
-   {
-    "id": "evict",
-    "kind": "effect",
-    "text": "Healthy worker evicted as dead"
-   },
-   {
-    "id": "stop",
-    "kind": "amp",
-    "text": "Eager rebalance stops every worker"
-   },
-   {
-    "id": "replay",
-    "kind": "amp",
-    "text": "Replay + lag load the slow DB"
-   },
-   {
-    "id": "fix",
-    "kind": "fix",
-    "text": "Fix: 50-record batches + index"
-   }
-  ],
-  "loop": {
-   "from": "replay",
-   "to": "batch",
-   "label": "storm: batches get slower"
-  },
-  "stats": [
-   {
-    "label": "Consumer lag",
-    "metric": "lag",
-    "unit": "msgs",
-    "agg": "max"
-   },
-   {
-    "label": "DB p99",
-    "metric": "db_p99",
-    "unit": "ms",
-    "agg": "max"
-   },
-   {
-    "label": "Rebalances",
-    "metric": "rebalances",
-    "unit": "count",
-    "agg": "delta"
-   }
-  ],
-  "learnings": [
-   {
-    "glyph": "⏱",
-    "title": "Size batches to the timeout",
-    "body": "Worst-case batch time must stay well under max.poll.interval.ms."
-   },
-   {
-    "glyph": "⇄",
-    "title": "Prefer cooperative rebalancing",
-    "body": "Cooperative-sticky and static membership keep unaffected workers consuming."
-   },
-   {
-    "glyph": "↻",
-    "title": "Make replays cheap",
-    "body": "Idempotent processing and frequent commits make redone work harmless."
-   },
-   {
-    "glyph": "✕",
-    "title": "Don't scale out mid-storm",
-    "body": "New consumers trigger another rebalance; fix the slow dependency first."
-   }
-  ],
-  "math": {
-   "title": "Why a batch outlasts the deadline",
-   "lines": [
-    "500 records x 650 ms extra   = 325 s of extra work per batch",
-    "max.poll.interval.ms         = 300 s",
-    "325 s > 300 s                -> the worker is evicted, with its batch half done"
-   ]
-  },
-  "myths": [
-   {
-    "myth": "Add more workers.",
-    "truth": "Every new worker triggers another rebalance, and more workers means more partitions reassigned while the group is already unstable."
-   },
-   {
-    "myth": "The workers are crashing.",
-    "truth": "They were healthy. Kafka removed them for being slow to call poll(), which looks identical to dead from the coordinator's side."
-   }
-  ],
-  "links": [
-   {
-    "label": "Kafka docs: max.poll.interval.ms",
-    "url": "https://kafka.apache.org/documentation/#consumerconfigs_max.poll.interval.ms"
-   }
-  ]
- }
 }

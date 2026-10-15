@@ -49,6 +49,8 @@ export function validate(PB) {
   const SHAPES = ["ease", "linear", "step"];
   const FEED_KINDS = ["chat", "log", "deploy", "alert", "resolved"];
   const isNum = v => typeof v === "number" && Number.isFinite(v);
+  // hardcore mode: items tagged level "deep" are shown only when the viewer picks Hardcore; the run itself is the same
+  const checkLevel = (v, where) => { if (v != null && v !== "deep") err(`${where}: level must be "deep" (or left out)`); };
 
   if (PB.schema !== "sim-xp/playbook@2") err(`schema must be "sim-xp/playbook@2"`);
   const m = PB.meta || {};
@@ -94,6 +96,19 @@ export function validate(PB) {
     for (const p of n.parts || []) { if (!p.id) err(`part without id in ${n.id}`); partIds.add(n.id + "/" + p.id); }
     if ((n.parts || []).length > 12) warn(`node ${n.id} has ${(n.parts || []).length} parts: more than ~8 gets cramped`);
   }
+  const metricIdsEarly = new Set((PB.metrics || []).map(x => x.id));
+  for (const n of nodes) {
+    if (n.details == null) continue;
+    if (!Array.isArray(n.details)) { err(`node ${n.id}: details must be a list of { label, metric? | text?, level? }`); continue; }
+    n.details.forEach((d, i) => {
+      const w = `node ${n.id} details[${i}]`;
+      if (!d || !str(d.label)) err(`${w} needs a label`);
+      if (d && d.metric != null && !metricIdsEarly.has(d.metric)) err(`${w}: unknown metric ${d.metric}`);
+      if (d && d.metric == null && !str(d.text)) err(`${w} needs a metric (live value) or a text`);
+      if (d) checkLevel(d.level, w);
+    });
+    if (n.details.length > 8) warn(`node ${n.id} has ${n.details.length} detail rows; the hover card reads best with 3–6`);
+  }
   for (const e of edges) {
     if (!e.id) err(`edge without id: ${JSON.stringify(e)}`);
     if (edgeIds.has(e.id) || nodeIds.has(e.id)) err(`duplicate id ${e.id}`); edgeIds.add(e.id);
@@ -110,7 +125,9 @@ export function validate(PB) {
   }
   const panels = PB.dashboard || [], panelIds = new Set();
   if (!panels.length) err("dashboard is empty");
-  if (panels.length > 14) warn(`${panels.length} panels; more than ~12 makes the board scroll a lot`);
+  const stdPanels = panels.filter(p => p.level !== "deep");
+  if (stdPanels.length > 12) warn(`${stdPanels.length} standard panels; keep ~10 or fewer (put the rest at level "deep")`);
+  if (panels.length - stdPanels.length > 10) warn(`${panels.length - stdPanels.length} deep panels; more than ~8 is noise even in Hardcore`);
   if (panels.length < 4) warn(`only ${panels.length} panels; 6–10 gives the viewer enough to correlate`);
   const lay = PB.meta && PB.meta.layout;
   if (lay != null) {
@@ -127,6 +144,8 @@ export function validate(PB) {
     if (!p.metrics?.length) err(`panel ${p.id} has no metrics`);
     if (p.max != null && !isNum(p.max)) err(`panel ${p.id}: max must be a number`);
     for (const id of p.metrics || []) if (!metricIds.has(id)) err(`panel ${p.id}: unknown metric ${id}`);
+    checkLevel(p.level, `panel ${p.id}`);
+    if (p.component != null && !nodeIds.has(p.component)) err(`panel ${p.id}: unknown component ${p.component}`);
     if ((p.metrics || []).length > 2) warn(`panel ${p.id} plots ${p.metrics.length} metrics: max 2 reads well`);
   }
   for (const a of PB.alerts || []) {
@@ -173,6 +192,7 @@ export function validate(PB) {
       if (e.feed.kind && !FEED_KINDS.includes(e.feed.kind)) err(`${w}: feed.kind must be ${FEED_KINDS.join("/")}`);
       if (e.feed.key != null && typeof e.feed.key !== "boolean") err(`${w}: feed.key must be true or false`);
       if (e.feed.text && e.feed.text.length > 200) warn(`${w}: feed text over 200 chars`);
+      checkLevel(e.feed.level, `${w} feed`);
     }
     if (e.beat) {
       beats.push(e);
@@ -190,6 +210,9 @@ export function validate(PB) {
         if (!n.text) err(`${w}: note needs text`);
         else if (n.text.length > 80) warn(`${w}: note on ${n.panel} is ${n.text.length} chars; keep under ~70`);
       }
+      if (e.beat.deep != null && (!str(e.beat.deep) || e.beat.deep.length > 240)) warn(`${w}: beat.deep should be one or two sentences (≤ ~240 chars)`);
+      const notes = e.beat.notes || [];
+      if (notes.length && notes.every(n => (panels.find(p => p.id === n.panel) || {}).level === "deep")) warn(`${w}: every note is on a deep panel, so Standard shows none; note at least one standard panel`);
       if (!(e.beat.notes || []).length && beats.length > 1) warn(`${w}: key moment has no per-chart notes`);
     }
     if (e.title && e.title.length > 40) warn(`${w}: title over 40 chars`);
@@ -212,6 +235,11 @@ export function validate(PB) {
   if (r.math != null && (!r.math || !Array.isArray(r.math.lines) || !r.math.lines.length || r.math.lines.some((x) => typeof x !== "string"))) err("report.math must be { title?, lines: [string] }");
   if (r.myths != null) { if (!Array.isArray(r.myths)) err("report.myths must be a list of { myth, truth }"); else r.myths.forEach((x, i) => { if (!x || !str(x.myth) || !str(x.truth)) err(`report.myths[${i}] needs myth and truth`); }); }
   if (r.links != null) { if (!Array.isArray(r.links)) err("report.links must be a list of { label, url }"); else r.links.forEach((x, i) => { if (!x || !str(x.label) || !/^https:\/\//.test(x.url || "")) err(`report.links[${i}] needs a label and an https url`); }); }
+  if (r.deep != null) {
+    const dd = r.deep, list = v => v == null || (Array.isArray(v) && v.every(str));
+    if (typeof dd !== "object" || Array.isArray(dd)) err("report.deep must be { config?, runbook? }");
+    else { if (!list(dd.config)) err("report.deep.config must be a list of strings (one config line each)"); if (!list(dd.runbook)) err("report.deep.runbook must be a list of strings (what to check next time)"); }
+  }
   if (r.fix_t != null && (!Number.isInteger(r.fix_t) || r.fix_t > D)) err("report.fix_t must be an integer second within duration");
   const ln = r.learnings || [];
   if (ln.length < 2 || ln.length > 5) warn(`report.learnings has ${ln.length}; 3–4 is ideal`);

@@ -144,6 +144,30 @@ The report is a calm single column: tl;dr, the numbers, how it happened, (the ar
 - `links` (optional) `[{ label, url }]`: 1–3 https links to read more (docs, the original postmortem). Only link what you are sure exists.
 - `sparkline` is no longer drawn; leave it out.
 
+## Hardcore layer (optional)
+
+The viewer can switch the player between **Standard** and **Hardcore** (menu, or `H`). Hardcore plays the *same* run
+and reveals extra items you tag `"level": "deep"`. Standard must tell the whole story on its own; the deep layer is
+for an engineer who wants the next level down. The toggle only appears when the playbook has a deep layer.
+
+- `dashboard[].component` (any level): the node id this chart belongs to. The chart shows a small tag with that
+  node's name, coloured by its live status (calm, degrading, failing). Tag every chart that clearly belongs to one node.
+- `dashboard[]` with `"level": "deep"`: 3–6 second-order signals (pool usage, GC, join/sync time, commit failures,
+  rows scanned). In Hardcore a deep chart is drawn full size only while it matters (a key-moment note sits on it, or an
+  alert on its metric is pending or firing) and is otherwise a one-line row under "Quiet signals". So put a note on a
+  deep chart at the key moment where it explains something, and keep at least one note per key moment on a standard chart.
+  Keep ~10 standard charts; deep ones do not count toward that.
+- `feed` with `"level": "deep"`: 6–12 raw lines: real log lines, commands someone typed (`$ psql -c ...`), config
+  greps, error traces. One feed entry per event, so put deep lines on their own events.
+- `beat.deep`: one or two sentences with the numbers and config keys behind the hint, shown under it in Hardcore.
+- `components.nodes[].details`: `[{ label, metric? | text?, level? }]`, the node's hover card (both modes). A
+  `metric` row shows its live value at the cursor; `text` is static. Mark rows `"level": "deep"` for Hardcore only.
+  3–6 rows.
+- `report.deep`: `{ config: [lines], runbook: [lines] }`, a collapsed "Deep dive" in the report (Hardcore only):
+  the config keys involved (with a short `#` comment) and what to check next time.
+
+The example playbook has a full deep layer; copy its shape.
+
 ## Rules of thumb
 
 - **Realistic first.** Numbers should hold together: if consumption drops below production, lag
