@@ -2,7 +2,9 @@
 
 Learn systems by watching them in motion.
 
+- **[Gallery](home/)**: the site root lists the playbooks; each Play button opens `/v2/?pb=<id>`.
+  Live at https://smarchone.github.io/sim-xp/
 - **[v2](v2/)**: a story becomes a playbook that plays as components, dashboards and a feed, pausing at the
   moments that explain it. Claude Code writes the playbook with the `story-to-playbook` skill, and you drop it on
   the page to play it. Live at https://smarchone.github.io/sim-xp/v2/
-- **[MVP](mvp/)**: incident drills you operate yourself. Live at https://smarchone.github.io/sim-xp/
+- **[MVP](mvp/)** (deprecated): incident drills you operate yourself. No longer deployed; the code stays for reference.

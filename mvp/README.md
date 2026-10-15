@@ -1,3 +1,6 @@
+> **Deprecated.** The MVP is no longer deployed or maintained; sim-xp continues as the v2 playbook player
+> (https://smarchone.github.io/sim-xp/). The code stays here for reference.
+
 # sim-xp MVP
 
 ![sim-xp dashboard mid-incident](screenshot.png)

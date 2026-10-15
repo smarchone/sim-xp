@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>sim-xp</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="v2/style.css">
+<style>
+  .library{gap:20px}
+  .make{display:flex;flex-direction:column;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .make .copy{align-items:center;padding:4px 4px 4px 8px}
+  .make .copy span{font-size:11px;color:var(--muted);width:56px;flex:none}
+  .make button{padding:2px 10px;font-size:11px}
+  .bar{display:flex;align-items:center;gap:12px}
+  .bar h2 span{font-weight:400;color:var(--muted)}
+  .bar input{margin-left:auto;font:inherit;font-size:12px;color:var(--fg);background:var(--panel);border:1px solid var(--line2);border-radius:6px;padding:4px 10px;width:220px}
+  .bar input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  .list{list-style:none;margin:0;padding:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .list li+li{border-top:1px solid var(--line)}
+  .list a{display:grid;grid-template-columns:minmax(0,1fr) 230px auto;align-items:center;gap:16px;padding:9px 14px;color:inherit;text-decoration:none}
+  .list a:hover{background:var(--sunk)}
+  .list a:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  .what{min-width:0}
+  .what b{font-weight:600}
+  .what p{margin:1px 0 0;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .list .meta{margin:0;flex-wrap:nowrap;overflow:hidden}
+  .play{font:500 12px var(--sans);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);border-radius:6px;padding:2px 12px}
+  .list a:hover .play{color:#fff;background:var(--accent)}
+  .empty{padding:12px 14px;color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+<!-- The list of playbooks: each opens in the v2 player at v2/?pb=<id>. The list comes from v2/playbooks/index.json. -->
+<main class="library">
+  <header class="top">
+    <div>
+      <h1>sim-xp</h1>
+      <p class="lede">Watch a system in motion: a story played as components, dashboards and a feed, pausing at the moments that explain it.</p>
+    </div>
+  </header>
+
+  <section class="make" aria-label="Make your own">
+    <div class="copy"><span>Install</span><code id="cmdSkill">npx skills add smarchone/sim-xp --skill story-to-playbook -g</code><button data-copy="cmdSkill">Copy</button></div>
+    <div class="copy"><span>Write</span><code id="cmdRun">claude "/story-to-playbook why Postgres replicas fall behind during a big backfill"</code><button data-copy="cmdRun">Copy</button></div>
+    <p class="small muted" style="margin:0">Then drop the file it writes on the <a href="v2/">player</a>.</p>
+  </section>
+
+  <section aria-labelledby="pbHead">
+    <div class="bar">
+      <h2 id="pbHead">Playbooks <span id="count"></span></h2>
+      <input id="filter" type="search" placeholder="Filter by title or tag" aria-label="Filter playbooks">
+    </div>
+    <div class="error" id="error" hidden></div>
+    <ul class="list" id="list"></ul>
+  </section>
+</main>
+
+<script type="module">
+  const $ = (id) => document.getElementById(id);
+  let rows = [];
+  function render() {
+    const q = $("filter").value.trim().toLowerCase();
+    const shown = rows.filter((r) => !q || r.text.includes(q));
+    $("list").replaceChildren(...shown.map((r) => r.li));
+    if (!shown.length) { const li = document.createElement("li"); li.className = "empty"; li.textContent = "No playbook matches."; $("list").append(li); }
+    $("count").textContent = q ? `${shown.length} of ${rows.length}` : rows.length;
+  }
+  try {
+    const index = await (await fetch("v2/playbooks/index.json")).json();
+    rows = index.map((p) => {
+      const li = document.createElement("li"), a = document.createElement("a");
+      a.href = "v2/?pb=" + encodeURIComponent(p.id);
+      a.innerHTML = `<div class="what"><b></b><p></p></div><span class="meta"></span><span class="play">Play</span>`;
+      a.querySelector("b").textContent = p.title;
+      a.querySelector("p").textContent = p.story;
+      a.title = p.story;
+      for (const t of [`${Math.round(p.duration_s / 60)} min`, ...p.tags.slice(0, 2)]) {
+        const s = document.createElement("span"); s.textContent = t; a.querySelector(".meta").append(s);
+      }
+      li.append(a);
+      return { li, text: [p.title, p.story, ...p.tags].join(" ").toLowerCase() };
+    });
+    render();
+  } catch (e) { $("error").textContent = "Could not load the playbooks."; $("error").hidden = false; }
+  $("filter").oninput = render;
+  document.querySelectorAll("[data-copy]").forEach((b) => {
+    b.onclick = async () => {
+      const code = $(b.dataset.copy);
+      try { await navigator.clipboard.writeText(code.textContent); b.textContent = "Copied"; } catch (err) { getSelection().selectAllChildren(code); b.textContent = "Selected"; }
+      setTimeout(() => (b.textContent = "Copy"), 1500);
+    };
+  });
+</script>
+</body>
+</html>

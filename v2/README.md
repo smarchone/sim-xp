@@ -8,7 +8,7 @@ moments that explain what happened. A one-screen report closes the run.
 story ──(Claude Code + story-to-playbook skill)──► playbook.json ──(drop it on the page)──► this page plays it
 ```
 
-v1 (the MVP in `../mvp`) let the learner operate the system. v2 drops that: nobody operates anything, the
+v1 (the MVP in `../mvp`, now deprecated) let the learner operate the system. v2 drops that: nobody operates anything, the
 playbook is played deterministically, and the experience is about how easy it is to follow.
 
 ## Run it
