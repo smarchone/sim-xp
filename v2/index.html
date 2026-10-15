@@ -37,8 +37,10 @@
     <ol class="steps">
       <li><span>Add the WebMCP bridge to Claude Code, once</span>
         <div class="copy"><code id="cmdAdd">claude mcp add webmcp -- npx -y @smarchone/webmcp-bridge</code><button data-copy="cmdAdd">Copy</button></div></li>
-      <li><span>From a clone of <a href="https://github.com/smarchone/sim-xp">sim-xp</a> (it has the story-to-playbook skill), ask for a story</span>
-        <div class="copy"><code id="cmdRun">claude "Use the story-to-playbook skill on: why Postgres replicas fall behind during a big backfill. Then open https://smarchone.github.io/sim-xp/v2/ with the webmcp tools and play it."</code><button data-copy="cmdRun">Copy</button></div></li>
+      <li><span>Download the <code>/story-to-playbook</code> command, once (rerun to update)</span>
+        <div class="copy"><code id="cmdCmd">npx degit smarchone/sim-xp/.claude/commands ~/.claude/commands --force</code><button data-copy="cmdCmd">Copy</button></div></li>
+      <li><span>Give it a story: a prompt, a postmortem or a blog post URL</span>
+        <div class="copy"><code id="cmdRun">claude "/story-to-playbook why Postgres replicas fall behind during a big backfill"</code><button data-copy="cmdRun">Copy</button></div></li>
     </ol>
   </section>
 </main>

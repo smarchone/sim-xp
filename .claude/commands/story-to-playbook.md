@@ -1,6 +1,6 @@
 ---
-name: story-to-playbook
-description: Turn a story (blog post, postmortem, concept or short prompt) into a sim-xp playbook that the player animates as a narrated, realistic simulation.
+description: Turn a story (blog post, postmortem, concept or short prompt) into a sim-xp playbook and play it in the browser through WebMCP
+argument-hint: "[story, URL or prompt]"
 ---
 
 # Story → playbook
@@ -13,19 +13,33 @@ The bet: seeing a system in motion is easier than reading about it. Your job is 
 **realistic, relevant and easy to follow**. Concepts (replication lag, Kafka rebalancing) and
 incidents are the same thing here: every playbook is a narrated story.
 
-Paths below are relative to the sim-xp repo root.
+Story: $ARGUMENTS
 
-| Where | What |
+The player is a web page, https://smarchone.github.io/sim-xp/v2/ (source: https://github.com/smarchone/sim-xp/tree/main/v2).
+You reach it through the `webmcp` MCP server (the [WebMCP bridge](https://github.com/smarchone/webmcp-apps)).
+If that server is not set up, stop and give the person the command:
+`claude mcp add webmcp -- npx -y @smarchone/webmcp-bridge`.
+
+The page's tools, called with the bridge's `page_call_tool`:
+
+| Tool | Use it to |
 |---|---|
-| `v2/playbooks/kafka-rebalance-storm.json` | A complete, approved playbook. Read it before writing your own. The other files in `v2/playbooks/` are good references too. |
-| `v2/tools/validate.mjs` | `node v2/tools/validate.mjs pb.json [--at 60,120]` checks the playbook and prints the world (metric values, alert fire/resolve times) at every key moment. |
-| `v2/index.html` | The player page, live at https://smarchone.github.io/sim-xp/v2/. Its WebMCP tools (`validate_playbook`, `load_playbook`, `get_state`, `wait_for`, `control`) load and play a playbook. |
+| `list_playbooks`, `load_playbook {id}`, `get_playbook` | Read the bundled playbooks. `kafka-rebalance-storm` is the approved example: read it before writing your own. |
+| `validate_playbook` | Check a playbook and see the world (metric values, alert fire/resolve times) at every key moment |
+| `load_playbook` | Load your playbook into the player and show its story |
+| `get_state`, `wait_for`, `control` | Look at the world at any second, wait for a key moment, drive playback when asked |
 
-Write new playbooks to `v2/playbooks/<id>.json`, where `<id>` is `meta.id`.
+Pass playbooks as files: write `playbooks/<id>.json` (`<id>` is `meta.id`) in the folder Claude Code runs in,
+and pass `{"$file": "playbooks/<id>.json"}`. The bridge inlines the file, so the JSON stays out of the conversation.
+Inside a sim-xp clone, write to `v2/playbooks/` instead; there `node v2/tools/validate.mjs <file> [--at 60,120]` runs
+the same checks offline.
 
 ## Workflow
 
-1. **Read the story.** Pull out: the system, the trigger, the mechanism (why it got worse),
+0. **Open the page.** `browser_open_page` with `https://smarchone.github.io/sim-xp/v2/` (or a local
+   `http://localhost:3000/` when testing player changes), then `load_playbook {"id": "kafka-rebalance-storm"}`
+   and `get_playbook` to read the example.
+1. **Read the story** (fetch it if it is a URL). Pull out: the system, the trigger, the mechanism (why it got worse),
    what people saw and did, the fix, and the lesson. If the story is vague, invent realistic
    detail (names, versions, numbers, config keys, log lines) consistent with how the real tech
    behaves. Real defaults beat round numbers (`max.poll.interval.ms=300000`, not "a timeout").
@@ -33,19 +47,16 @@ Write new playbooks to `v2/playbooks/<id>.json`, where `<id>` is `meta.id`.
    worse (the mechanism) → someone acts / the fix → why the fix works → recovered. One idea per
    key moment.
 3. **Write the playbook** (schema below). Start from the example's shape.
-4. **Observe the world.** Run `node v2/tools/validate.mjs v2/playbooks/<id>.json` (or the page's `validate_playbook`). Read the printed values at each key moment and the
+4. **Observe the world.** Call `validate_playbook` with the file. Read the values at each key moment and the
    alert times, and check they tell your story: does lag actually rise before the alert? does the
-   note's claim match the number? Use `--at` for any other second. Fix and re-run until clean.
-5. **Load and play it** through the `webmcp` MCP server (the WebMCP bridge):
-   - `browser_open_page` with `https://smarchone.github.io/sim-xp/v2/`. To test local player changes, serve
-     the repo (`python3 -m http.server 3000` in `v2/`) and open `http://localhost:3000/` instead.
-   - `page_call_tool` `load_playbook` with `{"playbook": {"$file": "v2/playbooks/<id>.json"}}`. The bridge
+   note's claim match the number? Pass `at: [seconds]` for any other moment. Fix and re-run until clean.
+5. **Load and play it:**
+   - `load_playbook` with `{"playbook": {"$file": "playbooks/<id>.json"}}`. The bridge
      inlines the file, so the JSON stays out of the conversation. Add `"autoplay": true` only when the person
      asked you to start it; otherwise the story shows and they press Space.
    - Tell the person how to watch: Space plays and pauses, ←/→ jump between key moments, R opens the report.
    - To check the run yourself, `get_state` with `t` shows the world at any second without moving playback.
-   If the `webmcp` server is not set up, say so and give the command:
-   `claude mcp add webmcp -- npx -y @smarchone/webmcp-bridge`.
+   - Finish with one or two lines: what is playing, and the file path for replaying it later.
 
 ## Schema `sim-xp/playbook@2`
 
@@ -150,7 +161,8 @@ Sorted list of events: `{ t, title?, feed?, effects?, metrics?, beat? }`
 
 ## Freezing a good run
 
-A playbook plays the same every time, so a good one is already frozen: keep it in `v2/playbooks/`, add it
-to `v2/playbooks/index.json` (id, file, title, story, duration_s, tags, key_moments) so the page lists it,
-and it can be shared and replayed without re-authoring. `get_playbook` returns the loaded JSON if it was
+A playbook plays the same every time, so a good one is already frozen: keep the file, and anyone can replay
+it by dropping it on the page or loading it with `load_playbook`. To bundle it with the page, add it to
+`v2/playbooks/` in sim-xp and list it in `v2/playbooks/index.json` (id, file, title, story, duration_s, tags,
+key_moments). `get_playbook` returns the loaded JSON if it was
 edited elsewhere.
