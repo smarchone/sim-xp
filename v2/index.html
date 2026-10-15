@@ -32,15 +32,14 @@
   </section>
 
   <section aria-labelledby="ccHead" class="cc">
-    <h2 id="ccHead">Let Claude Code write and play one</h2>
-    <p class="small muted">Claude Code turns a story (a blog post, a postmortem, a one-line prompt) into a playbook, loads it here through WebMCP and plays it. Requires Node 22+ and Chrome.</p>
+    <h2 id="ccHead">Let Claude Code write one</h2>
+    <p class="small muted">The <code>story-to-playbook</code> skill turns a story (a blog post, a postmortem, a one-line prompt) into a checked playbook file. Requires Node 18+.</p>
     <ol class="steps">
-      <li><span>Add the WebMCP bridge to Claude Code, once</span>
-        <div class="copy"><code id="cmdAdd">claude mcp add webmcp -- npx -y @smarchone/webmcp-bridge</code><button data-copy="cmdAdd">Copy</button></div></li>
-      <li><span>Download the <code>/story-to-playbook</code> command, once (rerun to update)</span>
-        <div class="copy"><code id="cmdCmd">npx degit smarchone/sim-xp/.claude/commands ~/.claude/commands --force</code><button data-copy="cmdCmd">Copy</button></div></li>
+      <li><span>Download the skill, once (rerun to update)</span>
+        <div class="copy"><code id="cmdSkill">npx degit smarchone/sim-xp/.claude/skills/story-to-playbook ~/.claude/skills/story-to-playbook --force</code><button data-copy="cmdSkill">Copy</button></div></li>
       <li><span>Give it a story: a prompt, a postmortem or a blog post URL</span>
         <div class="copy"><code id="cmdRun">claude "/story-to-playbook why Postgres replicas fall behind during a big backfill"</code><button data-copy="cmdRun">Copy</button></div></li>
+      <li><span>Drop the playbook file it writes (<code>playbooks/&lt;id&gt;.json</code>) on this page</span></li>
     </ol>
   </section>
 </main>

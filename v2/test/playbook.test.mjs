@@ -53,3 +53,10 @@ test("page tools reject unknown arguments and report the world at any second", a
   assert.equal(v.ok, true);
   assert.equal(v.world.at[0].t, 100);
 });
+
+test("the story-to-playbook skill ships the same validator and examples as v2", () => {
+  const skill = new URL("../../.claude/skills/story-to-playbook/", import.meta.url);
+  const same = (a, b) => assert.equal(fs.readFileSync(a, "utf8"), fs.readFileSync(b, "utf8"), `${b.pathname} is out of date; copy it from ${a.pathname}`);
+  same(new URL("../js/playbook.js", import.meta.url), new URL("scripts/playbook.js", skill));
+  for (const f of fs.readdirSync(new URL("examples/", skill))) same(new URL(f, dir), new URL("examples/" + f, skill));
+});
