@@ -24,7 +24,6 @@ Everything you need is next to this file (`<skill>` below means this skill's fol
 | File | What it is |
 |---|---|
 | `<skill>/examples/kafka-rebalance-storm.json` | The approved example. Read it before writing your own. |
-| `<skill>/examples/*.json` | Three more good playbooks: a concept (Postgres replica lag), a vague prompt (cache stampede), a real postmortem (GitHub 2018) |
 | `<skill>/scripts/validate.mjs` | `node <skill>/scripts/validate.mjs <file> [--at 60,120]`: checks the playbook and prints the world (metric values, alert fire and resolve times) at every key moment. Node 18+, no dependencies. |
 
 Write the playbook to `playbooks/<id>.json` in the current folder, where `<id>` is `meta.id`, unless the person

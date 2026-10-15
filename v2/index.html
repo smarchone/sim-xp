@@ -35,8 +35,8 @@
     <h2 id="ccHead">Let Claude Code write one</h2>
     <p class="small muted">The <code>story-to-playbook</code> skill turns a story (a blog post, a postmortem, a one-line prompt) into a checked playbook file. Requires Node 18+.</p>
     <ol class="steps">
-      <li><span>Download the skill, once (rerun to update)</span>
-        <div class="copy"><code id="cmdSkill">npx degit smarchone/sim-xp/.claude/skills/story-to-playbook ~/.claude/skills/story-to-playbook --force</code><button data-copy="cmdSkill">Copy</button></div></li>
+      <li><span>Install the skill, once</span>
+        <div class="copy"><code id="cmdSkill">npx skills add smarchone/sim-xp --skill story-to-playbook -g</code><button data-copy="cmdSkill">Copy</button></div></li>
       <li><span>Give it a story: a prompt, a postmortem or a blog post URL</span>
         <div class="copy"><code id="cmdRun">claude "/story-to-playbook why Postgres replicas fall behind during a big backfill"</code><button data-copy="cmdRun">Copy</button></div></li>
       <li><span>Drop the playbook file it writes (<code>playbooks/&lt;id&gt;.json</code>) on this page</span></li>

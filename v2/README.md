@@ -27,15 +27,15 @@ Tests: `node --test v2/test/*.test.mjs`
 
 ## With Claude Code
 
-Download the `story-to-playbook` skill once (rerun to update), give it a story, then drop the playbook file it
+Install the `story-to-playbook` skill once, give it a story, then drop the playbook file it
 writes on the page:
 
 ```sh
-npx degit smarchone/sim-xp/.claude/skills/story-to-playbook ~/.claude/skills/story-to-playbook --force
+npx skills add smarchone/sim-xp --skill story-to-playbook -g
 claude "/story-to-playbook why Postgres replicas fall behind during a big backfill"
 ```
 
-The skill is self-contained: the format and authoring rules, four example playbooks, and the validator.
+The skill is self-contained: the format and authoring rules, an example playbook, and the validator.
 A clone of this repo has it already, in `.claude/skills/story-to-playbook`.
 
 The page also registers WebMCP tools, so an agent with the
@@ -58,8 +58,7 @@ The page also registers WebMCP tools, so an agent with the
 |---|---|
 | `index.html`, `js/app.js` | The page: library, file drop, player frame, WebMCP tools |
 | `player.html` | The player. It plays the playbook its host page hands it, and exposes `window.player` for playback |
-| `js/playbook.js` | Validation and the noise-free simulation, shared by the page and the CLI |
+| `js/playbook.js` | Symlink to the skill's validator (`../.claude/skills/story-to-playbook/scripts/playbook.js`), so the page and the skill share one copy |
 | `js/tools.js` | The WebMCP tools |
-| `tools/validate.mjs` | `node v2/tools/validate.mjs pb.json [--at 60,120]` |
-| `playbooks/` | Four playbooks and `index.json` |
-| `../.claude/skills/story-to-playbook/` | The skill: format, authoring rules, examples, and a copy of the validator |
+| `playbooks/` | Four playbooks and `index.json`; the Kafka one is a symlink to the skill's example |
+| `../.claude/skills/story-to-playbook/` | The skill: format, authoring rules, one example, and the validator (`node scripts/validate.mjs pb.json [--at 60,120]`) |
