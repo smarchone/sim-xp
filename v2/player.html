@@ -51,11 +51,11 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--p
 
 /* components stage */
 .stage{display:flex;flex-direction:column;overflow:hidden}
-.zoomc{margin-left:auto;display:flex;gap:2px}
-.zoomc button{font:inherit;line-height:1;min-width:20px;height:18px;padding:0 5px;border:1px solid var(--line);border-radius:5px;background:transparent;color:var(--muted);cursor:pointer}
-.zoomc button:hover{color:var(--text);border-color:var(--muted)}
-.zoomc button[hidden]{display:none}
-#comp.zoomed{cursor:grab}#comp.panning{cursor:grabbing}
+.zoombar{position:absolute;top:10px;right:16px;z-index:2;display:flex;align-items:center;background:var(--glass);border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+.zoombar button{border:0;border-radius:0;background:transparent;color:var(--muted);padding:2px 8px;font:500 var(--s) var(--mono);line-height:18px;min-width:26px}
+.zoombar button:hover{color:var(--fg);background:var(--sunk);border-color:transparent}
+.zoombar #zoomPct{min-width:46px;border-left:1px solid var(--line);border-right:1px solid var(--line);font-variant-numeric:tabular-nums}
+#comp{cursor:grab;touch-action:none}#comp.panning{cursor:grabbing}
 .split{position:absolute;top:0;bottom:0;right:0;width:8px;cursor:col-resize;z-index:5;touch-action:none;outline:none}
 .split::after{content:"";position:absolute;top:0;bottom:0;left:5px;width:2px;border-radius:1px;background:var(--accent);opacity:0;transition:opacity .15s}
 .split:hover::after,.split:focus-visible::after,.split.drag::after{opacity:.7}
@@ -292,6 +292,8 @@ pre{font:var(--s)/1.5 var(--mono);background:var(--sunk);border-radius:8px;paddi
           <span><kbd>R</kbd></span><span>report</span>
           <span><kbd>−</kbd><kbd>+</kbd></span><span>slower / faster</span>
           <span><kbd>Esc</kbd></span><span>close</span>
+          <span>drag · scroll</span><span>pan the components</span>
+          <span>Ctrl + scroll</span><span>zoom them (or pinch)</span>
           <span>hover</span><span>charts or feed to look back</span>
           <span>click</span><span>a feed line or chart to jump there</span>
         </div>
@@ -309,8 +311,8 @@ pre{font:var(--s)/1.5 var(--mono);background:var(--sunk);border-radius:8px;paddi
   <main class="main">
     <div class="board" id="dashgrid">
       <div class="pn stage dimmable" id="compCard" data-pn="comps">
-        <div class="ph"><span>Components</span><span class="zoomc"><button type="button" id="zoomOut" title="Zoom out" aria-label="Zoom out">−</button><button type="button" id="zoomIn" title="Zoom in (or scroll over the diagram)" aria-label="Zoom in">+</button><button type="button" id="zoomReset" title="Fit to view" hidden>fit</button></span></div>
-        <div class="stagebox"><svg id="comp" role="img" aria-label="Components"></svg></div>
+        <div class="ph"><span>Components</span></div>
+        <div class="stagebox"><svg id="comp" role="img" aria-label="Components"></svg><div class="zoombar"><button type="button" id="zoomOut" title="Zoom out" aria-label="Zoom out">−</button><button type="button" id="zoomPct" title="Fit to view" aria-label="Fit to view">100%</button><button type="button" id="zoomIn" title="Zoom in" aria-label="Zoom in">+</button></div></div>
         <div class="sheet" id="caption" aria-live="polite">
           <div class="strip" id="sheetStrip"></div>
           <div class="sb">
@@ -487,9 +489,9 @@ const LAYOUTS = { wide: autoLayout("LR"), tall: autoLayout("TB") };
 const comp = $("#comp"); let nodeEls = {}, partEls = {}, edgeEls = {}, nodes = {}, layoutKey = null;
 const ONE_SCREEN = matchMedia("(min-width:1000px) and (min-height:600px)");
 const stageEl = $("#compCard");
-$("#zoomIn").onclick = () => { const c = centerVB(); zoomAt(1.4, c[0], c[1]); };
-$("#zoomOut").onclick = () => { const c = centerVB(); zoomAt(1 / 1.4, c[0], c[1]); };
-$("#zoomReset").onclick = resetView;
+$("#zoomIn").onclick = () => { const c = centerVB(); zoomAt(1.25, c[0], c[1]); };
+$("#zoomOut").onclick = () => { const c = centerVB(); zoomAt(1 / 1.25, c[0], c[1]); };
+$("#zoomPct").onclick = () => resetView();
 // one-screen: pick the layout whose aspect fits the stage box; stacked: top-to-bottom only on phones
 // resize observers fire many times while a splitter is dragged; draw at most once per frame
 let renderQueued = false;
@@ -506,33 +508,40 @@ const pickLayout = () => {
   }
   return innerWidth <= 640 ? "tall" : "wide";
 };
-// zoom/pan the components by moving the viewBox (text keeps its on-screen size, see fitCompText): wheel or +/- to zoom, drag to pan, double-click or the reset button to fit
-let view = { z: 1, x: 0, y: 0 };
-const ZMIN = 1, ZMAX = 4;
-function applyView(vb = LAYOUTS[layoutKey].vb) {
-  const w = vb[0] / view.z, h = vb[1] / view.z;
-  view.x = Math.max(0, Math.min(vb[0] - w, view.x)); view.y = Math.max(0, Math.min(vb[1] - h, view.y));
+// Excalidraw-style canvas: drag to pan, Ctrl+scroll or pinch to zoom at the cursor, plain scroll pans, double-click or the % button fits.
+// The viewBox always has the stage's aspect, so view = { z: zoom relative to fit, x/y: top-left in graph units, fit: untouched }.
+// Text is sized in graph units (see fitCompText), so it grows and shrinks with the canvas like any drawing.
+let view = { z: 1, x: 0, y: 0, fit: true };
+const ZMIN = 0.4, ZMAX = 6, clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const stageSize = () => [comp.clientWidth || 1, comp.clientHeight || 1];
+const fitScale = () => { const [W, H] = stageSize(), vb = LAYOUTS[layoutKey].vb; return Math.min(W / vb[0], H / vb[1]) || 1; };
+function applyView() {
+  const vb = LAYOUTS[layoutKey].vb, [W, H] = stageSize(), s = fitScale() * view.z, w = W / s, h = H / s;
+  if (view.fit) { view.x = (vb[0] - w) / 2; view.y = 0; } // centred across, top-aligned
+  else { const m = 60 / s; view.x = clamp(view.x, m - w, vb[0] - m); view.y = clamp(view.y, m - h, vb[1] - m); } // keep some of the graph in view
   comp.setAttribute("viewBox", `${view.x.toFixed(1)} ${view.y.toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}`);
-  comp.classList.toggle("zoomed", view.z > 1.001);
-  if ($("#zoomReset")) $("#zoomReset").hidden = view.z <= 1.001;
+  $("#zoomPct").textContent = Math.round(view.z * 100) + "%";
 }
-function zoomAt(f, cx, cy) { // f: factor; (cx,cy) in viewBox units stays under the cursor
-  const vb = LAYOUTS[layoutKey].vb, z = Math.max(ZMIN, Math.min(ZMAX, view.z * f)); if (z === view.z) return;
-  const k = view.z / z; view.x = cx - (cx - view.x) * k; view.y = cy - (cy - view.y) * k; view.z = z;
-  applyView(vb); fitCompText();
+function zoomAt(f, cx, cy) { // f: factor; (cx,cy) in graph units stays under the cursor
+  const z = clamp(view.z * f, ZMIN, ZMAX); if (z === view.z) return;
+  const k = view.z / z; view.x = cx - (cx - view.x) * k; view.y = cy - (cy - view.y) * k; view.z = z; view.fit = false; applyView();
 }
 const toVB = (x, y) => { const m = comp.getScreenCTM(); if (!m) return null; const p = new DOMPoint(x, y).matrixTransform(m.inverse()); return [p.x, p.y]; };
-const centerVB = () => { const vb = LAYOUTS[layoutKey].vb; return [view.x + vb[0] / view.z / 2, view.y + vb[1] / view.z / 2]; };
-function resetView() { view = { z: 1, x: 0, y: 0 }; applyView(); fitCompText(); }
-comp.addEventListener("wheel", e => { e.preventDefault(); const p = toVB(e.clientX, e.clientY); if (p) zoomAt(Math.exp(-e.deltaY * 0.0015), p[0], p[1]); }, { passive: false });
+const centerVB = () => { const [W, H] = stageSize(), s = fitScale() * view.z; return [view.x + W / s / 2, view.y + H / s / 2]; };
+function resetView() { view = { z: 1, x: 0, y: 0, fit: true }; applyView(); }
+comp.addEventListener("wheel", e => {
+  e.preventDefault();
+  if (e.ctrlKey || e.metaKey) { const p = toVB(e.clientX, e.clientY); if (p) zoomAt(Math.exp(-clamp(e.deltaY, -40, 40) * 0.006), p[0], p[1]); return; } // pinch arrives as ctrl+wheel
+  const k = comp.getScreenCTM().a || 1; view.x += e.deltaX / k; view.y += e.deltaY / k; view.fit = false; applyView();
+}, { passive: false });
 comp.addEventListener("pointerdown", e => {
-  if (e.button !== 0 || view.z <= 1.001) return;
+  if (e.button > 1) return;
   const x0 = e.clientX, y0 = e.clientY, v0 = { ...view }; let moved = false;
   const move = m => {
     if (!moved && Math.hypot(m.clientX - x0, m.clientY - y0) < 4) return;
     if (!moved) { moved = true; comp.setPointerCapture(e.pointerId); comp.classList.add("panning"); }
-    const k = comp.getScreenCTM().a || 1; // screen px per viewBox unit (constant while panning)
-    view.x = v0.x - (m.clientX - x0) / k; view.y = v0.y - (m.clientY - y0) / k;
+    const k = comp.getScreenCTM().a || 1; // screen px per graph unit (constant while panning)
+    view.x = v0.x - (m.clientX - x0) / k; view.y = v0.y - (m.clientY - y0) / k; view.fit = false;
     applyView();
   };
   const up = () => { comp.classList.remove("panning"); comp.removeEventListener("pointermove", move); comp.removeEventListener("pointerup", up); comp.removeEventListener("pointercancel", up); };
@@ -541,7 +550,7 @@ comp.addEventListener("pointerdown", e => {
 comp.addEventListener("dblclick", e => { if (e.target === comp) resetView(); });
 function buildComponents() {
   layoutKey = pickLayout(); const L = LAYOUTS[layoutKey]; comp.setAttribute("preserveAspectRatio", "xMidYMin meet");
-  comp.replaceChildren(); view = { z: 1, x: 0, y: 0 }; applyView(L.vb); comp.classList.toggle("tall", layoutKey === "tall");
+  comp.replaceChildren(); view = { z: 1, x: 0, y: 0, fit: true }; applyView(); comp.classList.toggle("tall", layoutKey === "tall");
   nodeEls = {}; partEls = {}; edgeEls = {};
   nodes = Object.fromEntries(PB.components.nodes.map(n => [n.id, { ...n, ...(L.n[n.id] || {}) }]));
   const gEdges = el("g", {}, comp), gNodes = el("g", {}, comp);
@@ -653,19 +662,18 @@ function placeDots(T) {
   }
 }
 buildComponents();
-// keep components text at a fixed on-screen size: names ~10.5px, labels ~9px (clamped so text still fits its box)
+// components text is sized so it reads ~11px (names) and ~9.5px (labels) when the graph is fitted, then scales with the canvas
 let compText = null;
 function fitCompText() {
-  const r = comp.getBoundingClientRect(), vb = LAYOUTS[layoutKey].vb; if (!r.width) return;
-  const sc = (Math.min(r.width / vb[0], r.height / vb[1]) * view.z) || 1;
-  const ct = Math.min(14.4, Math.max(10.6, 13.1 / sc)), cs = Math.min(12.5, Math.max(9.4, 11.25 / sc));
+  const sc = fitScale();
+  const ct = Math.min(13, Math.max(8.5, 11 / sc)), cs = Math.min(11, Math.max(7.5, 9.5 / sc));
   if (compText && Math.abs(compText.ct - ct) < 0.05 && Math.abs(compText.cs - cs) < 0.05) return;
   compText = { ct, cs, charW: cs * 0.62 };
   comp.style.setProperty("--ct", ct.toFixed(2) + "px"); comp.style.setProperty("--cs", cs.toFixed(2) + "px");
   for (const id in nodeEls) nodeEls[id].lastSub = null; // re-wrap labels for the new size
   scheduleRender();
 }
-new ResizeObserver(() => { if (pickLayout() !== layoutKey) { buildComponents(); compText = null; if (activeBeat) applyFocus(activeBeat); scheduleRender(); } fitCompText(); }).observe(stageEl);
+new ResizeObserver(() => { if (pickLayout() !== layoutKey) { buildComponents(); compText = null; if (activeBeat) applyFocus(activeBeat); scheduleRender(); } applyView(); fitCompText(); }).observe(stageEl);
 
 /* ===================== Dashboard =====================
    Rules that make it regular:
