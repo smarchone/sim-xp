@@ -1,9 +1,9 @@
-name: Deploy mvp to GitHub Pages
+name: Deploy to GitHub Pages
 
 on:
   push:
     branches: [main]
-    paths: ['mvp/**', '.github/workflows/pages.yml']
+    paths: ['mvp/**', 'v2/**', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 permissions:
@@ -23,10 +23,12 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - run: node --test mvp/test/*.test.mjs
+      - run: node --test mvp/test/*.test.mjs v2/test/*.test.mjs
+      # the MVP stays at the site root; v2 is served at /v2/
+      - run: cp -r mvp _site && cp -r v2 _site/v2
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: mvp
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4
