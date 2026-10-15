@@ -55,10 +55,15 @@ Top level: `schema`, `meta`, `components`, `metrics`, `dashboard`, `alerts`, `in
 `timeline`, `report`. Times are integer seconds from 0 to `meta.duration_s`.
 
 ### meta
-`{ id, title, story, duration_s, tags[] }`
+`{ id, title, story, duration_s, tags[], background[], cast[], watch[], learn[] }`
 - `title`: short and evocative ("The rebalance storm: when slow looks dead").
-- `story`: 2–3 sentences shown first. Sets the scene, does not spoil the cause.
+- `story`: the hook, 1–2 sentences, shown large at the top of the intro and as the subtitle in the gallery. Sets the scene, does not spoil the cause.
 - `duration_s`: 240–600 is typical (the viewer watches at 1×–4×).
+- The rest is the **intro**: it is how a viewer who has never seen this system gets the context. Write for an engineer who knows software but not this stack.
+  - `background`: 2–4 `{ title, body }` paragraphs, each ≤ ~400 chars, plain words. A good set is "The system" (what it is, rough scale, why it is built this way), "How it normally works" (the mechanism, in the normal state), "Today" (what is about to happen). Do not spoil the cause.
+  - `cast`: `[{ name, role }]`, one per component the viewer will see (use the component labels), role in a few words.
+  - `watch`: `[{ label, normal }]`, 2–3 things to keep an eye on with the normal value (`{ "label": "Replica replay lag", "normal": "normal < 1 s" }`).
+  - `learn`: 2–4 short "you'll come away knowing…" lines. No spoilers; name the question, not the answer.
 
 ### components
 `{ nodes: [{ id, label, kind, parts?: [{id}], part_cols? }], edges: [{ id, from, to }] }`
@@ -123,14 +128,18 @@ Sorted list of events: `{ t, title?, feed?, effects?, metrics?, beat? }`
   grey = paused, distinct colours = ownership. Changing traffic should change edge `flow`.
 
 ### report
-`{ tldr, fix_t?, sparkline?, chain[], loop?, stats[], learnings[] }`
+`{ tldr, fix_t?, chain[], loop?, stats[], learnings[], math?, myths?, links? }`
+The report is a calm single column: tl;dr, the numbers, how it happened, (the arithmetic), takeaways, (myths), (read more).
 - `tldr`: one or two sentences, cause → consequence.
-- `chain`: 4–6 boxes `{ id, kind, text }` (text ≤ 42 chars, wraps to 3 short lines), kind `cause` | `effect` | `amp` (amplifier) | `fix`.
-- `loop` `{ from, to, label }`: a feedback loop between two chain boxes, when there is one.
+- `chain`: 4–6 steps `{ id, kind, text }`, shown as a list, one sentence each (≤ ~100 chars), kind `cause` | `effect` | `amp` (amplifier) | `fix`.
+- `loop` `{ from, to, label }`: a feedback loop between two chain steps, when there is one.
 - `stats` `[{ label, metric, unit, agg: "max"|"min"|"delta" }]`: 2–4 numbers worth remembering,
-  shown as worst (max or min over the run) → value at the end; `delta` shows change before vs after `fix_t`.
-- `sparkline`: the metric that best shows the whole run (defaults to the first panel's first metric); `fix_t` marks the fix.
-- `learnings` 3–4 `{ glyph, title, body }`: title ≤ 40 chars, body one sentence, actionable.
+  shown as worst (max or min over the run) and the value at the end; `delta` shows change before vs after `fix_t`. `fix_t` marks the fix.
+- `learnings` 3–4 `{ glyph, title, body }`: title ≤ 40 chars, body one or two sentences, actionable. (`glyph` is kept for old playbooks and not drawn.)
+- `math` (optional) `{ title?, lines[] }`: the back-of-envelope that explains the mechanism, one line per step, monospace (`"42M rows ÷ 50k per batch = 840 batches"`).
+- `myths` (optional) `[{ myth, truth }]`: the tempting wrong explanations ("Add a third replica"), and why they fail. 1–3.
+- `links` (optional) `[{ label, url }]`: 1–3 https links to read more (docs, the original postmortem). Only link what you are sure exists.
+- `sparkline` is no longer drawn; leave it out.
 
 ## Rules of thumb
 

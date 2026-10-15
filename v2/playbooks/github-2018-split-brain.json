@@ -12,6 +12,61 @@
    "failover",
    "split-brain",
    "network-partition"
+  ],
+  "background": [
+   {
+    "title": "The system",
+    "body": "GitHub runs MySQL clusters, each with a primary and replicas, across data centers on the US East and West coasts. Orchestrator, a 3-node Raft group (East, West, cloud), watches them and promotes a replica when it decides a primary is dead."
+   },
+   {
+    "title": "How it normally works",
+    "body": "Apps in the East data center write to East primaries, which replicate asynchronously to West. Writes are local and fast. West holds replicas that can take over if an East primary ever fails."
+   },
+   {
+    "title": "Today",
+    "body": "Engineers replace a failing 100G optic at the East network hub. The East data center loses contact with the rest of the network for 43 seconds. Time is compressed after the first two minutes."
+   }
+  ],
+  "cast": [
+   {
+    "name": "us-east network hub",
+    "role": "the link between East and everything else"
+   },
+   {
+    "name": "apps (us-east DC)",
+    "role": "write to East primaries"
+   },
+   {
+    "name": "mysql (us-east) / (us-west)",
+    "role": "the primaries and replicas"
+   },
+   {
+    "name": "orchestrator",
+    "role": "decides who is primary, by Raft majority"
+   },
+   {
+    "name": "webhooks + pages",
+    "role": "background work that reads and writes the same data"
+   }
+  ],
+  "watch": [
+   {
+    "label": "MySQL write p99",
+    "normal": "normal: about 9 ms"
+   },
+   {
+    "label": "Clusters with primary in us-west",
+    "normal": "normal 0"
+   },
+   {
+    "label": "Writes only on old East primaries",
+    "normal": "normal 0"
+   }
+  ],
+  "learn": [
+   "how a 43-second blip becomes a day of recovery",
+   "why failing over is only safe if the apps can live with the new primary",
+   "what you can and cannot do with writes that exist on only one side"
   ]
  },
  "components": {
@@ -1149,7 +1204,6 @@
  "report": {
   "tldr": "A 43-second partition let Orchestrator promote West primaries while East still took writes. Two divergent histories and cross-country latency forced a 24-hour restore.",
   "fix_t": 330,
-  "sparkline": "write_p99",
   "chain": [
    {
     "id": "cut",

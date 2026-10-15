@@ -55,6 +55,18 @@ export function validate(PB) {
   for (const k of ["id", "title", "story", "duration_s"]) if (m[k] == null) err(`meta.${k} is required`);
   const D = m.duration_s;
   if (!isNum(D) || D < 60 || D > 1800) err("meta.duration_s must be a number between 60 and 1800");
+  // intro context (all optional, but a good playbook has them: the intro is where the viewer learns what they are looking at)
+  const str = (v) => typeof v === "string" && v.trim().length > 0;
+  if (m.background != null) {
+    if (!Array.isArray(m.background) || !m.background.length) err("meta.background must be a list of { title, body } (2–4 short paragraphs)");
+    else {
+      if (m.background.length > 5) warn("meta.background has more than 5 paragraphs; the intro should be quick to read");
+      m.background.forEach((b, i) => { const body = typeof b === "string" ? b : b && b.body; if (!str(body)) err(`meta.background[${i}] needs a body`); else if (body.length > 420) warn(`meta.background[${i}] is ${body.length} chars; keep under ~400`); });
+    }
+  } else warn("meta.background is missing: the intro will only show the story line");
+  if (m.cast != null) { if (!Array.isArray(m.cast)) err("meta.cast must be a list of { name, role }"); else m.cast.forEach((c, i) => { if (!c || !str(c.name) || !str(c.role)) err(`meta.cast[${i}] needs name and role`); }); }
+  if (m.watch != null) { if (!Array.isArray(m.watch)) err("meta.watch must be a list of { label, normal }"); else m.watch.forEach((w, i) => { if (!w || !str(w.label) || !str(w.normal)) err(`meta.watch[${i}] needs label and normal (e.g. "normal < 1 s")`); }); }
+  if (m.learn != null) { if (!Array.isArray(m.learn) || m.learn.some((x) => !str(x))) err("meta.learn must be a list of short strings"); else if (m.learn.length > 4) warn("meta.learn has more than 4 items"); }
 
   // components
   const nodes = PB.components?.nodes || [], edges = PB.components?.edges || [];
@@ -167,10 +179,13 @@ export function validate(PB) {
   const chainIds = new Set((r.chain || []).map(c => c.id));
   if (!(r.chain || []).length) err("report.chain is required (cause → effect → fix boxes)");
   if ((r.chain || []).length > 7) warn("report.chain over 7 boxes gets cramped");
-  for (const c of r.chain || []) { if (!["cause", "effect", "amp", "fix"].includes(c.kind)) err(`report.chain ${c.id}: kind must be cause/effect/amp/fix`); if (c.text && c.text.length > 42) warn(`report.chain ${c.id}: text over 42 chars`); }
+  for (const c of r.chain || []) { if (!["cause", "effect", "amp", "fix"].includes(c.kind)) err(`report.chain ${c.id}: kind must be cause/effect/amp/fix`); if (c.text && c.text.length > 110) warn(`report.chain ${c.id}: text over 110 chars`); }
   if (r.loop && (!chainIds.has(r.loop.from) || !chainIds.has(r.loop.to))) err("report.loop from/to must be chain ids");
   for (const s of r.stats || []) { if (!metricIds.has(s.metric)) err(`report.stats: unknown metric ${s.metric}`); if (!["max", "min", "delta"].includes(s.agg)) err(`report.stats ${s.metric}: agg must be max/min/delta`); }
-  if (r.sparkline && !metricIds.has(r.sparkline)) err(`report.sparkline: unknown metric ${r.sparkline}`);
+  // report.sparkline is no longer drawn; an old playbook that still has it stays valid
+  if (r.math != null && (!r.math || !Array.isArray(r.math.lines) || !r.math.lines.length || r.math.lines.some((x) => typeof x !== "string"))) err("report.math must be { title?, lines: [string] }");
+  if (r.myths != null) { if (!Array.isArray(r.myths)) err("report.myths must be a list of { myth, truth }"); else r.myths.forEach((x, i) => { if (!x || !str(x.myth) || !str(x.truth)) err(`report.myths[${i}] needs myth and truth`); }); }
+  if (r.links != null) { if (!Array.isArray(r.links)) err("report.links must be a list of { label, url }"); else r.links.forEach((x, i) => { if (!x || !str(x.label) || !/^https:\/\//.test(x.url || "")) err(`report.links[${i}] needs a label and an https url`); }); }
   if (r.fix_t != null && (!Number.isInteger(r.fix_t) || r.fix_t > D)) err("report.fix_t must be an integer second within duration");
   const ln = r.learnings || [];
   if (ln.length < 2 || ln.length > 5) warn(`report.learnings has ${ln.length}; 3–4 is ideal`);

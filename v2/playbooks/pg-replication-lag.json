@@ -10,6 +10,57 @@
    "replication",
    "read-replicas",
    "consistency"
+  ],
+  "background": [
+   {
+    "title": "The system",
+    "body": "profile-api serves a consumer app. Every write goes to one Postgres primary. Reads, the large majority of traffic, go to two streaming replicas, which keeps the primary free for writes."
+   },
+   {
+    "title": "How it normally works",
+    "body": "The primary records every change in its write-ahead log (WAL) and streams it to each replica, which replays it in order. A replica is usually a few milliseconds behind, so nobody notices that a read can come from the slightly-past."
+   },
+   {
+    "title": "Today",
+    "body": "The data team starts a backfill that rewrites a column on 42 million user rows. A few seconds later, Maya renames herself and refreshes the page."
+   }
+  ],
+  "cast": [
+   {
+    "name": "profile-api",
+    "role": "writes to the primary, reads from a replica"
+   },
+   {
+    "name": "pg-primary",
+    "role": "takes every write"
+   },
+   {
+    "name": "pg-replica-1, -2",
+    "role": "replay the primary's WAL and serve reads"
+   },
+   {
+    "name": "backfill_user_tz",
+    "role": "a one-off job over 42M rows"
+   },
+   {
+    "name": "maya's browser",
+    "role": "one user, one rename"
+   }
+  ],
+  "watch": [
+   {
+    "label": "Replica replay lag",
+    "normal": "normal < 1 s"
+   },
+   {
+    "label": "Reads that miss your own write",
+    "normal": "normal 0%"
+   }
+  ],
+  "learn": [
+   "how a read can come from the past",
+   "what limits how fast a replica catches up",
+   "how apps read their own writes safely"
   ]
  },
  "components": {
@@ -856,7 +907,6 @@
  "report": {
   "tldr": "A bulk backfill made the primary write WAL faster than replicas could replay it. Lag grew to ~35s, so reads routed to replicas returned rows from before the user's own save.",
   "fix_t": 130,
-  "sparkline": "lag",
   "chain": [
    {
     "id": "bf",
@@ -929,6 +979,31 @@
     "glyph": "◔",
     "title": "Alert on lag, not just uptime",
     "body": "Watch pg_stat_replication.replay_lag; a streaming replica can be healthy and 30s behind."
+   }
+  ],
+  "math": {
+   "title": "Why the lag only grows",
+   "lines": [
+    "primary writes WAL      70 MB/s   (backfill)",
+    "one replay process     50 MB/s   (a replica applies WAL in a single process)",
+    "backlog grows by       70 - 50 = 20 MB/s",
+    "by the time the fix ships  about 2.4 GB behind, which reads as tens of seconds of lag"
+   ]
+  },
+  "myths": [
+   {
+    "myth": "Add a third replica.",
+    "truth": "Every replica replays the same WAL at the same speed, so another one is just as far behind. It also adds one more stream for the primary to feed."
+   },
+   {
+    "myth": "The replicas are overloaded.",
+    "truth": "Replica CPU stayed low. Replay is limited by one process, not by the machine around it."
+   }
+  ],
+  "links": [
+   {
+    "label": "PostgreSQL docs: hot standby and query conflicts",
+    "url": "https://www.postgresql.org/docs/current/hot-standby.html"
    }
   ]
  }

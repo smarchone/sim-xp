@@ -10,6 +10,57 @@
    "consumer-groups",
    "rebalancing",
    "backpressure"
+  ],
+  "background": [
+   {
+    "title": "The system",
+    "body": "checkout-api publishes every order to a 6-partition orders topic. Three payments workers form one consumer group and charge the orders, each polling a batch of up to 500 records, processing them one by one against Postgres, then committing."
+   },
+   {
+    "title": "How it normally works",
+    "body": "A worker must call poll() again within max.poll.interval.ms (5 minutes). If it does not, the group coordinator decides it is dead, removes it, and rebalances: partitions are reassigned to whoever is left. Normally a batch takes seconds and this never comes up."
+   },
+   {
+    "title": "Today",
+    "body": "A database migration adds a fraud_score lookup with no index yet, which makes each record about 650 ms slower. Nothing crashes and nothing alerts."
+   }
+  ],
+  "cast": [
+   {
+    "name": "checkout-api",
+    "role": "produces about 1,200 orders a second"
+   },
+   {
+    "name": "orders topic",
+    "role": "6 partitions, two per worker"
+   },
+   {
+    "name": "payments-worker-1, -2, -3",
+    "role": "one consumer group, one batch each"
+   },
+   {
+    "name": "payments-db",
+    "role": "looked up for every record"
+   }
+  ],
+  "watch": [
+   {
+    "label": "Consumer lag",
+    "normal": "normal: near 0"
+   },
+   {
+    "label": "Group rebalances",
+    "normal": "normal: almost never"
+   },
+   {
+    "label": "DB query p99",
+    "normal": "normal: about 45 ms"
+   }
+  ],
+  "learn": [
+   "why a slow worker can look dead to Kafka",
+   "why a rebalance makes the next one more likely",
+   "how batch size, timeouts and rebalancing mode fit together"
   ]
  },
  "components": {
@@ -1413,6 +1464,30 @@
     "glyph": "✕",
     "title": "Don't scale out mid-storm",
     "body": "New consumers trigger another rebalance; fix the slow dependency first."
+   }
+  ],
+  "math": {
+   "title": "Why a batch outlasts the deadline",
+   "lines": [
+    "500 records x 650 ms extra   = 325 s of extra work per batch",
+    "max.poll.interval.ms         = 300 s",
+    "325 s > 300 s                -> the worker is evicted, with its batch half done"
+   ]
+  },
+  "myths": [
+   {
+    "myth": "Add more workers.",
+    "truth": "Every new worker triggers another rebalance, and more workers means more partitions reassigned while the group is already unstable."
+   },
+   {
+    "myth": "The workers are crashing.",
+    "truth": "They were healthy. Kafka removed them for being slow to call poll(), which looks identical to dead from the coordinator's side."
+   }
+  ],
+  "links": [
+   {
+    "label": "Kafka docs: max.poll.interval.ms",
+    "url": "https://kafka.apache.org/documentation/#consumerconfigs_max.poll.interval.ms"
    }
   ]
  }

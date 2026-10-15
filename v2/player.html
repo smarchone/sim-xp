@@ -6,27 +6,29 @@
 <title>sim-xp player</title>
 <link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap">
 <style>
-/* Proposal B v4, desktop only, resizable + reorderable (1440x900, 1280x800), cognitive-load pass.
-   Three surfaces: left (components over feed), right (dashboard), bottom (player bar).
-   Type scale: 10 / 11.5 / 14 px, nothing else. Colour only for state (red/amber/green), ownership (teal/violet/pink),
-   and the one accent (playhead, progress, primary action). */
+/* 12 x 6 board: components and feed are placed by hand, charts share one size and fill the rest, the board scrolls.
+   Type scale for the board: 10 / 11.5 / 14 px. Reading screens (intro, report) use the serif at a larger size.
+   Colour only for state (red/amber/green), ownership (teal/violet/pink), and the one accent.
+   Light is cream, dark is warm. */
 :root{
-  --bg:#eef1f5; --panel:#ffffff; --sunk:#f2f4f7; --line:#e3e7ed; --line2:#d5dbe3; --fg:#1b232d; --muted:#66727f; --faint:#9aa4af; --node:#f7f9fb; --glass:rgba(255,255,255,.95);
-  --accent:#2f6fd6; --track:#dde2e8;
-  --red:#d63a48; --amber:#c98a12; --green:#1f9a61; --blue:#2f7fd6; --teal:#14958a; --violet:#6c5ce0; --pink:#c8418d; --grey:#8a949f;
-  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
-  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --bg:#f3eee3; --panel:#fbf8f1; --sunk:#eee8da; --line:#e4dccb; --line2:#d5cab3; --fg:#28241d; --muted:#776d5c; --faint:#9c917a; --node:#f6f1e4; --glass:rgba(251,248,241,.96);
+  --accent:#2c5a98; --track:#e0d7c4;
+  --red:#b8432f; --amber:#a8740f; --green:#2f7a4c; --blue:#2c5a98; --teal:#2a7f78; --violet:#6a55c4; --pink:#b23f80; --grey:#8b8372;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --serif:"Newsreader",Georgia,"Times New Roman",serif;
+  --mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
   --s:10px; --m:11.5px; --l:14px;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0c1015; --panel:#13181e; --sunk:#181e26; --line:#212932; --line2:#2b343f; --fg:#d9e0e8; --muted:#8793a1; --faint:#56616e; --node:#19202a; --glass:rgba(19,24,30,.95);
-  --accent:#6aa6ff; --track:#2a333e; --red:#f0616d; --amber:#f2b84b; --green:#4cc38a; --blue:#5aa9f6; --teal:#3fc1b0; --violet:#9b8cff; --pink:#f07fc0; --grey:#5f6b78;
+  --bg:#131311; --panel:#1b1b18; --sunk:#22221e; --line:#2c2b27; --line2:#3a3933; --fg:#e8e3d8; --muted:#9c9585; --faint:#6b6657; --node:#21211d; --glass:rgba(27,27,24,.96);
+  --accent:#86aee6; --track:#34332d; --red:#e57a64; --amber:#ddb05a; --green:#72c08e; --blue:#86aee6; --teal:#5fc0b3; --violet:#a999f0; --pink:#e888bb; --grey:#7a7567;
   color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#0c1015; --panel:#13181e; --sunk:#181e26; --line:#212932; --line2:#2b343f; --fg:#d9e0e8; --muted:#8793a1; --faint:#56616e; --node:#19202a; --glass:rgba(19,24,30,.95);
-  --accent:#6aa6ff; --track:#2a333e; --red:#f0616d; --amber:#f2b84b; --green:#4cc38a; --blue:#5aa9f6; --teal:#3fc1b0; --violet:#9b8cff; --pink:#f07fc0; --grey:#5f6b78;
+  --bg:#131311; --panel:#1b1b18; --sunk:#22221e; --line:#2c2b27; --line2:#3a3933; --fg:#e8e3d8; --muted:#9c9585; --faint:#6b6657; --node:#21211d; --glass:rgba(27,27,24,.96);
+  --accent:#86aee6; --track:#34332d; --red:#e57a64; --amber:#ddb05a; --green:#72c08e; --blue:#86aee6; --teal:#5fc0b3; --violet:#a999f0; --pink:#e888bb; --grey:#7a7567;
   color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -39,27 +41,37 @@ button,select{font:inherit;font-size:var(--m);color:var(--fg);background:var(--p
 button:hover,select:hover{border-color:var(--accent)}
 button:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 button.primary{background:var(--accent);border-color:var(--accent);color:var(--panel);font-weight:600}
-.surface{background:var(--panel);border-radius:10px;min-width:0}
 
-/* main: two surfaces */
-.main{display:flex;flex-direction:column;gap:8px;min-width:0}
-.left{display:flex;flex-direction:column;min-width:0}
+/* board: a 12-column grid, 6 rows per screen. Stacked on small windows. */
+.main{display:flex;flex-direction:column;gap:6px;min-width:0}
+.board{position:relative;display:flex;flex-direction:column;gap:4px;min-width:0}
+.pn{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:8px;min-width:0;min-height:0}
+.pn.moving{z-index:7;box-shadow:0 10px 28px rgba(0,0,0,.2);border-color:var(--accent)}
+.pn.target{outline:2px solid var(--accent);outline-offset:-2px}
+.pn.stick{position:sticky;top:0;align-self:start}
+.handle{cursor:grab;touch-action:none}
+.corner{position:absolute;right:0;bottom:0;width:16px;height:16px;cursor:nwse-resize;touch-action:none;z-index:6;color:var(--line2);
+  background:linear-gradient(135deg,transparent 52%,currentColor 52%,currentColor 62%,transparent 62%,transparent 74%,currentColor 74%,currentColor 84%,transparent 84%)}
+.corner:hover{color:var(--accent)}
+.cell{border:1px dashed var(--line2);border-radius:4px;opacity:0;pointer-events:none;transition:opacity .15s}
+.board.moving .cell{opacity:.7}
+.lanes{display:flex;flex-direction:column;gap:4px;flex:none}
+body.moving-panel,body.moving-panel *{cursor:grabbing!important;user-select:none!important}
 
 /* components stage */
-.stage{position:relative;overflow:hidden;min-width:0}
-.stagebox{padding:10px}
-#comp{display:block;width:100%;height:auto;transform-origin:50% 0;transition:transform .38s cubic-bezier(.2,.8,.2,1)}
-/* key-moment card: same popup family, anchored inside the stage away from the focused components */
-
+.stage{display:flex;flex-direction:column;overflow:hidden}
+.ph{display:flex;align-items:baseline;gap:8px;padding:6px 10px 2px;font-size:var(--s);font-weight:600;color:var(--muted);flex:none}
+.ph .hint,.fh .hint{font-weight:400;color:var(--faint)}
+.stagebox{position:relative;flex:1;min-height:0;padding:6px 8px 8px}
+#comp{display:block;width:100%;height:100%;transform-origin:50% 0;transition:transform .38s cubic-bezier(.2,.8,.2,1)}
 #beatGo{white-space:nowrap}
 
-/* feed: always visible, one line per entry, tied to the shared cursor */
-.feed{position:relative;display:flex;flex-direction:column;height:var(--feedH,170px);flex:none}
-.feed .fh{display:flex;align-items:baseline;gap:8px;padding:2px 12px 2px}
-.feed .fh b{font-size:var(--s);font-weight:600;color:var(--muted)}
+/* feed: one line per entry, tied to the shared cursor */
+.feed{display:flex;flex-direction:column;overflow:hidden}
+.feed .fh{display:flex;align-items:baseline;gap:8px;padding:6px 10px 2px;flex:none;font-size:var(--s)}
+.feed .fh b{font-weight:600;color:var(--muted)}
 .feedbox{position:relative;flex:1;min-height:0}
 .feed ol{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 10px);mask-image:linear-gradient(to bottom,transparent 0,#000 10px);position:absolute;inset:0;list-style:none;margin:0;padding:0 6px 6px;overflow-y:auto;scroll-behavior:smooth;scrollbar-width:thin}
-/* every entry wraps fully; wrapped lines hang under the message column, not under the time */
 .feed li{display:grid;grid-template-columns:30px minmax(0,1fr);gap:8px;align-items:baseline;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:var(--s);line-height:1.4;box-shadow:inset 2px 0 0 transparent}
 .feed li .msg{overflow-wrap:anywhere}
 .feed li .who{margin-right:6px}
@@ -78,14 +90,12 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--p
 .feed li.k-resolved .txt{color:var(--green)}
 .feed .empty{display:block;color:var(--muted);padding:2px 6px;font-size:var(--s)}
 
-
-/* dashboard: one surface, panels separated by hairlines only */
-.dash{display:flex;flex-direction:column;min-width:0;overflow:hidden}
-.dashgrid{display:grid;grid-template-columns:repeat(var(--cols,1),minmax(0,1fr));grid-auto-rows:170px;min-width:0;position:relative}
-.panel{display:flex;flex-direction:column;padding:8px 12px 4px;min-width:0;min-height:0;border-bottom:1px solid var(--line)}
-.dashgrid[style*="--cols: 2"] .panel:nth-child(2n){border-left:1px solid var(--line)}
+/* charts: same size, tight gaps */
+.panel{display:flex;flex-direction:column;padding:6px 10px 4px;min-width:0;min-height:0}
 .panel-h{display:flex;align-items:baseline;gap:10px;min-height:18px;white-space:nowrap;min-width:0;font-size:var(--s)}
 .panel-h b{font-weight:600;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+.panel.chart .panel-h b::before{content:"⠿";color:var(--faint);margin-right:5px;opacity:0;transition:opacity .15s}
+.panel.chart .panel-h:hover b::before{opacity:1}
 .panel .legend{display:flex;gap:10px;color:var(--faint);overflow:hidden}
 .panel .legend i{display:inline-block;width:10px;height:2px;margin-right:4px;vertical-align:middle}
 .panel .val{margin-left:auto;font:500 var(--m) var(--mono);font-variant-numeric:tabular-nums;text-align:right;color:var(--fg)}
@@ -93,7 +103,7 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--p
 .panel .val.warn{color:var(--amber)} .panel .val.bad{color:var(--red)}
 .plot{position:relative;flex:1;min-height:0}
 .plot svg{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
-.panel.lane{flex:none;border-bottom:0}
+.panel.lane{flex:none}
 .panel.lane .plot{flex:none;height:34px}
 
 /* ---------- no play bar: progress hairline + status chip + corner menus ---------- */
@@ -123,29 +133,6 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--p
 .ghost{background:none;border-color:transparent;color:var(--muted);font-size:var(--s);padding:4px 6px;white-space:nowrap}
 .ghost:hover{color:var(--accent);border-color:transparent}
 
-/* splitters: a hairline at rest, a grab handle on hover, resize cursor */
-.vsplit,.hsplit{position:relative;flex:none;z-index:4;touch-action:none;outline:none}
-.vsplit{cursor:col-resize}
-.hsplit{height:9px;cursor:row-resize;margin:0 10px}
-.vsplit::before{content:"";position:absolute;top:0;bottom:0;left:50%;width:1px;transform:translateX(-50%);background:transparent;transition:background .15s}
-.hsplit::before{content:"";position:absolute;left:0;right:0;top:50%;height:1px;transform:translateY(-50%);background:var(--line);transition:background .15s}
-.vsplit::after,.hsplit::after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:3px;background:var(--faint);opacity:0;transition:opacity .15s}
-.vsplit::after{width:4px;height:36px}
-.hsplit::after{width:36px;height:4px}
-.vsplit:hover::before,.vsplit.active::before,.vsplit:focus-visible::before,.hsplit:hover::before,.hsplit.active::before,.hsplit:focus-visible::before{background:var(--accent)}
-.vsplit:hover::after,.vsplit.active::after,.vsplit:focus-visible::after,.hsplit:hover::after,.hsplit.active::after,.hsplit:focus-visible::after{opacity:1;background:var(--accent)}
-body.resizing,body.resizing *{user-select:none!important}
-body.resizing .dimmable{transition:none}
-body.resizing.col *{cursor:col-resize!important} body.resizing.row *{cursor:row-resize!important}
-
-/* reorderable panels: drag by the title */
-.panel.chart .panel-h{cursor:grab}
-.panel.chart .panel-h b::before{content:"⠿";color:var(--faint);margin-right:5px;opacity:0;transition:opacity .15s}
-.panel.chart .panel-h:hover b::before{opacity:1}
-body.reordering,body.reordering *{cursor:grabbing!important;user-select:none!important}
-.panel.lifted{opacity:.35}
-.dropmark{position:absolute;background:var(--accent);border-radius:2px;pointer-events:none;z-index:5;box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 25%,transparent)}
-
 /* focus mode: one focal point */
 .dimmable{transition:opacity .45s ease}
 .focus-mode .dimmable{opacity:.28}
@@ -168,21 +155,19 @@ body.reordering,body.reordering *{cursor:grabbing!important;user-select:none!imp
 .playing .pulse{animation:pulse 2s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){.playing .pulse{animation:none}.feed li.fresh{animation:none}.feed ol{scroll-behavior:auto}}
 
-/* one-screen desktop */
+/* one screen: the board is a 12 x 6 grid (rows are sized from JS) and scrolls when there are more charts than fit */
 @media (min-width:1000px) and (min-height:600px){
   .app{height:calc(100dvh - 22px)}
-  .main{flex:1;min-height:0;display:grid;grid-template-columns:var(--left,minmax(340px,.55fr)) 10px minmax(420px,1fr);gap:0}
-  .left{min-height:0}
-  .stage{flex:1;min-height:0}
-  .stagebox{position:absolute;inset:0}
-  #comp{height:100%}
-  .dash{min-height:0}
-  .dashgrid{flex:1;min-height:0;overflow-y:auto;grid-auto-rows:minmax(150px,1fr);overscroll-behavior:contain;scroll-behavior:smooth;scrollbar-width:thin}
+  .main{flex:1;min-height:0}
+  .board{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scroll-behavior:smooth;scrollbar-width:thin}
 }
-/* a narrow window just stacks; the player bar stays reachable */
+/* a narrow window just stacks */
 @media not ((min-width:1000px) and (min-height:600px)){
-  .stage{min-height:260px}
-  .vsplit,.hsplit{display:none}
+  .stage{height:340px}
+  .feed{height:220px}
+  .panel.chart{height:190px}
+  .corner{display:none}
+  .handle{cursor:default}
 }
 
 /* popups: intro + report */
@@ -205,18 +190,23 @@ body.reordering,body.reordering *{cursor:grabbing!important;user-select:none!imp
 kbd{font:500 var(--s) var(--mono);color:var(--muted);border:1px solid var(--line2);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--sunk);white-space:nowrap}
 .modal{width:min(560px,100%);max-height:calc(100dvh - 32px)}
 .modal.wide{width:min(680px,100%)}
-/* key moment: a sheet that rises from the bottom of the components view (overlay, never pushes layout) */
-.sheet{position:absolute;left:0;right:0;bottom:0;z-index:3;max-height:calc(100% - 16px);display:flex;flex-direction:column;background:var(--glass);border-top:1px solid var(--line2);border-radius:10px 10px 0 0;transform:translateY(calc(100% - 22px));transition:transform .38s cubic-bezier(.2,.8,.2,1),box-shadow .38s,border-color .38s}
-.sheet.open{transform:none;border-top-color:color-mix(in srgb,var(--accent) 60%,transparent);box-shadow:0 -12px 30px rgba(0,0,0,.18)}
-.sheet .strip{flex:none;height:22px;line-height:22px;padding:0 14px;font-size:var(--s);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* key moment: a compact sheet that rises from the bottom of the components view (overlay, never pushes layout) */
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:3;max-height:calc(100% - 12px);display:flex;flex-direction:column;background:var(--glass);border-top:1px solid var(--line2);border-radius:8px 8px 0 0;transform:translateY(calc(100% - 20px));transition:transform .38s cubic-bezier(.2,.8,.2,1),box-shadow .38s,border-color .38s}
+.sheet.open{transform:none;border-top-color:color-mix(in srgb,var(--accent) 60%,transparent);box-shadow:0 -8px 22px rgba(0,0,0,.12)}
+.sheet .strip{flex:none;height:20px;line-height:20px;padding:0 10px;font-size:var(--s);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sheet.open .strip{display:none}
-.sheet .sb{display:flex;flex-direction:column;gap:4px;padding:12px 16px 12px;min-height:0;overflow:hidden}
+.sheet .sb{display:flex;flex-direction:column;gap:2px;padding:6px 10px 7px;min-height:0;overflow-y:auto}
+.sheet .top{display:flex;align-items:baseline;gap:8px}
 .sheet .eb{font-size:var(--s);color:var(--muted)}
-.sheet h2{margin:0;font-size:var(--l);line-height:1.3}
-.sheet p{margin:0;line-height:1.5}
-.sheet .foot{display:flex;align-items:center;gap:8px;margin-top:4px}
+.sheet .top .spacer{flex:1}
+.sheet .more{border:0;background:none;color:var(--muted);font-size:var(--s);padding:0 2px}
+.sheet .more:hover{color:var(--accent)}
+.sheet h2{margin:0;font-size:var(--m);font-weight:600;line-height:1.3}
+.sheet p{margin:0;font-size:var(--s);line-height:1.45;color:var(--muted);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.sheet.expanded p{-webkit-line-clamp:unset;color:var(--fg)}
+.sheet .foot{display:flex;align-items:center;gap:6px;margin-top:3px}
 .sheet .foot .spacer{flex:1}
-.sheet .foot button{padding:4px 12px}
+.sheet .foot button{padding:2px 10px;font-size:var(--s)}
 .note{position:absolute;left:0;top:0;z-index:2;pointer-events:none;opacity:0;transition:opacity .3s}
 .note.show{opacity:1}
 .note .nl{position:absolute;max-width:220px;padding:4px 8px;font-size:var(--s);line-height:1.35;color:var(--fg);background:var(--glass);border:1px solid color-mix(in srgb,var(--accent) 60%,transparent);border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.18);white-space:normal}
@@ -227,29 +217,53 @@ kbd{font:500 var(--s) var(--mono);color:var(--muted);border:1px solid var(--line
 .pop h4{margin:8px 0 0;font-size:var(--s);font-weight:600;color:var(--muted)}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 .chips span{font-size:var(--s);color:var(--muted);background:var(--sunk);border-radius:999px;padding:1px 8px}
-.modal.report{width:min(900px,100%)}
-.rp-tldr{font-size:var(--l);line-height:1.45;margin:0;text-wrap:pretty}
-.rp-sec{display:flex;flex-direction:column;gap:6px}
-.rp-chain svg,.rp-strip svg{display:block;width:100%;height:auto;overflow:visible}
-.rp-chain text,.rp-strip text{font-family:var(--sans);fill:var(--fg)}
-.rp-chain .bx{fill:var(--sunk);stroke:var(--line2)}
-.rp-chain .k-cause .bx{stroke:var(--amber)} .rp-chain .k-amp .bx{stroke:var(--red)} .rp-chain .k-fix .bx{stroke:var(--green);fill:color-mix(in srgb,var(--green) 10%,var(--panel))}
-.rp-chain .tag{font-size:8.5px;fill:var(--muted);letter-spacing:.04em;text-transform:uppercase}
-.rp-chain .k-cause .tag{fill:var(--amber)} .rp-chain .k-amp .tag{fill:var(--red)} .rp-chain .k-fix .tag{fill:var(--green)}
-.rp-chain .ar{stroke:var(--faint);fill:none;stroke-width:1.2}
-.rp-chain .lp{stroke:var(--red);fill:none;stroke-width:1.2;stroke-dasharray:4 3}
-.rp-chain .lpl{font-size:var(--s);fill:var(--red)}
-.rp-strip .ax{stroke:var(--line2)} .rp-strip .sp{fill:none;stroke:var(--accent);stroke-width:1.5} .rp-strip .ar2{fill:color-mix(in srgb,var(--accent) 12%,transparent)}
-.rp-strip .mk{fill:var(--panel);stroke:var(--accent);stroke-width:1.5} .rp-strip .ml{font-size:9px;fill:var(--muted)} .rp-strip .mn{font-size:8.5px;fill:var(--accent);font-weight:600}
-.rp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
-.rp-card{background:var(--sunk);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:3px}
-.rp-card b{font-size:var(--m);line-height:1.3;display:flex;gap:6px;align-items:baseline}
-.rp-card b i{font-style:normal;color:var(--accent);flex:none;width:14px;text-align:center}
-.rp-card span{color:var(--muted);font-size:var(--s);line-height:1.45;padding-left:20px}
-.rp-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-.rp-stat{border:1px solid var(--line);border-radius:8px;padding:6px 10px;display:flex;align-items:baseline;gap:8px;font-size:var(--s);color:var(--muted)}
-.rp-stat .bf{font-size:var(--l);color:var(--red);font-weight:600;font-family:var(--mono)} .rp-stat .af{font-size:var(--l);color:var(--green);font-weight:600;font-family:var(--mono)}
-.rp-stat .lb{margin-right:auto;color:var(--fg)}
+/* reading screens: intro and report. One calm column, serif prose. */
+.modal.report{width:min(720px,100%)}
+.modal.intro{width:min(max(60vw,760px),100%);max-height:calc(100dvh - 32px);padding:22px 28px 16px;gap:10px}
+.intro h2{font:500 28px/1.15 var(--serif);letter-spacing:-.01em}
+.intro .hook{font:400 17px/1.5 var(--serif);color:var(--fg);margin:0;text-wrap:pretty}
+.intro .icols{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:28px;margin-top:6px;overflow-y:auto;min-height:0}
+.intro .icols.one{grid-template-columns:minmax(0,1fr)}
+.intro .story,.intro .side{display:flex;flex-direction:column;gap:14px;min-width:0}
+.intro h4{margin:0 0 3px;font-size:var(--s);font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.intro .story p{font:400 15px/1.6 var(--serif);color:var(--fg)}
+.intro ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px}
+.intro li{font-size:12.5px;line-height:1.45;color:var(--fg)}
+.intro .cast li b{font-weight:600}
+.intro .cast li span{color:var(--muted)}
+.intro .watch li{display:flex;gap:8px;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--line);padding-bottom:4px}
+.intro .watch li em{font:normal 11px var(--mono);color:var(--green);white-space:nowrap}
+.intro .learn li{padding-left:16px;position:relative}
+.intro .learn li::before{content:"→";position:absolute;left:0;color:var(--accent)}
+.rp{display:flex;flex-direction:column;gap:20px;padding:4px 2px 6px}
+.rp h4{margin:0 0 6px;font-size:var(--s);font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.modal.report h2{font:500 26px/1.15 var(--serif);letter-spacing:-.01em}
+.rp-tldr{font:400 19px/1.5 var(--serif);margin:0;text-wrap:pretty}
+.rp-num{width:100%;border-collapse:collapse;font-size:12.5px}
+.rp-num th{font-size:var(--s);font-weight:500;color:var(--muted);text-align:right;padding:0 0 4px}
+.rp-num th:first-child{text-align:left}
+.rp-num td{padding:5px 0;border-top:1px solid var(--line);font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+.rp-num td:first-child{font-family:var(--sans);text-align:left;color:var(--fg)}
+.rp-num .bf{color:var(--red)} .rp-num .af{color:var(--green)}
+.rp-chain{list-style:none;margin:0;padding:0 0 0 14px;border-left:2px solid var(--line2);display:flex;flex-direction:column;gap:8px}
+.rp-chain li{display:flex;gap:10px;align-items:baseline;font:400 15px/1.45 var(--serif);position:relative}
+.rp-chain li::before{content:"";position:absolute;left:-20px;top:.5em;width:8px;height:8px;border-radius:50%;background:var(--panel);border:2px solid var(--line2)}
+.rp-chain .tag{flex:none;width:68px;font:600 9.5px var(--sans);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.rp-chain .k-cause .tag{color:var(--amber)} .rp-chain .k-amp .tag{color:var(--red)} .rp-chain .k-fix .tag{color:var(--green)}
+.rp-chain .k-cause::before{border-color:var(--amber)} .rp-chain .k-amp::before{border-color:var(--red)} .rp-chain .k-fix::before{border-color:var(--green)}
+.rp-loop{margin:12px 0 0;font:italic 400 14px/1.5 var(--serif);color:var(--muted)}
+.rp-loop b{font-style:normal;color:var(--red);font-weight:500}
+.rp-math{font:12px/1.7 var(--mono);background:var(--sunk);border-radius:8px;padding:10px 14px;margin:0;white-space:pre-wrap;max-height:none;overflow:visible}
+.rp-take{list-style:none;counter-reset:t;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.rp-take li{counter-increment:t;display:grid;grid-template-columns:22px minmax(0,1fr);gap:4px 8px}
+.rp-take li::before{content:counter(t);font:500 12px var(--mono);color:var(--accent);padding-top:3px}
+.rp-take b{font:600 14px/1.4 var(--sans)}
+.rp-take span{grid-column:2;font:400 15px/1.55 var(--serif);color:var(--fg)}
+.rp-myth{border-left:2px solid var(--line2);padding:2px 0 2px 12px;margin:0 0 10px}
+.rp-myth q{font:italic 400 15px/1.5 var(--serif);color:var(--muted);quotes:"\201C" "\201D"}
+.rp-myth p{margin:3px 0 0;font:400 15px/1.55 var(--serif)}
+.rp-links{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px}
+.rp-links a{color:var(--accent)}
 
 /* reviewer-only section */
 details.review{max-width:1600px;margin:16px auto 0;border:1px dashed var(--line2);border-radius:8px;padding:8px 14px;color:var(--muted);font-size:var(--s)}
@@ -284,6 +298,7 @@ pre{font:var(--s)/1.5 var(--mono);background:var(--sunk);border-radius:8px;paddi
         <span class="eb">Playback</span>
         <button class="mi" id="reportBtn" role="menuitem">Report <kbd>R</kbd></button>
         <div class="row"><span class="small" style="flex:1">Speed</span><div class="seg" id="speedSeg"><button data-speed="2">0.5×</button><button data-speed="4">1×</button><button data-speed="8">2×</button><button data-speed="16">4×</button></div></div>
+        <div class="row"><span class="small" style="flex:1">Theme</span><div class="seg" id="themeSeg"><button data-theme-set="system">Auto</button><button data-theme-set="light">Light</button><button data-theme-set="dark">Dark</button></div></div>
         <button class="mi" id="resetLayout" role="menuitem">Reset layout</button>
         <button class="mi" id="libraryBtn" role="menuitem">Open another playbook</button>
       </div>
@@ -291,28 +306,28 @@ pre{font:var(--s)/1.5 var(--mono);background:var(--sunk);border-radius:8px;paddi
   </header>
 
   <main class="main">
-    <section class="surface left">
-      <div class="stage dimmable" id="compCard">
+    <div class="board" id="dashgrid">
+      <div class="pn stage dimmable" id="compCard" data-pn="comps">
+        <div class="ph handle" title="Drag to move · corner resizes">Components</div>
         <div class="stagebox"><svg id="comp" role="img" aria-label="Components"></svg></div>
         <div class="sheet" id="caption" aria-live="polite">
           <div class="strip" id="sheetStrip"></div>
           <div class="sb">
-            <span class="eb" id="capK"></span>
+            <div class="top"><span class="eb" id="capK"></span><span class="spacer"></span><button class="more" id="capMore" aria-expanded="false">more</button></div>
             <h2 id="capT"></h2>
             <p id="capH"></p>
             <div class="foot"><span class="spacer"></span><kbd>Space</kbd><button class="primary" id="beatGo" tabindex="-1">Continue ▶</button></div>
           </div>
         </div>
+        <div class="corner" aria-hidden="true"></div>
       </div>
-      <div class="hsplit" id="hsplit" role="separator" aria-orientation="horizontal" aria-label="Resize components and feed" tabindex="0" title="Drag to resize · double-click to reset"></div>
-      <div class="feed dimmable" data-id="feed" id="feedCard">
-        <div class="fh"><b>Feed</b><span class="small">hover a line to see that moment · click to jump</span></div>
+      <div class="pn feed dimmable" data-pn="feed" data-id="feed" id="feedCard">
+        <div class="fh handle" title="Drag to move · corner resizes"><b>Feed</b><span class="hint">hover a line to see that moment · click to jump</span></div>
         <div class="feedbox"><ol id="feed"></ol></div>
+        <div class="corner" aria-hidden="true"></div>
       </div>
-    </section>
-    <div class="vsplit" id="vsplit" role="separator" aria-orientation="vertical" aria-label="Resize components and dashboard" tabindex="0" title="Drag to resize · double-click to reset"></div>
-    <section class="surface dash" id="dash" aria-label="Dashboard"><div class="dashgrid" id="dashgrid"></div>
-    </section>
+    </div>
+    <div class="lanes" id="dash" aria-label="Events"></div>
   </main>
 </div>
 
@@ -322,11 +337,12 @@ pre{font:var(--s)/1.5 var(--mono);background:var(--sunk);border-radius:8px;paddi
 </details>
 
 <div class="scrim" id="intro">
-  <div class="pop modal pop-in" role="dialog" aria-modal="true" aria-labelledby="introT">
+  <div class="pop modal intro pop-in" role="dialog" aria-modal="true" aria-labelledby="introT">
     <span class="eb" id="introMeta"></span>
     <h2 id="introT"></h2>
-    <div class="pbody"><div class="chips" id="introTags"></div><p id="introStory"></p></div>
-    <div class="foot"><span class="small">Pauses at each key moment. <kbd>?</kbd> lists the keys.</span><span class="spacer"></span><kbd>Space</kbd><button class="primary" id="start">Start ▶</button></div>
+    <p class="hook" id="introStory"></p>
+    <div class="icols" id="introBody"></div>
+    <div class="foot"><span class="small">Pauses at each key moment. <kbd>←</kbd> <kbd>→</kbd> jump between them. <kbd>?</kbd> lists the keys.</span><span class="spacer"></span><kbd>Space</kbd><button class="primary" id="start">Start ▶</button></div>
   </div>
 </div>
 <div class="scrim" id="scrim" hidden>
@@ -339,6 +355,17 @@ pre{font:var(--s)/1.5 var(--mono);background:var(--sunk);border-radius:8px;paddi
 const host = window.parent !== window ? window.parent.simxp : null;
 const PB = host && host.current ? structuredClone(host.current) : null;
 if (!PB) { document.body.innerHTML = '<p style="padding:24px">No playbook loaded. Open <a href="./" target="_top">sim-xp</a> to pick one.</p>'; throw new Error("no playbook"); }
+
+/* ===================== Theme: auto follows the system; light is cream ===================== */
+const THEME_KEY = "sim-xp.theme";
+function applyTheme(v, persist) {
+  const root = document.documentElement;
+  if (v === "light" || v === "dark") root.dataset.theme = v; else delete root.dataset.theme;
+  try { const top = window.parent !== window ? window.parent.document.documentElement : null; if (top) { if (root.dataset.theme) top.dataset.theme = root.dataset.theme; else delete top.dataset.theme; } } catch (e) { /* different origin: the frame alone changes */ }
+  document.querySelectorAll("#themeSeg [data-theme-set]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.themeSet === (v === "light" || v === "dark" ? v : "system"))));
+  if (persist) try { if (v === "light" || v === "dark") localStorage.setItem(THEME_KEY, v); else localStorage.removeItem(THEME_KEY); } catch (e) { /* storage blocked */ }
+}
+try { applyTheme(localStorage.getItem(THEME_KEY), false); } catch (e) { /* storage blocked */ }
 
 /* ===================== Engine (what the app does with it) ===================== */
 const D = PB.meta.duration_s;
@@ -612,10 +639,10 @@ const statusOf = (p, v, T) => {
 const dash = $("#dash"), dashGrid = $("#dashgrid");
 const panels = [...PB.dashboard.filter(p => !isEvent(p)), ...PB.dashboard.filter(isEvent)].map(p => {
   const kind = isEvent(p) ? "lane" : "chart", units = metricById[p.metrics[0]].unit;
-  const card = document.createElement("div"); card.className = `panel ${kind} dimmable`; card.dataset.id = "panel:" + p.id;
+  const card = document.createElement("div"); card.className = `pn panel ${kind} dimmable`; card.dataset.id = "panel:" + p.id;
   const unitTxt = units === "msg/s" ? "msg/s" : units === "msgs" ? "msgs" : "";
   const legend = p.metrics.length > 1 ? `<span class="legend">${p.metrics.map((m, i) => `<span><i style="background:${seriesColor({ p }, i)}"></i>${esc(metricById[m].label)}</span>`).join("")}</span>` : "";
-  card.innerHTML = `<div class="panel-h"><b>${esc(p.title)}</b>${legend}<span class="val"></span></div><div class="plot"></div>`;
+  card.innerHTML = `<div class="panel-h${kind === "chart" ? " handle" : ""}"><b>${esc(p.title)}</b>${legend}<span class="val"></span></div><div class="plot"></div>${kind === "chart" ? '<div class="corner" aria-hidden="true"></div>' : ""}`;
   (kind === "lane" ? dash : dashGrid).appendChild(card);
   const plot = card.querySelector(".plot"), svg = el("svg", {}, plot);
   const P = { p, kind, units, unitTxt, card, plot, svg, val: card.querySelector(".val"), W: 0, H: 0, xOf: xOfW(600), tOf: tOfW(600), yOf: () => 0, lines: [], dots: [], annoEls: [] };
@@ -624,8 +651,6 @@ const panels = [...PB.dashboard.filter(p => !isEvent(p)), ...PB.dashboard.filter
   new ResizeObserver(() => { buildPanel(P); scheduleRender(); }).observe(plot);
   return P;
 });
-// 1 column up to 4 charts, 2 columns above that; the pane scrolls inside when panels overflow
-dashGrid.style.setProperty("--cols", panels.filter(P => P.kind === "chart").length > 4 ? 2 : 1);
 function buildPanel(P) {
   const W = Math.round(P.plot.clientWidth), H = Math.round(P.plot.clientHeight); if (!W || !H) return;
   P.W = W; P.H = H; P.xOf = xOfW(W); P.tOf = tOfW(W);
@@ -748,6 +773,8 @@ function fitAboveSheet(on) {
   if (!on) { comp.style.transform = ""; return; }
   requestAnimationFrame(() => { const H = box.clientHeight, free = H - sh.offsetHeight - 6; comp.style.transform = free > 60 && free < H ? `scale(${(free / H).toFixed(3)})` : ""; });
 }
+function setExpanded(on) { $("#caption").classList.toggle("expanded", on); $("#capMore").textContent = on ? "less" : "more"; $("#capMore").setAttribute("aria-expanded", String(on)); if (activeBeat) fitAboveSheet(true); }
+$("#capMore").onclick = () => setExpanded(!$("#caption").classList.contains("expanded"));
 function renderNarr(v) { const ch = chapters[chapterAt(v)]; const t = v < beats[0].t ? "Intro" : `${chapterAt(v) + 1}/${chapters.length} · ${ch.title}`; if ($("#sheetStrip").textContent !== t) $("#sheetStrip").textContent = t; }
 function placeCallout() {}
 
@@ -806,7 +833,7 @@ const emit = (type, data) => { try { host && host.onPlayerEvent && host.onPlayer
 function showBeat(e) {
   activeBeat = e; setPlaying(false); emit("key_moment", { n: beats.indexOf(e) + 1, t: e.t });
   $("#capK").textContent = `Key moment ${beats.indexOf(e) + 1} of ${beats.length} · ${fmtT(e.t)}`; $("#capT").textContent = e.title || ""; $("#capH").textContent = e.beat.hint;
-  $("#caption").classList.add("open"); $("#beatGo").tabIndex = 0; fitAboveSheet(true);
+  setExpanded(false); $("#caption").classList.add("open"); $("#beatGo").tabIndex = 0; fitAboveSheet(true);
   $("#app").classList.add("focus-mode");
   applyFocus(e);
   render();
@@ -876,7 +903,7 @@ document.addEventListener("keydown", e => {
 });
 function hoverable(svg, toTime) {
   const toT = ev => { const r = svg.getBoundingClientRect(); const vb = svg.viewBox.baseVal; return toTime(((ev.clientX - r.left) / r.width) * (vb && vb.width ? vb.width : r.width)); };
-  svg.addEventListener("pointermove", ev => { if (ev.pointerType === "mouse" && !document.body.classList.contains("resizing") && !document.body.classList.contains("reordering")) { hoverT = toT(ev); render(); } });
+  svg.addEventListener("pointermove", ev => { if (ev.pointerType === "mouse" && !document.body.classList.contains("moving-panel")) { hoverT = toT(ev); render(); } });
   svg.addEventListener("pointerleave", () => { hoverT = null; render(); });
   svg.addEventListener("click", ev => { const t = toT(ev); if (t <= playT) seek(t); });
 }
@@ -884,34 +911,6 @@ function hoverable(svg, toTime) {
 /* ===================== Report (opens itself at the end; R or the menu reopen it) ===================== */
 $("#pbTitle").textContent = PB.meta.title;
 const R = PB.report;
-function chainSVG() {
-  const n = R.chain.length, W = 880, bw = 116, gap = (W - n * bw) / (n - 1), bh = 60, y0 = 4;
-  const tags = { cause: "cause", effect: "effect", amp: "amplifies", fix: "fix" };
-  const wrap = t => { const w = t.split(" "), L = [""]; w.forEach(x => { const c = L[L.length - 1]; if ((c + " " + x).trim().length > 19 && c) L.push(x); else L[L.length - 1] = (c + " " + x).trim(); }); return L.slice(0, 3); };
-  const X = i => i * (bw + gap), idx = id => R.chain.findIndex(c => c.id === id);
-  let g = `<defs><marker id="rpA" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="var(--faint)"/></marker><marker id="rpL" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="var(--red)"/></marker></defs>`;
-  R.chain.forEach((c, i) => {
-    g += `<g class="k-${c.kind}"><rect class="bx" x="${X(i)}" y="${y0}" width="${bw}" height="${bh}" rx="7"/><text class="tag" x="${X(i) + 9}" y="${y0 + 13}">${tags[c.kind]}</text>`;
-    wrap(c.text).forEach((l, j) => (g += `<text x="${X(i) + 9}" y="${y0 + 27 + j * 12}" font-size="10.5">${esc(l)}</text>`));
-    g += `</g>`;
-    if (i < n - 1) g += `<line class="ar" x1="${X(i) + bw + 2}" x2="${X(i + 1) - 3}" y1="${y0 + bh / 2}" y2="${y0 + bh / 2}" marker-end="url(#rpA)"${R.chain[i + 1].kind === "fix" ? ' stroke-dasharray="3 3"' : ""}/>`;
-  });
-  if (R.loop) {
-    const a = X(idx(R.loop.from)) + bw / 2, b = X(idx(R.loop.to)) + bw / 2, yb = y0 + bh, yl = yb + 22;
-    g += `<path class="lp" d="M${a} ${yb + 2} V${yl - 6} Q${a} ${yl} ${a - 6} ${yl} H${b + 6} Q${b} ${yl} ${b} ${yl - 6} V${yb + 4}" marker-end="url(#rpL)"/><text class="lpl" x="${(a + b) / 2}" y="${yl + 12}" text-anchor="middle">↻ ${esc(R.loop.label)}</text>`;
-  }
-  return `<svg viewBox="-2 0 ${W + 4} ${R.loop ? 106 : 70}" role="img" aria-label="Causal chain">${g}</svg>`;
-}
-function stripSVG() {
-  const W = 880, H = 72, top = 14, bot = 44, m = (PB.report && PB.report.sparkline) || PB.dashboard[0].metrics[0]; let max = 0; clean[m].forEach(v => (max = Math.max(max, v)));
-  const x = t => (t / D) * W, y = v => bot - (v / max) * (bot - top);
-  const step = Math.max(1, Math.round(D / 300)); const pts = []; for (let t = 0; t <= D; t += step) pts.push(`${x(t).toFixed(1)},${y(series[m][t]).toFixed(1)}`);
-  let g = `<line class="ax" x1="0" x2="${W}" y1="${bot}" y2="${bot}"/><path class="ar2" d="M0 ${bot} L${pts.join(" L")} L${W} ${bot}Z"/><polyline class="sp" points="${pts.join(" ")}"/>`;
-  g += `<text class="ml" x="0" y="9">${esc(metricById[m].label)} · peak ${fmtV(max, metricById[m].unit)}${metricById[m].unit && metricById[m].unit !== "count" && metricById[m].unit !== "ms" ? " " + metricById[m].unit : ""}</text>`;
-  beats.forEach((b, i) => { const bx = x(b.t), by = y(at(m, b.t)), anc = i === 0 ? "start" : i === beats.length - 1 ? "end" : "middle";
-    g += `<circle class="mk" cx="${bx}" cy="${by}" r="6.5"/><text class="mn" x="${bx}" y="${by + 3}" text-anchor="middle">${i + 1}</text><text class="ml" x="${bx}" y="${i % 2 ? H - 1 : H - 12}" text-anchor="${anc}">${esc(b.title.length > 26 ? b.title.slice(0, 25) + "…" : b.title)}</text>`; });
-  return `<svg viewBox="-8 0 ${W + 16} ${H}" role="img" aria-label="The run over time with the key moments">${g}</svg>`;
-}
 function statVals(st) {
   // whole run: peak (or low) vs the end; delta = how much it moved before vs after the fix
   const s = clean[st.metric], f = Number.isInteger(R.fix_t) ? R.fix_t : D;
@@ -919,16 +918,27 @@ function statVals(st) {
   if (st.agg === "min") return [Math.min(...s), s[D]];
   return [Math.max(...s), s[D]];
 }
+const TAGS = { cause: "cause", effect: "effect", amp: "amplifies", fix: "fix" };
+const chainHTML = () => {
+  const items = R.chain.map(c => `<li class="k-${c.kind}"><span class="tag">${TAGS[c.kind]}</span><span>${esc(c.text)}</span></li>`).join("");
+  const byId = Object.fromEntries(R.chain.map(c => [c.id, c]));
+  const loop = R.loop ? `<p class="rp-loop"><b>↻ A loop.</b> ${byId[R.loop.from] && byId[R.loop.to] ? `“${esc(byId[R.loop.from].text)}” keeps feeding “${esc(byId[R.loop.to].text)}”. ` : ""}<span>(${esc(R.loop.label)})</span></p>` : "";
+  return `<ol class="rp-chain">${items}</ol>${loop}`;
+};
+const safeUrl = u => /^https?:\/\//i.test(u) ? u : "#";
+const sec = (title, body) => body ? `<section><h4>${title}</h4>${body}</section>` : "";
 $("#report").innerHTML = `
   <span class="eb">Report · ${fmtT(D)} · ${beats.length} key moments</span>
   <h2 id="repT">${esc(PB.meta.title)}</h2>
-  <div class="pbody">
+  <div class="pbody"><div class="rp">
     <p class="rp-tldr">${esc(R.tldr)}</p>
-    <div class="rp-sec"><h4>How it happened</h4><div class="rp-chain">${chainSVG()}</div></div>
-    <div class="rp-sec"><h4>${esc(metricById[(PB.report && PB.report.sparkline) || PB.dashboard[0].metrics[0]].label)} across the key moments</h4><div class="rp-strip">${stripSVG()}</div></div>
-    <div class="rp-sec"><h4>Takeaways</h4><div class="rp-grid">${R.learnings.map(l => `<div class="rp-card"><b><i aria-hidden="true">${l.glyph}</i>${esc(l.title)}</b><span>${esc(l.body)}</span></div>`).join("")}</div></div>
-    <div class="rp-sec"><h4>Worst → at the end</h4><div class="rp-stats">${R.stats.map(st => { const [b, a] = statVals(st); return `<div class="rp-stat"><span class="lb">${esc(st.label)}</span><span class="bf">${fmtV(b, st.unit)}</span>→<span class="af">${fmtV(a, st.unit)}</span></div>`; }).join("")}</div></div>
-  </div>
+    ${sec("The numbers", `<table class="rp-num"><tr><th></th><th>Worst</th><th>At the end</th></tr>${R.stats.map(st => { const [b, a] = statVals(st); return `<tr><td>${esc(st.label)}</td><td class="bf">${fmtV(b, st.unit)}</td><td class="af">${fmtV(a, st.unit)}</td></tr>`; }).join("")}</table>`)}
+    ${sec("How it happened", chainHTML())}
+    ${sec(esc((R.math && R.math.title) || "The arithmetic"), R.math ? `<pre class="rp-math">${esc(R.math.lines.join("\n"))}</pre>` : "")}
+    ${sec("What to take away", `<ol class="rp-take">${R.learnings.map(l => `<li><b>${esc(l.title)}</b><span>${esc(l.body)}</span></li>`).join("")}</ol>`)}
+    ${sec("Common myths", (R.myths || []).length ? R.myths.map(m => `<div class="rp-myth"><q>${esc(m.myth)}</q><p>${esc(m.truth)}</p></div>`).join("") : "")}
+    ${sec("Read more", (R.links || []).length ? `<div class="rp-links">${R.links.map(l => `<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener noreferrer">${esc(l.label)} ↗</a>`).join("")}</div>` : "")}
+  </div></div>
   <div class="foot"><kbd>Esc</kbd><button class="ghost" id="repClose">Close</button><span class="spacer"></span><kbd>Space</kbd><button class="primary" id="repAgain">↺ Watch again</button></div>`;
 function openReport() { closeMenus(); setPlaying(false); showModal($("#scrim")); renderHud(viewT()); }
 function closeReport(done) { hideModal($("#scrim"), () => { renderHud(viewT()); if (done) done(); }); }
@@ -942,116 +952,168 @@ $("#scrim").addEventListener("click", e => {
 $("#schema").innerHTML = `<p>The agent writes one JSON file; the app only plays it. Layout coordinates in this proposal come from the app, not from the playbook.</p><pre>${JSON.stringify(PB, null, 2).replace(/</g, "&lt;")}</pre>`;
 
 
-/* ===================== Layout: resizable splitters, reorderable panels, saved per viewer ===================== */
-const LKEY = "sim-xp.layout.v1." + PB.meta.id;
-const loadLayout = () => { try { const v = JSON.parse(localStorage.getItem(LKEY)); return v && typeof v === "object" ? v : {}; } catch (e) { return {}; } };
-const saveLayout = () => { try { if (Object.keys(layout).length) localStorage.setItem(LKEY, JSON.stringify(layout)); else localStorage.removeItem(LKEY); } catch (e) { /* storage blocked: the layout still works for this visit */ } };
-let layout = loadLayout();
-const mainEl = $(".main"), leftEl = $(".left"), feedBox = $("#feedCard"), dropMark = document.createElement("div");
-dropMark.className = "dropmark"; dropMark.hidden = true; dash.style.position = "relative"; dash.appendChild(dropMark);
-// limits: the components graph never draws below 85% (labels stay >= ~8.5px), the dashboard keeps >= 430px,
-// the feed keeps header + 3 rows and never takes more than 45% of the left column
-const LEFT_MIN = 380, DASH_MIN = 430, FEED_MIN = 72, FEED_MAX_FRAC = 0.45, GRAPH_MIN_SCALE = 0.85;
-// the feed may only grow while the graph can still be drawn at >= 85% in one of its two layouts
-function feedMax() {
-  const colH = leftEl.clientHeight, w = leftEl.clientWidth;
-  const needH = Math.min(...["tall", "wide"].map(k => (w - 20) / LAYOUTS[k].vb[0] >= GRAPH_MIN_SCALE ? GRAPH_MIN_SCALE * LAYOUTS[k].vb[1] + 20 : Infinity));
-  return Math.max(FEED_MIN, Math.min(colH - needH - 9, colH * FEED_MAX_FRAC));
-}
-const chartCards = () => [...dashGrid.querySelectorAll(":scope > .panel.chart")];
-const defaultOrder = chartCards().map(c => c.dataset.id);
-function applyFeedH() {
-  if (layout.feedH == null) { feedBox.style.removeProperty("--feedH"); return; }
-  const max = feedMax();
-  feedBox.style.setProperty("--feedH", Math.round(Math.min(max, Math.max(FEED_MIN, layout.feedH))) + "px");
-}
-function applyLayout() {
-  if (layout.leftFrac != null) mainEl.style.setProperty("--left", `clamp(${LEFT_MIN}px, ${(layout.leftFrac * 100).toFixed(3)}%, calc(100% - ${DASH_MIN + 10}px))`);
-  else mainEl.style.removeProperty("--left");
-  applyFeedH();
-  const byId = Object.fromEntries(chartCards().map(c => [c.dataset.id, c]));
-  const order = (layout.order || defaultOrder).filter(id => byId[id]);
-  [...order, ...Object.keys(byId).filter(id => !order.includes(id))].forEach(id => dashGrid.appendChild(byId[id]));
-  $("#resetLayout").disabled = !Object.keys(layout).length;
-}
-new ResizeObserver(() => { if (layout.feedH != null) applyFeedH(); }).observe(leftEl);
-
-// splitters: drag, double-click to reset, arrow keys for keyboard users
-function splitter(elm, axis, place, reset) {
-  elm.addEventListener("pointerdown", e => {
-    if (e.button !== 0) return;
-    e.preventDefault(); elm.setPointerCapture(e.pointerId); elm.classList.add("active");
-    document.body.classList.add("resizing", axis === "x" ? "col" : "row");
-    if (hoverT != null) { hoverT = null; scheduleRender(); }
-    const move = ev => { place(axis === "x" ? ev.clientX : ev.clientY); applyLayout(); };
-    const end = () => { elm.removeEventListener("pointermove", move); elm.classList.remove("active"); document.body.classList.remove("resizing", "col", "row"); saveLayout(); applyLayout(); };
-    elm.addEventListener("pointermove", move);
-    elm.addEventListener("pointerup", end, { once: true }); elm.addEventListener("pointercancel", end, { once: true });
-  });
-  elm.addEventListener("dblclick", () => { reset(); saveLayout(); applyLayout(); });
-  elm.addEventListener("keydown", e => {
-    const d = { ArrowLeft: -16, ArrowUp: -16, ArrowRight: 16, ArrowDown: 16 }[e.key]; if (d == null) return;
-    e.preventDefault(); e.stopPropagation();
-    const r = elm.getBoundingClientRect(); place((axis === "x" ? r.left + r.width / 2 : r.top + r.height / 2) + d); saveLayout(); applyLayout();
-  });
-}
-splitter($("#vsplit"), "x", x => {
-  const r = mainEl.getBoundingClientRect(), w = Math.min(Math.max(x - r.left - 5, LEFT_MIN), r.width - DASH_MIN - 10);
-  layout.leftFrac = w / r.width;
-}, () => { delete layout.leftFrac; });
-splitter($("#hsplit"), "y", y => { layout.feedH = leftEl.getBoundingClientRect().bottom - y - 4.5; }, () => { delete layout.feedH; });
-
-// reorder: drag a chart by its title; a bar shows where it will land; the grid only changes on drop
-let reorder = null;
-function dropTarget(x, y) {
-  const cards = chartCards().filter(c => c !== reorder.card); if (!cards.length) return null;
-  const two = getComputedStyle(dashGrid).gridTemplateColumns.split(" ").length > 1;
-  let best = null, bd = Infinity;
-  cards.forEach(c => { const r = c.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, d = Math.hypot(x - cx, y - cy); if (d < bd) { bd = d; best = { c, r, cx, cy } }; });
-  const before = two && Math.abs(y - best.cy) <= best.r.height / 2 ? x < best.cx : y < best.cy;
-  return { card: best.c, rect: best.r, before, vertical: two && Math.abs(y - best.cy) <= best.r.height / 2 };
-}
-function showDropMark(t) {
-  const d = dash.getBoundingClientRect(), r = t.rect; dropMark.hidden = false;
-  if (t.vertical) Object.assign(dropMark.style, { left: (t.before ? r.left : r.right) - d.left - 2 + "px", top: r.top - d.top + 6 + "px", width: "3px", height: r.height - 12 + "px" });
-  else Object.assign(dropMark.style, { left: r.left - d.left + 8 + "px", top: (t.before ? r.top : r.bottom) - d.top - 2 + "px", width: r.width - 16 + "px", height: "3px" });
-}
-function endReorder(commit) {
-  if (!reorder) return;
-  const { card, target, started } = reorder; reorder = null;
-  dropMark.hidden = true; card.classList.remove("lifted"); document.body.classList.remove("reordering");
-  if (commit && started && target && target.card !== card) {
-    dashGrid.insertBefore(card, target.before ? target.card : target.card.nextSibling);
-    const ids = chartCards().map(c => c.dataset.id);
-    if (ids.join() === defaultOrder.join()) delete layout.order; else layout.order = ids;
-    saveLayout(); applyLayout(); if (activeBeat) revealFocusedPanels(activeBeat);
+/* ===================== Layout: a 12 x 6 board =====================
+   Components and feed are placed by hand (drag the header, resize from the corner; both snap to cells).
+   Charts all share one size and fill every cell that is left, first free spot top-left; extra rows scroll.
+   Saved per playbook in this browser. */
+const COLS = 12, VIS = 6, GAP = 4, MIN_ROW = 44;
+const LKEY = "sim-xp.layout.v2." + PB.meta.id;
+const HOME = { comps: { x: 0, y: 0, w: 3, h: 6 }, feed: { x: 9, y: 0, w: 3, h: 6 } };
+const board = dashGrid, charts = panels.filter(P => P.kind === "chart"), chartIds = charts.map(P => P.p.id);
+const tiles = { comps: $("#compCard"), feed: $("#feedCard") };
+const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+const inView = r => r.x >= 0 && r.y >= 0 && r.x + r.w <= COLS && r.y + r.h <= VIS;
+const isRect = r => r && [r.x, r.y, r.w, r.h].every(Number.isInteger);
+const MINS = { comps: [3, 3], feed: [2, 1] };
+let lay = { auto: true, cw: 3, ch: 2, comps: { ...HOME.comps }, feed: { ...HOME.feed }, order: null };
+try {
+  const v = JSON.parse(localStorage.getItem(LKEY));
+  if (v && typeof v === "object") {
+    const ok = (r, id) => isRect(r) && inView(r) && r.w >= MINS[id][0] && r.h >= MINS[id][1];
+    if (ok(v.comps, "comps") && ok(v.feed, "feed") && !hit(v.comps, v.feed)) { lay.comps = v.comps; lay.feed = v.feed; }
+    if (v.auto === false && Number.isInteger(v.cw) && Number.isInteger(v.ch) && v.cw >= 2 && v.cw <= COLS && v.ch >= 1 && v.ch <= VIS) Object.assign(lay, { auto: false, cw: v.cw, ch: v.ch });
+    if (Array.isArray(v.order)) lay.order = v.order.filter(id => chartIds.includes(id));
   }
+} catch (e) { /* no saved layout */ }
+const orderNow = () => { const o = (lay.order || []).filter(id => chartIds.includes(id)); return [...o, ...chartIds.filter(id => !o.includes(id))]; };
+const isHome = () => lay.auto && JSON.stringify(lay.comps) === JSON.stringify(HOME.comps) && JSON.stringify(lay.feed) === JSON.stringify(HOME.feed) && orderNow().join() === chartIds.join();
+function saveLayout() {
+  $("#resetLayout").disabled = isHome();
+  try { if (isHome()) localStorage.removeItem(LKEY); else localStorage.setItem(LKEY, JSON.stringify({ ...lay, order: orderNow() })); } catch (e) { /* storage blocked: the layout still works for this visit */ }
 }
-dashGrid.addEventListener("pointerdown", e => {
-  const h = e.target.closest(".panel.chart > .panel-h"); if (!h || e.button !== 0) return;
-  e.preventDefault(); h.setPointerCapture(e.pointerId);
-  reorder = { card: h.parentElement, head: h, x0: e.clientX, y0: e.clientY, started: false, target: null };
+function gridMetrics() {
+  const rh = Math.max(MIN_ROW, (board.clientHeight - (VIS - 1) * GAP) / VIS), cw = (board.clientWidth - (COLS - 1) * GAP) / COLS, b = board.getBoundingClientRect();
+  return { rh, cw, sx: cw + GAP, sy: rh + GAP, left: b.left, top: b.top - board.scrollTop };
+}
+function flowAt(cw, ch) {
+  const taken = new Set(), mark = r => { for (let j = r.y; j < r.y + r.h; j++) for (let i = r.x; i < r.x + r.w; i++) taken.add(i + "," + j); };
+  const free = r => { if (r.x + r.w > COLS) return false; for (let j = r.y; j < r.y + r.h; j++) for (let i = r.x; i < r.x + r.w; i++) if (taken.has(i + "," + j)) return false; return true; };
+  // a full-height tile is sticky and spans every row, so the whole column strip is taken, not just the first screen
+  const col = r => (r.y === 0 && r.h === VIS ? { ...r, h: 400 } : r);
+  mark(col(lay.comps)); mark(col(lay.feed));
+  const slots = [];
+  for (let y = 0; slots.length < charts.length; y++) for (let x = 0; x < COLS && slots.length < charts.length; x++) {
+    const r = { x, y, w: Math.min(cw, COLS), h: ch };
+    if (free(r)) { slots.push(r); mark(r); }
+  }
+  return { slots, rows: Math.max(VIS, ...slots.map(s => s.y + s.h)) };
+}
+// until a chart is resized by hand: the biggest shared size that fits every chart on the first screen and is still readable
+function flow(m) {
+  if (lay.auto) {
+    for (const [w, h] of [[4, 3], [4, 2], [3, 3], [3, 2], [2, 3], [2, 2]]) {
+      if (w * m.sx - GAP < 250 || h * m.sy - GAP < 140) continue;
+      const r = flowAt(w, h); if (r.rows === VIS) return r;
+    }
+    return flowAt(3, 2);
+  }
+  return flowAt(lay.cw, lay.ch);
+}
+let cells = [];
+function clearCells() { cells.forEach(c => c.remove()); cells = []; }
+function renderLayout(animate) {
+  const all = [tiles.comps, tiles.feed, ...charts.map(P => P.card)];
+  if (!ONE_SCREEN.matches) { // stacked: no grid areas
+    clearCells(); board.style.gridTemplateRows = "";
+    all.forEach(e => { e.style.gridArea = ""; e.style.height = ""; e.classList.remove("stick"); });
+    return;
+  }
+  const m = gridMetrics(), { slots, rows } = flow(m);
+  const before = animate ? all.map(e => e.getBoundingClientRect()) : null;
+  board.style.gridTemplateRows = `repeat(${rows}, ${m.rh}px)`;
+  if (cells.length !== rows * COLS) {
+    clearCells();
+    for (let y = 0; y < rows; y++) for (let x = 0; x < COLS; x++) { const i = document.createElement("i"); i.className = "cell"; i.setAttribute("aria-hidden", "true"); i.style.gridArea = `${y + 1} / ${x + 1}`; board.prepend(i); cells.push(i); }
+  }
+  for (const id of ["comps", "feed"]) {
+    const r = lay[id], e = tiles[id], full = r.y === 0 && r.h === VIS;
+    // a full-height tile spans every row and sticks to the top while the charts scroll
+    e.style.gridArea = `${r.y + 1} / ${r.x + 1} / ${(full ? rows : r.y + r.h) + 1} / ${r.x + r.w + 1}`;
+    e.style.height = full ? `${VIS * m.rh + (VIS - 1) * GAP}px` : "";
+    e.classList.toggle("stick", full);
+  }
+  orderNow().forEach((id, k) => { const s = slots[k], P = charts.find(c => c.p.id === id); P.card.style.gridArea = `${s.y + 1} / ${s.x + 1} / ${s.y + s.h + 1} / ${s.x + s.w + 1}`; });
+  if (before) all.forEach((e, i) => {
+    const a = before[i], b = e.getBoundingClientRect();
+    if (!a.width || (a.left === b.left && a.top === b.top && a.width === b.width && a.height === b.height) || matchMedia("(prefers-reduced-motion:reduce)").matches) return;
+    e.animate([{ transform: `translate(${a.left - b.left}px,${a.top - b.top}px)` }, { transform: "none" }], { duration: 200, easing: "cubic-bezier(.2,.7,.2,1)" });
+  });
+  $("#resetLayout").disabled = isHome();
+}
+// the tile you move wins; the other one slides to the nearest free spot on the first screen
+function placeTile(id, r) {
+  const [mw, mh] = MINS[id];
+  if (r.w < mw || r.h < mh || !inView(r)) return;
+  const other = id === "comps" ? "feed" : "comps"; let o = lay[other];
+  if (hit(r, o)) {
+    let best = null;
+    for (let y = 0; y + o.h <= VIS; y++) for (let x = 0; x + o.w <= COLS; x++) {
+      const c = { x, y, w: o.w, h: o.h }; if (hit(c, r)) continue;
+      const d = Math.abs(x - o.x) + Math.abs(y - o.y); if (!best || d < best.d) best = { ...c, d };
+    }
+    if (!best) return; o = { x: best.x, y: best.y, w: best.w, h: best.h };
+  }
+  if (JSON.stringify(r) === JSON.stringify(lay[id]) && o === lay[other]) return;
+  lay[id] = r; lay[other] = o; renderLayout(true);
+}
+board.addEventListener("pointerdown", e => {
+  if (!ONE_SCREEN.matches || e.button !== 0) return;
+  const grip = e.target.closest(".corner"), handle = e.target.closest(".ph, .fh, .panel.chart > .panel-h");
+  if (!grip && !handle) return;
+  const box = e.target.closest(".pn"), chartP = charts.find(P => P.card === box), id = chartP ? null : box.dataset.pn, tgt = grip || handle;
+  e.preventDefault(); tgt.setPointerCapture(e.pointerId);
+  box.classList.add("moving"); board.classList.add("moving"); document.body.classList.add("moving-panel");
+  if (hoverT != null) { hoverT = null; scheduleRender(); }
+  const m = gridMetrics(), gx = Math.floor((e.clientX - m.left) / m.sx), gy = Math.floor((e.clientY - m.top) / m.sy), p0 = id ? { ...lay[id] } : null; let over = null;
+  const move = ev => {
+    const cx = Math.floor((ev.clientX - m.left) / m.sx), cy = Math.floor((ev.clientY - m.top) / m.sy);
+    if (chartP && grip) { // resizing one chart resizes every chart
+      const s = box.getBoundingClientRect(), w = Math.max(2, Math.min(COLS, Math.round((ev.clientX - s.left) / m.sx))), h = Math.max(1, Math.min(VIS, Math.round((ev.clientY - s.top) / m.sy)));
+      if (lay.auto || w !== lay.cw || h !== lay.ch) { lay.auto = false; lay.cw = w; lay.ch = h; renderLayout(true); }
+    } else if (chartP) { // drag a chart onto another to swap them
+      box.style.pointerEvents = "none"; const t = document.elementFromPoint(ev.clientX, ev.clientY); box.style.pointerEvents = "";
+      const tb = t && t.closest(".panel.chart");
+      if (over && over !== tb) over.classList.remove("target");
+      over = tb && tb !== box ? tb : null; if (over) over.classList.add("target");
+    } else if (grip) placeTile(id, { x: lay[id].x, y: lay[id].y, w: Math.round((ev.clientX - m.left) / m.sx) - lay[id].x, h: Math.round((ev.clientY - m.top) / m.sy) - lay[id].y });
+    else placeTile(id, { ...lay[id], x: Math.min(COLS - lay[id].w, Math.max(0, p0.x + cx - gx)), y: Math.min(VIS - lay[id].h, Math.max(0, p0.y + cy - gy)) });
+  };
+  const up = () => {
+    tgt.removeEventListener("pointermove", move);
+    box.classList.remove("moving"); board.classList.remove("moving"); document.body.classList.remove("moving-panel");
+    if (over) {
+      over.classList.remove("target");
+      const o = orderNow(), a = o.indexOf(chartP.p.id), b = o.indexOf(charts.find(P => P.card === over).p.id);
+      [o[a], o[b]] = [o[b], o[a]]; lay.order = o; renderLayout(true);
+    }
+    saveLayout(); if (activeBeat) revealFocusedPanels(activeBeat);
+  };
+  tgt.addEventListener("pointermove", move); tgt.addEventListener("pointerup", up, { once: true }); tgt.addEventListener("pointercancel", up, { once: true });
 });
-dashGrid.addEventListener("pointermove", e => {
-  if (!reorder) return;
-  if (!reorder.started) { if (Math.hypot(e.clientX - reorder.x0, e.clientY - reorder.y0) < 5) return; reorder.started = true; reorder.card.classList.add("lifted"); document.body.classList.add("reordering"); if (hoverT != null) { hoverT = null; scheduleRender(); } }
-  const g = dashGrid.getBoundingClientRect();
-  if (e.clientY < g.top + 28) dashGrid.scrollTop -= 12; else if (e.clientY > g.bottom - 28) dashGrid.scrollTop += 12;
-  reorder.target = dropTarget(e.clientX, e.clientY); if (reorder.target) showDropMark(reorder.target);
-});
-dashGrid.addEventListener("pointerup", () => endReorder(true));
-dashGrid.addEventListener("pointercancel", () => endReorder(false));
-document.addEventListener("keydown", e => { if (e.key === "Escape" && reorder) { e.stopPropagation(); endReorder(false); } }, true);
-
-$("#resetLayout").onclick = () => { layout = {}; saveLayout(); applyLayout(); flash("layout reset"); };
-applyLayout();
+$("#resetLayout").onclick = () => { lay = { auto: true, cw: 3, ch: 2, comps: { ...HOME.comps }, feed: { ...HOME.feed }, order: null }; saveLayout(); renderLayout(true); flash("layout reset"); };
+new ResizeObserver(() => renderLayout(false)).observe(board);
+ONE_SCREEN.addEventListener("change", () => renderLayout(false));
+document.querySelectorAll("#themeSeg [data-theme-set]").forEach(b => (b.onclick = () => applyTheme(b.dataset.themeSet, true)));
+applyTheme((() => { try { return localStorage.getItem(THEME_KEY); } catch (e) { return null; } })(), false);
+renderLayout(false); saveLayout();
 
 ready = true; setSpeed(speed);
 render();
 // story popup first; nothing plays until Space or Start
-$("#introT").textContent = PB.meta.title; $("#introStory").textContent = PB.meta.story;
-$("#introTags").innerHTML = PB.meta.tags.map(t => `<span>${esc(t)}</span>`).join("");
-$("#introMeta").textContent = `Story · ${Math.round(D / 60)} min · ${beats.length} key moments`;
+const M = PB.meta;
+$("#introT").textContent = M.title; $("#introStory").textContent = M.story;
+{
+  const bg = (M.background || []).map(b => typeof b === "string" ? { body: b } : b);
+  const story = bg.map(b => `<div>${b.title ? `<h4>${esc(b.title)}</h4>` : ""}<p>${esc(b.body)}</p></div>`).join("");
+  const list = (title, cls, items) => items.length ? `<div><h4>${title}</h4><ul class="${cls}">${items.join("")}</ul></div>` : "";
+  const side = list("The cast", "cast", (M.cast || []).map(c => `<li><b>${esc(c.name)}</b> <span>${esc(c.role)}</span></li>`))
+    + list("Keep an eye on", "watch", (M.watch || []).map(w => `<li>${esc(w.label)}<em>${esc(w.normal)}</em></li>`))
+    + list("You’ll come away knowing", "learn", (M.learn || []).map(x => `<li>${esc(x)}</li>`));
+  const box = $("#introBody");
+  box.innerHTML = (story ? `<div class="story">${story}</div>` : "") + (side ? `<div class="side">${side}</div>` : "");
+  box.classList.toggle("one", !story || !side); box.hidden = !story && !side;
+}
+$("#introMeta").textContent = `Story · ${Math.round(D / 60)} min · ${beats.length} key moments${(M.tags || []).length ? " · " + M.tags.slice(0, 3).join(" · ") : ""}`;
 function startRun() { hideModal($("#intro"), () => renderHud(viewT())); seek(0); setPlaying(true); }
 $("#start").onclick = startRun;
 $("#pbTitle").textContent = PB.meta.title; document.title = PB.meta.title;

@@ -59,3 +59,20 @@ test("the page uses the skill's validator and example, not copies", () => {
   assert.equal(fs.readlinkSync(new URL("../js/playbook.js", import.meta.url)), skill + "scripts/playbook.js");
   assert.equal(fs.readlinkSync(new URL("kafka-rebalance-storm.json", dir)), skill + "examples/kafka-rebalance-storm.json");
 });
+
+test("intro and report context fields are checked, and bundled playbooks carry them", () => {
+  for (const item of index) {
+    const pb = read(item.file);
+    assert.ok(pb.meta.background?.length >= 2 && pb.meta.cast?.length && pb.meta.watch?.length && pb.meta.learn?.length, `${item.file}: intro fields`);
+    assert.ok(!validate(pb).warnings.some((w) => w.includes("meta.background")));
+  }
+  const pb = read("kafka-rebalance-storm.json");
+  pb.meta.cast = [{ name: "x" }];
+  pb.meta.background = [{ title: "t" }];
+  pb.report.links = [{ label: "x", url: "http://insecure.example" }];
+  pb.report.myths = [{ myth: "m" }];
+  const r = validate(pb);
+  for (const bit of ["meta.cast[0]", "meta.background[0]", "report.links[0]", "report.myths[0]"]) assert.ok(r.errors.some((e) => e.includes(bit)), bit);
+  delete pb.meta.background;
+  assert.ok(validate(read("kafka-rebalance-storm.json")).ok);
+});
