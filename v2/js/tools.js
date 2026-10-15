@@ -1,12 +1,12 @@
 // WebMCP tools for the v2 page. An agent (Claude Code through the WebMCP bridge) writes a playbook with the
-// /story-to-playbook command, then checks, loads and plays it here, and reads the world back with get_state.
+// story-to-playbook skill, then checks, loads and plays it here, and reads the world back with get_state.
 // The page can't read files: the bridge replaces a {"$file": "path"} argument with the file's text.
 import { SCHEMA, validate, simulate, alertEvents, valuesAt } from "./playbook.js";
 
 const GUIDE = {
   what: "sim-xp plays a playbook: a scripted, deterministic run of a small system. The viewer watches components, dashboards and a feed move, and playback pauses at key moments that explain what happened. A report closes the run.",
   schema: SCHEMA,
-  how_to_write: "Use the /story-to-playbook command (install: npx degit smarchone/sim-xp/.claude/commands ~/.claude/commands --force). It has the format, the rules and the workflow. Bundled playbooks are complete references: list_playbooks, then get_playbook after loading one.",
+  how_to_write: "Use the story-to-playbook skill (install: npx skills add smarchone/sim-xp --skill story-to-playbook -g). It has the format, the rules, an example and the validator. Bundled playbooks are complete references: list_playbooks, then get_playbook after loading one.",
   passing_files: 'Write the playbook to a file and pass {"$file": "path/to/playbook.json"} as the playbook argument: the bridge inlines the file, so the JSON stays out of the conversation. Paths resolve against the folder Claude Code runs in.',
   workflow: [
     "validate_playbook with the file. Fix every error; read world.key_moments and world.alerts and check that the numbers tell the story (e.g. lag rises before its alert fires). Fix and validate again.",

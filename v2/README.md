@@ -5,7 +5,7 @@ this page plays it: components light up, dashboards move, a feed scrolls, and pl
 moments that explain what happened. A one-screen report closes the run.
 
 ```
-story ──(Claude Code + /story-to-playbook)──► playbook.json ──(WebMCP)──► this page plays it
+story ──(Claude Code + story-to-playbook skill)──► playbook.json ──(drop it on the page)──► this page plays it
 ```
 
 v1 (the MVP in `../mvp`) let the learner operate the system. v2 drops that: nobody operates anything, the
@@ -27,18 +27,19 @@ Tests: `node --test v2/test/*.test.mjs`
 
 ## With Claude Code
 
-Add the [WebMCP bridge](https://github.com/smarchone/webmcp-apps) and the `/story-to-playbook` command once
-(rerun the second line to update), then give it a story:
+Install the `story-to-playbook` skill once, give it a story, then drop the playbook file it
+writes on the page:
 
 ```sh
-claude mcp add webmcp -- npx -y @smarchone/webmcp-bridge
-npx degit smarchone/sim-xp/.claude/commands ~/.claude/commands --force
+npx skills add smarchone/sim-xp --skill story-to-playbook -g
 claude "/story-to-playbook why Postgres replicas fall behind during a big backfill"
 ```
 
-A clone of this repo has the command already, in `.claude/commands/`.
+The skill is self-contained: the format and authoring rules, an example playbook, and the validator.
+A clone of this repo has it already, in `.claude/skills/story-to-playbook`.
 
-The page's tools:
+The page also registers WebMCP tools, so an agent with the
+[WebMCP bridge](https://github.com/smarchone/webmcp-apps) can load and play a playbook itself. The page's tools:
 
 | Tool | What it does |
 |---|---|
@@ -57,8 +58,7 @@ The page's tools:
 |---|---|
 | `index.html`, `js/app.js` | The page: library, file drop, player frame, WebMCP tools |
 | `player.html` | The player. It plays the playbook its host page hands it, and exposes `window.player` for playback |
-| `js/playbook.js` | Validation and the noise-free simulation, shared by the page and the CLI |
+| `js/playbook.js` | Symlink to the skill's validator (`../.claude/skills/story-to-playbook/scripts/playbook.js`), so the page and the skill share one copy |
 | `js/tools.js` | The WebMCP tools |
-| `tools/validate.mjs` | `node v2/tools/validate.mjs pb.json [--at 60,120]` |
-| `playbooks/` | Four playbooks and `index.json` |
-| `../.claude/commands/story-to-playbook.md` | The `/story-to-playbook` command: format, authoring rules, workflow |
+| `playbooks/` | Four playbooks and `index.json`; the Kafka one is a symlink to the skill's example |
+| `../.claude/skills/story-to-playbook/` | The skill: format, authoring rules, one example, and the validator (`node scripts/validate.mjs pb.json [--at 60,120]`) |

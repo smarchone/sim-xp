@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 // Check a sim-xp playbook and print the world at each key moment, so an author can see whether the numbers tell the story.
-// Usage: node v2/tools/validate.mjs playbook.json [--at 60,120]
+// Usage: node scripts/validate.mjs playbook.json [--at 60,120]
 // Exit code 1 on errors. Warnings never fail. The page's validate_playbook tool runs the same checks.
 import fs from "node:fs";
-import { validate, simulate, valuesAt } from "../js/playbook.js";
+import { validate, simulate, valuesAt } from "./playbook.js";
 
 const file = process.argv[2];
-if (!file) { console.error("usage: node v2/tools/validate.mjs playbook.json [--at 60,120]"); process.exit(2); }
+if (!file) { console.error("usage: node scripts/validate.mjs playbook.json [--at 60,120]"); process.exit(2); }
 let pb;
 try { pb = JSON.parse(fs.readFileSync(file, "utf8")); } catch (e) { console.error("ERROR not valid JSON: " + e.message); process.exit(1); }
 

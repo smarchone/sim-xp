@@ -53,3 +53,9 @@ test("page tools reject unknown arguments and report the world at any second", a
   assert.equal(v.ok, true);
   assert.equal(v.world.at[0].t, 100);
 });
+
+test("the page uses the skill's validator and example, not copies", () => {
+  const skill = "../../.claude/skills/story-to-playbook/";
+  assert.equal(fs.readlinkSync(new URL("../js/playbook.js", import.meta.url)), skill + "scripts/playbook.js");
+  assert.equal(fs.readlinkSync(new URL("kafka-rebalance-storm.json", dir)), skill + "examples/kafka-rebalance-storm.json");
+});
