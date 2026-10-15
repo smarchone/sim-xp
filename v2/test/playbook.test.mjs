@@ -90,11 +90,3 @@ test("every panel says why it matters, and meta.clock / feed.key are checked", (
   const r = validate(pb);
   for (const bit of ["meta.clock.start", "meta.clock.scale", "meta.clock.changes[1]", "feed.key"]) assert.ok(r.errors.some((e) => e.includes(bit)), bit);
 });
-
-test("meta.layout.components must be 3, 4 or 5", () => {
-  const pb = read("github-2018-split-brain.json");
-  assert.equal(pb.meta.layout.components, 4);
-  assert.equal(validate(pb).ok, true);
-  pb.meta.layout.components = 7;
-  assert.ok(validate(pb).errors.some((e) => e.includes("meta.layout.components")));
-});

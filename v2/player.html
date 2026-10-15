@@ -51,6 +51,8 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--p
 
 /* components stage */
 .stage{display:flex;flex-direction:column;overflow:hidden}
+.ph .wsl{margin-left:auto;display:flex;align-items:center}
+.ph input[type=range]{width:64px;height:14px;margin:0;accent-color:var(--accent);cursor:pointer}
 .ph{display:flex;align-items:baseline;gap:8px;padding:6px 10px 2px;font-size:var(--s);font-weight:600;color:var(--muted);flex:none}
 .ph .hint,.fh .hint{font-weight:400;color:var(--faint)}
 .stagebox{position:relative;flex:1;min-height:0;padding:6px 8px 8px}
@@ -301,7 +303,7 @@ pre{font:var(--s)/1.5 var(--mono);background:var(--sunk);border-radius:8px;paddi
   <main class="main">
     <div class="board" id="dashgrid">
       <div class="pn stage dimmable" id="compCard" data-pn="comps">
-        <div class="ph">Components</div>
+        <div class="ph"><span>Components</span><label class="wsl" title="Components width"><input type="range" id="compW" min="3" max="5" step="1" value="3" aria-label="Components width"></label></div>
         <div class="stagebox"><svg id="comp" role="img" aria-label="Components"></svg></div>
         <div class="sheet" id="caption" aria-live="polite">
           <div class="strip" id="sheetStrip"></div>
@@ -978,13 +980,19 @@ $("#schema").innerHTML = `<p>The agent writes one JSON file; the app only plays 
 
 
 /* ===================== Layout: fixed =====================
-   Components on the left (3 of 12 columns, or 4 or 5 when meta.layout.components says so, taken from the charts only) and the feed
-   on the right (3 columns), both full height and fixed. The charts share the middle columns, all the same size. The playbook may pick meta.layout { components, columns, rows };
+   Components on the left (3 of 12 columns; a slider in its header widens it to 4 or 5, taking only from the charts) and the feed
+   on the right (3 columns), both full height and fixed. The charts share the middle columns, all the same size. The playbook may pick meta.layout { columns, rows };
    otherwise 2 columns, with as many rows per screen as fit all charts (2 to 5). More charts than fit: the board scrolls. */
 const COLS = 12, GAP = 4, MIN_H = 110;
 const board = dashGrid, charts = panels.filter(P => P.kind === "chart");
 const tiles = [$("#compCard"), $("#feedCard")];
 const LAYOUT = PB.meta.layout || {};
+// the viewer picks the components width with the slider in its header: 3 (default, narrow), 4 or 5 columns of 12, taken from the charts only
+const WKEY = "sim-xp.comp-cols";
+let compCols = 3;
+try { const v = +localStorage.getItem(WKEY); if ([3, 4, 5].includes(v)) compCols = v; } catch (e) { /* storage blocked */ }
+$("#compW").value = compCols;
+$("#compW").oninput = e => { compCols = +e.target.value; try { compCols === 3 ? localStorage.removeItem(WKEY) : localStorage.setItem(WKEY, compCols); } catch (err) { /* storage blocked */ } renderLayout(); };
 function renderLayout() {
   const all = [...tiles, ...charts.map(P => P.card)];
   if (!ONE_SCREEN.matches) { // stacked: no grid areas
@@ -993,7 +1001,7 @@ function renderLayout() {
     return;
   }
   const H = board.clientHeight, n = charts.length;
-  const cols = [1, 2, 3].includes(LAYOUT.columns) ? LAYOUT.columns : 2, CW = [3, 4, 5].includes(LAYOUT.components) ? LAYOUT.components : 3, M = 12 - CW - 3, R = Math.max(1, Math.ceil(n / cols));
+  const cols = [1, 2, 3].includes(LAYOUT.columns) ? LAYOUT.columns : 2, CW = compCols, M = 12 - CW - 3, R = Math.max(1, Math.ceil(n / cols));
   let per = Number.isInteger(LAYOUT.rows) && LAYOUT.rows >= 1 ? LAYOUT.rows : Math.max(2, Math.min(5, R));
   per = Math.max(1, Math.min(per, R, Math.floor((H + GAP) / (MIN_H + GAP))));
   const rh = (H - (per - 1) * GAP) / per, rows = R, tileH = Math.min(H, rows * rh + (rows - 1) * GAP);

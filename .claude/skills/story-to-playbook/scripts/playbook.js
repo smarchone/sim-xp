@@ -117,7 +117,6 @@ export function validate(PB) {
     if (typeof lay !== "object" || Array.isArray(lay)) err("meta.layout must be { columns?, rows? }");
     else {
       if (lay.columns != null && ![1, 2, 3].includes(lay.columns)) err("meta.layout.columns must be 1, 2 or 3");
-      if (lay.components != null && ![3, 4, 5].includes(lay.components)) err("meta.layout.components must be 3, 4 or 5 (grid columns of 12 for the components view)");
       if (lay.rows != null && !(Number.isInteger(lay.rows) && lay.rows >= 1 && lay.rows <= 8)) err("meta.layout.rows must be an integer 1..8");
     }
   }
