@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>sim-xp</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="v2/style.css">
+<style>
+  .card{text-decoration:none;color:inherit}
+  .play{align-self:flex-start;margin-top:4px;font:500 12px var(--sans);color:#fff;background:var(--accent);border-radius:6px;padding:4px 14px}
+  .card:hover .play{filter:brightness(1.1)}
+</style>
+</head>
+<body>
+<!-- The gallery: each playbook opens in the v2 player at v2/?pb=<id>. The list comes from v2/playbooks/index.json. -->
+<main class="library">
+  <header class="top">
+    <div>
+      <h1>sim-xp</h1>
+      <p class="lede">Watch a system in motion: a story played as components, dashboards and a feed, pausing at the moments that explain it.</p>
+    </div>
+  </header>
+
+  <section aria-labelledby="pbHead">
+    <h2 id="pbHead">Playbooks</h2>
+    <div class="error" id="error" hidden></div>
+    <ul class="cards" id="cards"></ul>
+  </section>
+
+  <section aria-labelledby="ccHead" class="cc">
+    <h2 id="ccHead">Make your own</h2>
+    <p class="small muted">The <code>story-to-playbook</code> skill turns a story (a blog post, a postmortem, a one-line prompt) into a playbook file. Requires Node 18+.</p>
+    <ol class="steps">
+      <li><span>Install the skill, once</span>
+        <div class="copy"><code id="cmdSkill">npx skills add smarchone/sim-xp --skill story-to-playbook -g</code><button data-copy="cmdSkill">Copy</button></div></li>
+      <li><span>Give it a story: a prompt, a postmortem or a blog post URL</span>
+        <div class="copy"><code id="cmdRun">claude "/story-to-playbook why Postgres replicas fall behind during a big backfill"</code><button data-copy="cmdRun">Copy</button></div></li>
+      <li><span>Drop the playbook file it writes on the <a href="v2/">player</a></span></li>
+    </ol>
+  </section>
+
+  <p class="small muted"><a href="v2/">Open a playbook file</a></p>
+</main>
+
+<script type="module">
+  const $ = (id) => document.getElementById(id);
+  try {
+    const index = await (await fetch("v2/playbooks/index.json")).json();
+    for (const p of index) {
+      const li = document.createElement("li"), a = document.createElement("a");
+      a.className = "card"; a.href = "v2/?pb=" + encodeURIComponent(p.id);
+      a.innerHTML = `<b></b><p></p><span class="meta"></span><span class="play">Play</span>`;
+      a.querySelector("b").textContent = p.title;
+      a.querySelector("p").textContent = p.story;
+      for (const t of [`${Math.round(p.duration_s / 60)} min`, `${p.key_moments} key moments`, ...p.tags.slice(0, 3)]) {
+        const s = document.createElement("span"); s.textContent = t; a.querySelector(".meta").append(s);
+      }
+      li.append(a); $("cards").append(li);
+    }
+  } catch (e) { $("error").textContent = "Could not load the playbooks."; $("error").hidden = false; }
+  document.querySelectorAll("[data-copy]").forEach((b) => {
+    b.onclick = async () => {
+      const code = $(b.dataset.copy);
+      try { await navigator.clipboard.writeText(code.textContent); b.textContent = "Copied"; } catch (err) { getSelection().selectAllChildren(code); b.textContent = "Selected"; }
+      setTimeout(() => (b.textContent = "Copy"), 1500);
+    };
+  });
+</script>
+</body>
+</html>

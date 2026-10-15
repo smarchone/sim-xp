@@ -3,7 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
-    paths: ['mvp/**', 'v2/**', '.github/workflows/pages.yml']
+    paths: ['home/**', 'v2/**', '.claude/skills/story-to-playbook/**', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 permissions:
@@ -23,9 +23,9 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - run: node --test mvp/test/*.test.mjs v2/test/*.test.mjs
-      # the MVP stays at the site root; v2 is served at /v2/
-      - run: cp -rL mvp _site && cp -rL v2 _site/v2
+      - run: node --test v2/test/*.test.mjs
+      # the playbook gallery is the site root and the player is at /v2/; the MVP is deprecated and not deployed
+      - run: cp -rL home _site && cp -rL v2 _site/v2
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
