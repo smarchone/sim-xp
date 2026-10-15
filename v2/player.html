@@ -1,0 +1,1085 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>sim-xp player</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Proposal B v4, desktop only, resizable + reorderable (1440x900, 1280x800), cognitive-load pass.
+   Three surfaces: left (components over feed), right (dashboard), bottom (player bar).
+   Type scale: 10 / 11.5 / 14 px, nothing else. Colour only for state (red/amber/green), ownership (teal/violet/pink),
+   and the one accent (playhead, progress, primary action). */
+:root{
+  --bg:#eef1f5; --panel:#ffffff; --sunk:#f2f4f7; --line:#e3e7ed; --line2:#d5dbe3; --fg:#1b232d; --muted:#66727f; --faint:#9aa4af; --node:#f7f9fb; --glass:rgba(255,255,255,.95);
+  --accent:#2f6fd6; --track:#dde2e8;
+  --red:#d63a48; --amber:#c98a12; --green:#1f9a61; --blue:#2f7fd6; --teal:#14958a; --violet:#6c5ce0; --pink:#c8418d; --grey:#8a949f;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --s:10px; --m:11.5px; --l:14px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0c1015; --panel:#13181e; --sunk:#181e26; --line:#212932; --line2:#2b343f; --fg:#d9e0e8; --muted:#8793a1; --faint:#56616e; --node:#19202a; --glass:rgba(19,24,30,.95);
+  --accent:#6aa6ff; --track:#2a333e; --red:#f0616d; --amber:#f2b84b; --green:#4cc38a; --blue:#5aa9f6; --teal:#3fc1b0; --violet:#9b8cff; --pink:#f07fc0; --grey:#5f6b78;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0c1015; --panel:#13181e; --sunk:#181e26; --line:#212932; --line2:#2b343f; --fg:#d9e0e8; --muted:#8793a1; --faint:#56616e; --node:#19202a; --glass:rgba(19,24,30,.95);
+  --accent:#6aa6ff; --track:#2a333e; --red:#f0616d; --amber:#f2b84b; --green:#4cc38a; --blue:#5aa9f6; --teal:#3fc1b0; --violet:#9b8cff; --pink:#f07fc0; --grey:#5f6b78;
+  color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:var(--m);line-height:1.4;padding:10px 16px 12px}
+.app{max-width:1600px;margin:0 auto;display:flex;flex-direction:column;gap:8px}
+.small{font-size:var(--s);color:var(--muted)}
+h1{font-size:var(--l);font-weight:600;margin:0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+button,select{font:inherit;font-size:var(--m);color:var(--fg);background:var(--panel);border:1px solid var(--line2);border-radius:6px;padding:4px 10px;cursor:pointer}
+button:hover,select:hover{border-color:var(--accent)}
+button:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--panel);font-weight:600}
+.surface{background:var(--panel);border-radius:10px;min-width:0}
+
+/* main: two surfaces */
+.main{display:flex;flex-direction:column;gap:8px;min-width:0}
+.left{display:flex;flex-direction:column;min-width:0}
+
+/* components stage */
+.stage{position:relative;overflow:hidden;min-width:0}
+.stagebox{padding:10px}
+#comp{display:block;width:100%;height:auto;transform-origin:50% 0;transition:transform .38s cubic-bezier(.2,.8,.2,1)}
+/* key-moment card: same popup family, anchored inside the stage away from the focused components */
+
+#beatGo{white-space:nowrap}
+
+/* feed: always visible, one line per entry, tied to the shared cursor */
+.feed{position:relative;display:flex;flex-direction:column;height:var(--feedH,170px);flex:none}
+.feed .fh{display:flex;align-items:baseline;gap:8px;padding:2px 12px 2px}
+.feed .fh b{font-size:var(--s);font-weight:600;color:var(--muted)}
+.feedbox{position:relative;flex:1;min-height:0}
+.feed ol{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 10px);mask-image:linear-gradient(to bottom,transparent 0,#000 10px);position:absolute;inset:0;list-style:none;margin:0;padding:0 6px 6px;overflow-y:auto;scroll-behavior:smooth;scrollbar-width:thin}
+/* every entry wraps fully; wrapped lines hang under the message column, not under the time */
+.feed li{display:grid;grid-template-columns:30px minmax(0,1fr);gap:8px;align-items:baseline;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:var(--s);line-height:1.4;box-shadow:inset 2px 0 0 transparent}
+.feed li .msg{overflow-wrap:anywhere}
+.feed li .who{margin-right:6px}
+.feed li:hover{background:var(--sunk)}
+.feed li{transition:font-size .25s ease,background .25s ease}
+.feed li.near{font-size:var(--m);background:color-mix(in srgb,var(--accent) 12%,transparent);box-shadow:inset 3px 0 0 var(--accent);padding-top:4px;padding-bottom:4px}
+.feed li.near .txt,.feed li.near .who{color:var(--fg)}
+.feed li.near time{color:var(--muted)}
+.feed li.fresh{animation:arrive .6s ease-out}
+@keyframes arrive{from{opacity:0;background:color-mix(in srgb,var(--accent) 10%,transparent)}to{opacity:1}}
+.feed time{font-family:var(--mono);color:var(--faint);font-variant-numeric:tabular-nums}
+.feed .who{color:var(--muted)}
+.feed .txt{color:var(--muted)}
+.feed li.k-log .txt{font-family:var(--mono)}
+.feed li.k-alert .txt{color:var(--red)}
+.feed li.k-resolved .txt{color:var(--green)}
+.feed .empty{display:block;color:var(--muted);padding:2px 6px;font-size:var(--s)}
+
+
+/* dashboard: one surface, panels separated by hairlines only */
+.dash{display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.dashgrid{display:grid;grid-template-columns:repeat(var(--cols,1),minmax(0,1fr));grid-auto-rows:170px;min-width:0;position:relative}
+.panel{display:flex;flex-direction:column;padding:8px 12px 4px;min-width:0;min-height:0;border-bottom:1px solid var(--line)}
+.dashgrid[style*="--cols: 2"] .panel:nth-child(2n){border-left:1px solid var(--line)}
+.panel-h{display:flex;align-items:baseline;gap:10px;min-height:18px;white-space:nowrap;min-width:0;font-size:var(--s)}
+.panel-h b{font-weight:600;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+.panel .legend{display:flex;gap:10px;color:var(--faint);overflow:hidden}
+.panel .legend i{display:inline-block;width:10px;height:2px;margin-right:4px;vertical-align:middle}
+.panel .val{margin-left:auto;font:500 var(--m) var(--mono);font-variant-numeric:tabular-nums;text-align:right;color:var(--fg)}
+.panel .val small{font-size:var(--s);color:var(--faint);margin-left:4px}
+.panel .val.warn{color:var(--amber)} .panel .val.bad{color:var(--red)}
+.plot{position:relative;flex:1;min-height:0}
+.plot svg{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
+.panel.lane{flex:none;border-bottom:0}
+.panel.lane .plot{flex:none;height:34px}
+
+/* ---------- no play bar: progress hairline + status chip + corner menus ---------- */
+.progress{position:fixed;top:0;left:0;right:0;height:2px;z-index:15;pointer-events:none}
+.progress i{display:block;height:100%;width:0;background:var(--accent)}
+.masthead{display:flex;align-items:center;gap:10px;min-height:26px;min-width:0}
+.hud{margin-left:auto;display:flex;align-items:center;gap:6px;position:relative;flex:none}
+.status{display:flex;align-items:center;gap:6px;font-size:var(--s);color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px 10px;max-width:520px;transition:opacity .35s ease}
+.status b{color:var(--fg);font:500 var(--s) var(--mono);font-variant-numeric:tabular-nums}
+.status .ch{color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px}
+.status .ic{width:10px;text-align:center;color:var(--accent)}
+.status.flash{border-color:var(--accent)}
+.app.playing:not(.hovering) .status:not(:hover):not(.flash){opacity:.4}
+.iconbtn{width:26px;height:26px;padding:0;border-radius:999px;display:grid;place-items:center;font-size:var(--m);color:var(--muted);border-color:var(--line)}
+.menu{position:absolute;top:calc(100% + 6px);right:0;width:270px;z-index:30;padding:10px 12px 10px;gap:4px}
+.menu .mi{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:left;background:none;border-color:transparent;padding:5px 6px}
+.menu .mi:hover:not(:disabled){background:var(--sunk)}
+.menu .mi:disabled{color:var(--faint);cursor:default}
+.menu .row{display:flex;align-items:center;gap:8px;padding:5px 6px}
+.seg{display:flex;border:1px solid var(--line2);border-radius:6px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:2px 7px;font-size:var(--s);background:none}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--panel)}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:5px 10px;align-items:center;font-size:var(--s);color:var(--muted)}
+.keys span:nth-child(odd){display:flex;gap:3px;justify-content:flex-end}
+.ghost{background:none;border-color:transparent;color:var(--muted);white-space:nowrap}
+.ghost:hover{color:var(--accent);border-color:transparent}
+.ghost{background:none;border-color:transparent;color:var(--muted);font-size:var(--s);padding:4px 6px;white-space:nowrap}
+.ghost:hover{color:var(--accent);border-color:transparent}
+
+/* splitters: a hairline at rest, a grab handle on hover, resize cursor */
+.vsplit,.hsplit{position:relative;flex:none;z-index:4;touch-action:none;outline:none}
+.vsplit{cursor:col-resize}
+.hsplit{height:9px;cursor:row-resize;margin:0 10px}
+.vsplit::before{content:"";position:absolute;top:0;bottom:0;left:50%;width:1px;transform:translateX(-50%);background:transparent;transition:background .15s}
+.hsplit::before{content:"";position:absolute;left:0;right:0;top:50%;height:1px;transform:translateY(-50%);background:var(--line);transition:background .15s}
+.vsplit::after,.hsplit::after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:3px;background:var(--faint);opacity:0;transition:opacity .15s}
+.vsplit::after{width:4px;height:36px}
+.hsplit::after{width:36px;height:4px}
+.vsplit:hover::before,.vsplit.active::before,.vsplit:focus-visible::before,.hsplit:hover::before,.hsplit.active::before,.hsplit:focus-visible::before{background:var(--accent)}
+.vsplit:hover::after,.vsplit.active::after,.vsplit:focus-visible::after,.hsplit:hover::after,.hsplit.active::after,.hsplit:focus-visible::after{opacity:1;background:var(--accent)}
+body.resizing,body.resizing *{user-select:none!important}
+body.resizing .dimmable{transition:none}
+body.resizing.col *{cursor:col-resize!important} body.resizing.row *{cursor:row-resize!important}
+
+/* reorderable panels: drag by the title */
+.panel.chart .panel-h{cursor:grab}
+.panel.chart .panel-h b::before{content:"⠿";color:var(--faint);margin-right:5px;opacity:0;transition:opacity .15s}
+.panel.chart .panel-h:hover b::before{opacity:1}
+body.reordering,body.reordering *{cursor:grabbing!important;user-select:none!important}
+.panel.lifted{opacity:.35}
+.dropmark{position:absolute;background:var(--accent);border-radius:2px;pointer-events:none;z-index:5;box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 25%,transparent)}
+
+/* focus mode: one focal point */
+.dimmable{transition:opacity .45s ease}
+.focus-mode .dimmable{opacity:.28}
+.focus-mode .dimmable.focused{opacity:1}
+/* key moments: the focused things glow, so they read around the edges of the centred card */
+.focus-mode .panel.focused,.focus-mode .feed.focused{border-radius:8px;background:color-mix(in srgb,var(--accent) 7%,var(--panel));box-shadow:inset 0 0 0 1.5px var(--accent),0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+.focus-mode #comp g.focused > rect:first-child{stroke:var(--accent);stroke-width:2.5px}
+.focus-mode #comp g.focused{filter:drop-shadow(0 0 5px color-mix(in srgb,var(--accent) 75%,transparent))}
+.focus-mode #comp g.focused g.focused,.focus-mode #comp g[data-id^="e-"].focused{filter:none}
+
+/* svg text: two sizes only */
+/* components text is sized for the screen, not the viewBox: ~10.5px names and ~9px labels whatever the graph's scale (set from JS) */
+.t{fill:var(--fg);font:600 var(--ct,10.5px) var(--sans)}
+.ts{fill:var(--muted);font:var(--cs,9px) var(--mono)}
+.tp{fill:var(--fg);font:500 var(--cs,9px) var(--mono)}
+.axis{fill:var(--faint);font:var(--s) var(--mono);font-variant-numeric:tabular-nums}
+.alab{font:500 var(--s) var(--mono);paint-order:stroke;stroke:var(--panel);stroke-width:3px}
+.grid{stroke:var(--line);stroke-width:1}
+@keyframes pulse{0%,100%{opacity:var(--o1)}50%{opacity:var(--o2)}}
+.playing .pulse{animation:pulse 2s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.playing .pulse{animation:none}.feed li.fresh{animation:none}.feed ol{scroll-behavior:auto}}
+
+/* one-screen desktop */
+@media (min-width:1000px) and (min-height:600px){
+  .app{height:calc(100dvh - 22px)}
+  .main{flex:1;min-height:0;display:grid;grid-template-columns:var(--left,minmax(340px,.55fr)) 10px minmax(420px,1fr);gap:0}
+  .left{min-height:0}
+  .stage{flex:1;min-height:0}
+  .stagebox{position:absolute;inset:0}
+  #comp{height:100%}
+  .dash{min-height:0}
+  .dashgrid{flex:1;min-height:0;overflow-y:auto;grid-auto-rows:minmax(150px,1fr);overscroll-behavior:contain;scroll-behavior:smooth;scrollbar-width:thin}
+}
+/* a narrow window just stacks; the player bar stays reachable */
+@media not ((min-width:1000px) and (min-height:600px)){
+  .stage{min-height:260px}
+  .vsplit,.hsplit{display:none}
+}
+
+/* popups: intro + report */
+/* ---------- one popup family: story, key moment, report, menus ---------- */
+.scrim{position:fixed;inset:0;background:rgba(8,12,18,.45);z-index:20;display:grid;place-items:center;padding:16px;animation:fade .2s ease-out}
+.scrim.leaving{animation:fadeOut .16s ease-in forwards}
+@keyframes fade{from{opacity:0}} @keyframes fadeOut{to{opacity:0}}
+.pop{background:var(--panel);border:1px solid var(--line2);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.28);padding:16px 18px 14px;display:flex;flex-direction:column;gap:8px;min-width:0;color:var(--fg);font-size:var(--m)}
+.pop-in{animation:popIn .2s ease-out}
+.pop.leaving{animation:popOut .16s ease-in forwards}
+@keyframes popIn{from{opacity:0;transform:translateY(6px) scale(.985)}}
+@keyframes popOut{to{opacity:0;transform:translateY(4px) scale(.985)}}
+.pop .eb{font-size:var(--s);color:var(--muted)}
+.pop h2{margin:0;font-size:var(--l);line-height:1.3;text-wrap:balance}
+.pop p{margin:0;line-height:1.55}
+.pop .pbody{display:flex;flex-direction:column;gap:8px;min-height:0;overflow-y:auto}
+.pop .foot{display:flex;align-items:center;gap:8px;margin-top:6px;flex:none}
+.pop .foot .spacer{flex:1}
+.pop .foot button{padding:5px 14px}
+kbd{font:500 var(--s) var(--mono);color:var(--muted);border:1px solid var(--line2);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--sunk);white-space:nowrap}
+.modal{width:min(560px,100%);max-height:calc(100dvh - 32px)}
+.modal.wide{width:min(680px,100%)}
+/* key moment: a sheet that rises from the bottom of the components view (overlay, never pushes layout) */
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:3;max-height:calc(100% - 16px);display:flex;flex-direction:column;background:var(--glass);border-top:1px solid var(--line2);border-radius:10px 10px 0 0;transform:translateY(calc(100% - 22px));transition:transform .38s cubic-bezier(.2,.8,.2,1),box-shadow .38s,border-color .38s}
+.sheet.open{transform:none;border-top-color:color-mix(in srgb,var(--accent) 60%,transparent);box-shadow:0 -12px 30px rgba(0,0,0,.18)}
+.sheet .strip{flex:none;height:22px;line-height:22px;padding:0 14px;font-size:var(--s);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sheet.open .strip{display:none}
+.sheet .sb{display:flex;flex-direction:column;gap:4px;padding:12px 16px 12px;min-height:0;overflow:hidden}
+.sheet .eb{font-size:var(--s);color:var(--muted)}
+.sheet h2{margin:0;font-size:var(--l);line-height:1.3}
+.sheet p{margin:0;line-height:1.5}
+.sheet .foot{display:flex;align-items:center;gap:8px;margin-top:4px}
+.sheet .foot .spacer{flex:1}
+.sheet .foot button{padding:4px 12px}
+.note{position:absolute;left:0;top:0;z-index:2;pointer-events:none;opacity:0;transition:opacity .3s}
+.note.show{opacity:1}
+.note .nl{position:absolute;max-width:220px;padding:4px 8px;font-size:var(--s);line-height:1.35;color:var(--fg);background:var(--glass);border:1px solid color-mix(in srgb,var(--accent) 60%,transparent);border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.18);white-space:normal}
+.note svg{position:absolute;inset:0;overflow:visible}
+@media (prefers-reduced-motion:reduce){.note{transition:none}}
+@media (prefers-reduced-motion:reduce){.sheet{transition:none}.feed li{transition:none!important}}
+
+.pop h4{margin:8px 0 0;font-size:var(--s);font-weight:600;color:var(--muted)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips span{font-size:var(--s);color:var(--muted);background:var(--sunk);border-radius:999px;padding:1px 8px}
+.modal.report{width:min(900px,100%)}
+.rp-tldr{font-size:var(--l);line-height:1.45;margin:0;text-wrap:pretty}
+.rp-sec{display:flex;flex-direction:column;gap:6px}
+.rp-chain svg,.rp-strip svg{display:block;width:100%;height:auto;overflow:visible}
+.rp-chain text,.rp-strip text{font-family:var(--sans);fill:var(--fg)}
+.rp-chain .bx{fill:var(--sunk);stroke:var(--line2)}
+.rp-chain .k-cause .bx{stroke:var(--amber)} .rp-chain .k-amp .bx{stroke:var(--red)} .rp-chain .k-fix .bx{stroke:var(--green);fill:color-mix(in srgb,var(--green) 10%,var(--panel))}
+.rp-chain .tag{font-size:8.5px;fill:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.rp-chain .k-cause .tag{fill:var(--amber)} .rp-chain .k-amp .tag{fill:var(--red)} .rp-chain .k-fix .tag{fill:var(--green)}
+.rp-chain .ar{stroke:var(--faint);fill:none;stroke-width:1.2}
+.rp-chain .lp{stroke:var(--red);fill:none;stroke-width:1.2;stroke-dasharray:4 3}
+.rp-chain .lpl{font-size:var(--s);fill:var(--red)}
+.rp-strip .ax{stroke:var(--line2)} .rp-strip .sp{fill:none;stroke:var(--accent);stroke-width:1.5} .rp-strip .ar2{fill:color-mix(in srgb,var(--accent) 12%,transparent)}
+.rp-strip .mk{fill:var(--panel);stroke:var(--accent);stroke-width:1.5} .rp-strip .ml{font-size:9px;fill:var(--muted)} .rp-strip .mn{font-size:8.5px;fill:var(--accent);font-weight:600}
+.rp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.rp-card{background:var(--sunk);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:3px}
+.rp-card b{font-size:var(--m);line-height:1.3;display:flex;gap:6px;align-items:baseline}
+.rp-card b i{font-style:normal;color:var(--accent);flex:none;width:14px;text-align:center}
+.rp-card span{color:var(--muted);font-size:var(--s);line-height:1.45;padding-left:20px}
+.rp-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.rp-stat{border:1px solid var(--line);border-radius:8px;padding:6px 10px;display:flex;align-items:baseline;gap:8px;font-size:var(--s);color:var(--muted)}
+.rp-stat .bf{font-size:var(--l);color:var(--red);font-weight:600;font-family:var(--mono)} .rp-stat .af{font-size:var(--l);color:var(--green);font-weight:600;font-family:var(--mono)}
+.rp-stat .lb{margin-right:auto;color:var(--fg)}
+
+/* reviewer-only section */
+details.review{max-width:1600px;margin:16px auto 0;border:1px dashed var(--line2);border-radius:8px;padding:8px 14px;color:var(--muted);font-size:var(--s)}
+details.review summary{cursor:pointer}
+.doc{display:flex;flex-direction:column;gap:10px;padding-top:8px}
+.doc p{margin:0;max-width:72ch}
+pre{font:var(--s)/1.5 var(--mono);background:var(--sunk);border-radius:8px;padding:12px;overflow:auto;max-height:480px;margin:0}
+</style>
+</head>
+<body>
+<div class="progress" id="progress" aria-hidden="true"><i></i></div>
+<div class="app" id="app">
+  <header class="masthead">
+    <h1 id="pbTitle"></h1>
+    <div class="hud">
+      <button class="status" id="status" aria-live="polite" title="Click or press Space to pause and play"></button>
+      <button class="iconbtn" id="helpBtn" aria-label="Keyboard shortcuts" aria-expanded="false" title="Keyboard shortcuts (?)">?</button>
+      <button class="iconbtn" id="menuBtn" aria-label="Menu" aria-expanded="false" title="Report, speed, layout">⋯</button>
+      <div class="pop menu" id="help" hidden>
+        <span class="eb">Keyboard</span>
+        <div class="keys">
+          <span><kbd>Space</kbd></span><span>start · pause and play · continue</span>
+          <span><kbd>←</kbd><kbd>→</kbd></span><span>previous / next key moment</span>
+          <span><kbd>R</kbd></span><span>report</span>
+          <span><kbd>−</kbd><kbd>+</kbd></span><span>slower / faster</span>
+          <span><kbd>Esc</kbd></span><span>close</span>
+          <span>hover</span><span>charts or feed to look back</span>
+          <span>click</span><span>a feed line or chart to jump there</span>
+        </div>
+      </div>
+      <div class="pop menu" id="menu" hidden role="menu">
+        <span class="eb">Playback</span>
+        <button class="mi" id="reportBtn" role="menuitem">Report <kbd>R</kbd></button>
+        <div class="row"><span class="small" style="flex:1">Speed</span><div class="seg" id="speedSeg"><button data-speed="2">0.5×</button><button data-speed="4">1×</button><button data-speed="8">2×</button><button data-speed="16">4×</button></div></div>
+        <button class="mi" id="resetLayout" role="menuitem">Reset layout</button>
+        <button class="mi" id="libraryBtn" role="menuitem">Open another playbook</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+    <section class="surface left">
+      <div class="stage dimmable" id="compCard">
+        <div class="stagebox"><svg id="comp" role="img" aria-label="Components"></svg></div>
+        <div class="sheet" id="caption" aria-live="polite">
+          <div class="strip" id="sheetStrip"></div>
+          <div class="sb">
+            <span class="eb" id="capK"></span>
+            <h2 id="capT"></h2>
+            <p id="capH"></p>
+            <div class="foot"><span class="spacer"></span><kbd>Space</kbd><button class="primary" id="beatGo" tabindex="-1">Continue ▶</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="hsplit" id="hsplit" role="separator" aria-orientation="horizontal" aria-label="Resize components and feed" tabindex="0" title="Drag to resize · double-click to reset"></div>
+      <div class="feed dimmable" data-id="feed" id="feedCard">
+        <div class="fh"><b>Feed</b><span class="small">hover a line to see that moment · click to jump</span></div>
+        <div class="feedbox"><ol id="feed"></ol></div>
+      </div>
+    </section>
+    <div class="vsplit" id="vsplit" role="separator" aria-orientation="vertical" aria-label="Resize components and dashboard" tabindex="0" title="Drag to resize · double-click to reset"></div>
+    <section class="surface dash" id="dash" aria-label="Dashboard"><div class="dashgrid" id="dashgrid"></div>
+    </section>
+  </main>
+</div>
+
+<details class="review">
+  <summary>For review only, not part of the product: the playbook behind this run</summary>
+  <div id="schema" class="doc"></div>
+</details>
+
+<div class="scrim" id="intro">
+  <div class="pop modal pop-in" role="dialog" aria-modal="true" aria-labelledby="introT">
+    <span class="eb" id="introMeta"></span>
+    <h2 id="introT"></h2>
+    <div class="pbody"><div class="chips" id="introTags"></div><p id="introStory"></p></div>
+    <div class="foot"><span class="small">Pauses at each key moment. <kbd>?</kbd> lists the keys.</span><span class="spacer"></span><kbd>Space</kbd><button class="primary" id="start">Start ▶</button></div>
+  </div>
+</div>
+<div class="scrim" id="scrim" hidden>
+  <div class="pop modal report" role="dialog" aria-modal="true" aria-labelledby="repT" id="report"></div>
+</div>
+
+<script>
+// The player plays one playbook, handed over by the page that hosts it (index.html). That page owns loading,
+// validation and the WebMCP tools; it drives playback through window.player (end of this script).
+const host = window.parent !== window ? window.parent.simxp : null;
+const PB = host && host.current ? structuredClone(host.current) : null;
+if (!PB) { document.body.innerHTML = '<p style="padding:24px">No playbook loaded. Open <a href="./" target="_top">sim-xp</a> to pick one.</p>'; throw new Error("no playbook"); }
+
+/* ===================== Engine (what the app does with it) ===================== */
+const D = PB.meta.duration_s;
+const $ = s => document.querySelector(s);
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs = {}, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+const COLORS = ["red","amber","green","blue","teal","violet","pink","grey"];
+const col = c => c == null ? null : COLORS.includes(c) ? `var(--${c})` : c;
+const fmtT = t => { t = Math.max(0, Math.floor(t)); return String(Math.floor(t / 60)).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0"); };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// metric series: keyframes + shape, plus deterministic jitter (unchanged)
+const series = {}, clean = {};
+PB.metrics.forEach((m, mi) => {
+  const kfs = {};
+  PB.timeline.forEach(e => (e.metrics || []).filter(x => x.id === m.id).forEach(x => (kfs[e.t] = x)));
+  let v = m.start, seg = null; const out = [], co = [];
+  for (let s = 0; s <= D; s++) {
+    if (kfs[s]) { const k = kfs[s]; seg = { from: v, to: k.to, t0: s, dur: k.over_s || 0, shape: k.shape || "ease" }; }
+    if (seg) { let p = seg.dur ? Math.min(1, (s - seg.t0) / seg.dur) : 1; if (seg.shape === "step") p = 1; const e = seg.shape === "linear" ? p : p * p * (3 - 2 * p); v = seg.from + (seg.to - seg.from) * e; }
+    const n = Math.sin(s * 0.9 + mi * 7) * 0.5 + Math.sin(s * 2.3 + mi * 3) * 0.3 + Math.sin(s * 5.1 + mi) * 0.2;
+    out[s] = Math.max(0, v * (1 + (m.noise || 0) * n)); co[s] = v;
+  }
+  series[m.id] = out; clean[m.id] = co;
+});
+const metricById = Object.fromEntries(PB.metrics.map(m => [m.id, m]));
+const at = (id, t) => series[id][Math.max(0, Math.min(D, Math.floor(t)))];
+
+// alerts (unchanged)
+const alertState = {}, alertFeed = [], alertRanges = [];
+PB.alerts.forEach(a => {
+  const st = []; let since = null, firing = false, start = null;
+  for (let s = 0; s <= D; s++) {
+    const v = series[a.metric][s]; const c = a.op === ">" ? v > a.value : v < a.value;
+    if (c) { if (since == null) since = s; } else since = null;
+    const now = c && s - since >= a.for_s ? "firing" : c ? "pending" : "ok";
+    if (now === "firing" && !firing) { firing = true; start = s; alertFeed.push({ t: s, from: "alertmanager", kind: "alert", text: `FIRING · ${a.summary}` }); }
+    if (now !== "firing" && firing) { firing = false; alertRanges.push({ a, from: start, to: s }); alertFeed.push({ t: s, from: "alertmanager", kind: "resolved", text: `RESOLVED · ${a.summary}` }); }
+    st[s] = now;
+  }
+  if (firing) alertRanges.push({ a, from: start, to: D });
+  alertState[a.id] = st;
+});
+
+function stateAt(T) {
+  const st = {};
+  const apply = eff => { const cur = st[eff.target] || {}; for (const k in eff) { if (k === "target") continue; if (eff[k] === null) delete cur[k]; else cur[k] = eff[k]; } st[eff.target] = cur; };
+  PB.initial.effects.forEach(apply);
+  PB.timeline.forEach(e => { if (e.t <= T) (e.effects || []).forEach(apply); });
+  return st;
+}
+const feedItems = PB.timeline.filter(e => e.feed).map(e => ({ t: e.t, ...e.feed })).concat(alertFeed).sort((a, b) => a.t - b.t);
+const beats = PB.timeline.filter(e => e.beat);
+const titled = PB.timeline.filter(e => e.title);
+// chapters = the key moments; chapter i runs from its beat (the first one from 0) to the next beat
+const chapters = beats.map((b, i) => ({ beat: b, title: b.title, from: i === 0 ? 0 : b.t, to: i + 1 < beats.length ? beats[i + 1].t : D }));
+const chapterAt = t => { let c = 0; chapters.forEach((ch, i) => { if (t >= ch.from) c = i; }); return c; };
+
+/* ===================== Components view =====================
+   Stand-in for engine auto-layout: the agent only says which nodes and edges exist;
+   the app lays them out left-to-right on wide screens and top-to-bottom on phones. */
+// Auto-layout: the playbook only lists nodes and edges. Layers come from the longest path from a source;
+// nodes in a layer are ordered by the average position of their parents. Two directions: LR (wide) and TB (tall).
+function autoLayout(dir) {
+  const ns = PB.components.nodes, es = PB.components.edges, ids = ns.map(n => n.id);
+  const preds = Object.fromEntries(ids.map(i => [i, []])), succ = Object.fromEntries(ids.map(i => [i, []]));
+  es.forEach(e => { if (preds[e.to] && succ[e.from] && e.from !== e.to) { preds[e.to].push(e.from); succ[e.from].push(e.to); } });
+  // drop back edges (cycles) with a DFS so layering terminates
+  const state = {}, back = new Set();
+  const dfs = u => { state[u] = 1; succ[u].forEach(v => { if (state[v] === 1) back.add(u + ">" + v); else if (!state[v]) dfs(v); }); state[u] = 2; };
+  ids.forEach(i => { if (!state[i]) dfs(i); });
+  const layer = {}; const L = u => { if (layer[u] != null) return layer[u]; layer[u] = 0; const ps = preds[u].filter(p => !back.has(p + ">" + u)); layer[u] = ps.length ? Math.max(...ps.map(L)) + 1 : 0; return layer[u]; };
+  ids.forEach(L);
+  const nl = Math.max(...ids.map(i => layer[i])) + 1, layers = Array.from({ length: nl }, () => []);
+  ids.forEach(i => layers[layer[i]].push(i));
+  const pos = {};
+  layers.forEach(l => { l.forEach((id, k) => (pos[id] = k)); });
+  for (let li = 1; li < nl; li++) { const bc = id => { const ps = preds[id].filter(p => layer[p] < li); return ps.length ? ps.reduce((a, p) => a + pos[p], 0) / ps.length : pos[id]; }; layers[li].sort((a, b) => bc(a) - bc(b)); layers[li].forEach((id, k) => (pos[id] = k)); }
+  const byId = Object.fromEntries(ns.map(n => [n.id, n]));
+  const size = id => { const n = byId[id], np = (n.parts || []).length;
+    if (np) { const rows = dir === "LR" ? Math.ceil(Math.sqrt(np)) : Math.min(2, Math.ceil(np / Math.ceil(Math.sqrt(np)))) || 1, cols = Math.ceil(np / rows), cw = 52, ch = 34, gap = 8;
+      return { w: Math.max(dir === "LR" ? 180 : 170, 20 + cols * cw + (cols - 1) * gap), h: 39 + rows * ch + (rows - 1) * gap + 10, cols }; }
+    return dir === "LR" ? { w: 160, h: 70 } : { w: 140, h: 76 }; };
+  const sz = Object.fromEntries(ids.map(i => [i, size(i)])), out = {}, M = 6;
+  if (dir === "LR") {
+    const gapX = 60, gapY = 16, colW = layers.map(l => Math.max(...l.map(i => sz[i].w))), colH = layers.map(l => l.reduce((a, i) => a + sz[i].h, 0) + gapY * (l.length - 1));
+    const H = Math.max(...colH); let x = M;
+    layers.forEach((l, li) => { let y = M + (H - colH[li]) / 2; l.forEach(i => { out[i] = { x: x + (colW[li] - sz[i].w) / 2, y, ...sz[i] }; y += sz[i].h + gapY; }); x += colW[li] + gapX; });
+    return { vb: [x - gapX + M, H + 2 * M], dir, n: out };
+  }
+  const gapX = 8, gapY = 50, rowH = layers.map(l => Math.max(...l.map(i => sz[i].h))), rowW = layers.map(l => l.reduce((a, i) => a + sz[i].w, 0) + gapX * (l.length - 1));
+  const W = Math.max(...rowW); let y = M;
+  layers.forEach((l, li) => { let x = M + (W - rowW[li]) / 2; l.forEach(i => { out[i] = { x, y: y + (rowH[li] - sz[i].h) / 2, ...sz[i] }; x += sz[i].w + gapX; }); y += rowH[li] + gapY; });
+  return { vb: [W + 2 * M, y - gapY + M], dir, n: out };
+}
+const LAYOUTS = { wide: autoLayout("LR"), tall: autoLayout("TB") };
+const comp = $("#comp"); let nodeEls = {}, partEls = {}, edgeEls = {}, nodes = {}, layoutKey = null;
+const ONE_SCREEN = matchMedia("(min-width:1000px) and (min-height:600px)");
+const stageEl = $("#compCard");
+// one-screen: pick the layout whose aspect fits the stage box; stacked: top-to-bottom only on phones
+// resize observers fire many times while a splitter is dragged; draw at most once per frame
+let renderQueued = false;
+const scheduleRender = () => { if (renderQueued) return; renderQueued = true; requestAnimationFrame(() => { renderQueued = false; render(); }); };
+const layoutScale = (key, w, h) => Math.min((w - 20) / LAYOUTS[key].vb[0], (h - 20) / LAYOUTS[key].vb[1]);
+const pickLayout = () => {
+  if (ONE_SCREEN.matches) {
+    // pick whichever layout draws the graph larger; switch only when the other is clearly (8%) better, so dragging doesn't flicker
+    const w = stageEl.clientWidth, h = stageEl.clientHeight; if (!w || !h) return layoutKey || "tall";
+    const st = layoutScale("tall", w, h), sw = layoutScale("wide", w, h);
+    if (!layoutKey) return st >= sw ? "tall" : "wide";
+    const cur = layoutKey === "tall" ? st : sw, other = layoutKey === "tall" ? sw : st;
+    return other > cur * 1.08 ? (layoutKey === "tall" ? "wide" : "tall") : layoutKey;
+  }
+  return innerWidth <= 640 ? "tall" : "wide";
+};
+function buildComponents() {
+  layoutKey = pickLayout(); const L = LAYOUTS[layoutKey]; comp.setAttribute("preserveAspectRatio", "xMidYMin meet");
+  comp.replaceChildren(); comp.setAttribute("viewBox", `0 0 ${L.vb[0]} ${L.vb[1]}`); comp.classList.toggle("tall", layoutKey === "tall");
+  nodeEls = {}; partEls = {}; edgeEls = {};
+  nodes = Object.fromEntries(PB.components.nodes.map(n => [n.id, { ...n, ...(L.n[n.id] || {}) }]));
+  const gEdges = el("g", {}, comp), gNodes = el("g", {}, comp);
+  PB.components.edges.forEach(e => {
+    const a = nodes[e.from], b = nodes[e.to]; let d;
+    if (L.dir === "LR") { const x1 = a.x + a.w, y1 = a.y + a.h / 2, x2 = b.x, y2 = b.y + b.h / 2, mx = (x1 + x2) / 2; d = `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`; }
+    else { const x1 = a.x + a.w / 2, y1 = a.y + a.h, x2 = b.x + b.w / 2, y2 = b.y, my = (y1 + y2) / 2; d = `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`; }
+    const g = el("g", { class: "dimmable", "data-id": e.id }, gEdges);
+    const path = el("path", { d, fill: "none", stroke: "var(--line)", "stroke-width": 2 }, g);
+    const dots = el("g", {}, g);
+    edgeEls[e.id] = { g, path, dots, len: 0, n: -1, rn: -1, flow: 0, color: "var(--muted)" };
+  });
+  PB.components.nodes.forEach(n0 => {
+    const n = nodes[n0.id];
+    const g = el("g", { class: "dimmable", "data-id": n.id }, gNodes);
+    const base = el("rect", { x: n.x, y: n.y, width: n.w, height: n.h, rx: 8, fill: "var(--node)", stroke: "var(--line)", "stroke-width": 1.5 }, g);
+    const ov = el("rect", { x: n.x, y: n.y, width: n.w, height: n.h, rx: 8, fill: "transparent", "pointer-events": "none" }, g);
+    const title = el("text", { x: n.x + 10, y: n.y + 17, class: "t" }, g); title.textContent = n.label;
+    // the node kind ("consumer", "postgres") is left out: the label already says it, and the intro beat explains the system
+    const sub = el("text", { x: n.x + 10, y: n.y + 32, class: "ts" }, g);
+    const badgeG = el("g", {}, g); const badgeR = el("rect", { y: n.y - 10, height: 18, rx: 9, fill: "var(--panel)", "stroke-width": 1.5 }, badgeG);
+    const badgeT = el("text", { y: n.y + 3, class: "tp", "text-anchor": "middle" }, badgeG);
+    const alertG = el("g", {}, g); const alertC = el("circle", { cx: n.x + n.w - 12, cy: n.y + 14, r: 7 }, alertG);
+    const alertT = el("text", { x: n.x + n.w - 12, y: n.y + 18, "text-anchor": "middle", class: "tp", style: "fill:var(--panel);font-weight:600" }, alertG); alertT.textContent = "!";
+    nodeEls[n.id] = { g, base, ov, sub, badgeG, badgeR, badgeT, alertG, alertC, lastSub: null };
+    if (n.parts) {
+      const cols = n.cols || n.part_cols || 2, rows = Math.ceil(n.parts.length / cols), top = n.y + 29, gap = 8;
+      const pw = (n.w - 20 - gap * (cols - 1)) / cols, ph = (n.h - 39 - gap * (rows - 1)) / rows;
+      n.parts.forEach((p, i) => {
+        const x = n.x + 10 + (i % cols) * (pw + gap), y = top + Math.floor(i / cols) * (ph + gap);
+        const pg = el("g", {}, g);
+        el("rect", { x, y, width: pw, height: ph, rx: 5, fill: "var(--panel)", stroke: "var(--line)" }, pg);
+        const pov = el("rect", { x, y, width: pw, height: ph, rx: 5, fill: "transparent" }, pg);
+        const t1 = el("text", { x: x + 8, y: y + ph / 2 + 4, class: "tp" }, pg); t1.textContent = p.label || p.id;
+        const t2 = el("text", { x: x + pw - 8, y: y + ph / 2 + 4, class: "ts", "text-anchor": "end" }, pg);
+        partEls[n.id + "/" + p.id] = { pov, t1, t2, x, y, pw, ph };
+      });
+    }
+  });
+}
+// node labels wrap (up to three lines) instead of spilling out of the box
+function setLines(t, str, x, y, maxCh) {
+  t.replaceChildren(); if (!str) return;
+  const lines = []; let cur = "";
+  for (const w of String(str).split(" ")) { const nx = cur ? cur + " " + w : w; if (nx.length > maxCh && cur) { lines.push(cur); cur = w; } else cur = nx; }
+  if (cur) lines.push(cur);
+  lines.slice(0, 3).forEach((l, i) => { const ts = el("tspan", { x, y: y + i * 11 }, t); ts.textContent = l; });
+}
+function knobsTo(rect, k, maxO) {
+  const c = col(k.color);
+  if (c && (k.intensity ?? 0.4) > 0) {
+    const o = (k.intensity ?? 0.4) * maxO;
+    rect.setAttribute("fill", c); rect.style.setProperty("--o1", o * 0.45); rect.style.setProperty("--o2", o);
+    rect.setAttribute("opacity", o); rect.classList.toggle("pulse", !!k.pulse);
+  } else { rect.setAttribute("fill", "transparent"); rect.classList.remove("pulse"); }
+}
+function renderComponents(T) {
+  const st = stateAt(T);
+  for (const id in nodeEls) {
+    const n = nodeEls[id], k = st[id] || {}, node = nodes[id], c = col(k.color);
+    knobsTo(n.ov, k, 0.55);
+    n.base.setAttribute("stroke", c && (k.intensity ?? 0.4) >= 0.5 ? c : "var(--line)");
+    if (n.lastSub !== (k.label || "")) { n.lastSub = k.label || ""; setLines(n.sub, n.lastSub, node.x + 10, node.y + 32, Math.floor((node.w - 18) / (compText ? compText.charW : 6.2))); }
+    n.sub.setAttribute("style", c ? `fill:${c}` : "");
+    if (false && k.badge) { // badges repeat the partition colours shown in the topic; not drawn
+      n.badgeG.style.display = ""; n.badgeT.textContent = k.badge;
+      const w = Math.max(30, k.badge.length * 7 + 16), x = node.x + node.w - w - 8;
+      n.badgeR.setAttribute("x", x); n.badgeR.setAttribute("width", w); n.badgeR.setAttribute("stroke", c || "var(--line)"); n.badgeT.setAttribute("x", x + w / 2);
+    } else n.badgeG.style.display = "none";
+    n.g.setAttribute("opacity", k.down ? 0.35 : 1);
+    let worst = null;
+    PB.alerts.filter(a => a.component === id).forEach(a => { const s = alertState[a.id][Math.floor(T)]; if (s === "firing") worst = "firing"; else if (s === "pending" && !worst) worst = "pending"; });
+    n.alertG.style.display = worst ? "" : "none";
+    if (worst) n.alertC.setAttribute("fill", worst === "firing" ? "var(--red)" : "var(--amber)");
+  }
+  for (const id in partEls) { const p = partEls[id], k = st[id] || {}; knobsTo(p.pov, k, 0.6); const lab = k.label || "";
+    if (p.lastLab !== lab) { // a status label stacks under the part id instead of drawing over it
+      p.lastLab = lab; const two = lab && p.ph >= 26, cw = compText ? compText.charW * 0.85 : 5.4, maxCh = Math.max(3, Math.floor((p.pw - 12) / cw));
+      const txt = lab.length > maxCh ? lab.slice(0, maxCh - 1) + "…" : lab;
+      p.t1.setAttribute("y", two ? p.y + p.ph / 2 - 2 : p.y + p.ph / 2 + 4);
+      if (two) { p.t2.setAttribute("x", p.x + 8); p.t2.setAttribute("text-anchor", "start"); p.t2.setAttribute("y", p.y + p.ph / 2 + 9); }
+      else { p.t2.setAttribute("x", p.x + p.pw - 8); p.t2.setAttribute("text-anchor", "end"); p.t2.setAttribute("y", p.y + p.ph / 2 + 4); }
+      p.t2.textContent = txt;
+    } }
+  for (const id in edgeEls) {
+    const e = edgeEls[id], k = st[id] || {}, c = col(k.color);
+    e.path.setAttribute("stroke", c || "var(--line)");
+    e.path.setAttribute("stroke-width", 1.5 + (k.width ?? 0) * 4);
+    e.path.setAttribute("stroke-opacity", (k.flow ?? 0) > 0 ? 0.6 : 0.35);
+    e.color = c || "var(--muted)"; e.flow = k.flow ?? 0;
+    const n = Math.round((k.flow ?? 0) * 8), rn = Math.round((k.reverse ?? 0) * 8);
+    if (n !== e.n || rn !== e.rn) {
+      e.dots.replaceChildren(); e.n = n; e.rn = rn;
+      for (let i = 0; i < n; i++) el("circle", { r: 3, "data-dir": 1, "data-i": i / Math.max(1, n) }, e.dots);
+      for (let i = 0; i < rn; i++) el("circle", { r: 3, "data-dir": -1, "data-i": i / Math.max(1, rn), fill: "var(--red)" }, e.dots);
+    }
+  }
+  placeDots(T);
+}
+function placeDots(T) {
+  for (const id in edgeEls) {
+    const e = edgeEls[id]; if (!e.len) e.len = e.path.getTotalLength();
+    for (const c of e.dots.children) {
+      const dir = +c.dataset.dir, off = +c.dataset.i;
+      let f = (T * 0.06 * (dir > 0 ? 0.6 + e.flow : 0.7) + off) % 1; if (dir < 0) f = 1 - f;
+      const p = e.path.getPointAtLength(f * e.len); c.setAttribute("cx", p.x); c.setAttribute("cy", p.y);
+      if (dir > 0) c.setAttribute("fill", e.color);
+    }
+  }
+}
+buildComponents();
+// keep components text at a fixed on-screen size: names ~10.5px, labels ~9px (clamped so text still fits its box)
+let compText = null;
+function fitCompText() {
+  const r = comp.getBoundingClientRect(), vb = LAYOUTS[layoutKey].vb; if (!r.width) return;
+  const sc = Math.min(r.width / vb[0], r.height / vb[1]) || 1;
+  const ct = Math.min(11.5, Math.max(8.5, 10.5 / sc)), cs = Math.min(10, Math.max(7.5, 9 / sc));
+  if (compText && Math.abs(compText.ct - ct) < 0.05 && Math.abs(compText.cs - cs) < 0.05) return;
+  compText = { ct, cs, charW: cs * 0.62 };
+  comp.style.setProperty("--ct", ct.toFixed(2) + "px"); comp.style.setProperty("--cs", cs.toFixed(2) + "px");
+  for (const id in nodeEls) nodeEls[id].lastSub = null; // re-wrap labels for the new size
+  scheduleRender();
+}
+new ResizeObserver(() => { if (pickLayout() !== layoutKey) { buildComponents(); compText = null; if (activeBeat) applyFocus(activeBeat); scheduleRender(); } fitCompText(); }).observe(stageEl);
+
+/* ===================== Dashboard =====================
+   Rules that make it regular:
+   - every chart is the same height and the same width, stacked, sharing ONE time axis (same left gutter, same x mapping);
+   - SVGs are sized to their real pixels, so every axis label is the same 10.5px everywhere;
+   - y axis: 0, half, and a "nice" max (1/2/2.5/5 x 10^n), same number format everywhere;
+   - count metrics (rebalances) are events, not a curve: they become an event lane under the charts,
+     and their steps (plus deploys) are drawn as annotations on every chart;
+   - annotations and the event lane only show what has happened so far (no spoilers). */
+const PL = 46, PR = 12;
+// one colour for data. In a multi-series panel the first series is the reference (e.g. produced) and is drawn quietly;
+// teal/violet/pink stay reserved for partition ownership in the components view
+const seriesColor = (P, i) => P.p.metrics.length > 1 && i === 0 ? "var(--muted)" : "var(--accent)";
+const kfmt = v => (v / 1000).toFixed(v >= 100000 ? 0 : 1).replace(/\.0$/, "") + "k";
+const fmtV = (v, unit) => unit === "count" ? String(Math.round(v)) : unit === "ms" ? (v >= 1000 ? (v / 1000).toFixed(2).replace(/0$/, "") + "s" : Math.round(v) + "ms") : v >= 1000 ? kfmt(v) : String(Math.round(v));
+const niceCeil = v => { if (v <= 0) return 1; const e = Math.pow(10, Math.floor(Math.log10(v))), f = v / e; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * e; };
+const isEvent = p => p.metrics.every(m => metricById[m].unit === "count");
+const annos = [
+  ...PB.timeline.filter(e => e.feed && e.feed.kind === "deploy").map(e => ({ t: e.t, kind: "deploy", label: "deploy", title: e.feed.text })),
+  ...PB.timeline.flatMap(e => (e.metrics || []).filter(x => metricById[x.id].unit === "count").map(x => ({ t: e.t, kind: "event", label: "↻" + x.to, title: e.title || "" })))
+].sort((a, b) => a.t - b.t);
+const xOfW = W => t => PL + (t / D) * (W - PL - PR);
+const tOfW = W => x => Math.max(0, Math.min(D, ((x - PL) / (W - PL - PR)) * D));
+const statusOf = (p, v, T) => {
+  let s = ""; PB.alerts.filter(a => p.metrics.includes(a.metric)).forEach(a => { const st = alertState[a.id][Math.floor(T)]; if (st === "firing") s = "bad"; else if (st === "pending" && !s) s = "warn"; });
+  if (!s && p.threshold && v > p.threshold.value) s = "bad";
+  return s;
+};
+const dash = $("#dash"), dashGrid = $("#dashgrid");
+const panels = [...PB.dashboard.filter(p => !isEvent(p)), ...PB.dashboard.filter(isEvent)].map(p => {
+  const kind = isEvent(p) ? "lane" : "chart", units = metricById[p.metrics[0]].unit;
+  const card = document.createElement("div"); card.className = `panel ${kind} dimmable`; card.dataset.id = "panel:" + p.id;
+  const unitTxt = units === "msg/s" ? "msg/s" : units === "msgs" ? "msgs" : "";
+  const legend = p.metrics.length > 1 ? `<span class="legend">${p.metrics.map((m, i) => `<span><i style="background:${seriesColor({ p }, i)}"></i>${esc(metricById[m].label)}</span>`).join("")}</span>` : "";
+  card.innerHTML = `<div class="panel-h"><b>${esc(p.title)}</b>${legend}<span class="val"></span></div><div class="plot"></div>`;
+  (kind === "lane" ? dash : dashGrid).appendChild(card);
+  const plot = card.querySelector(".plot"), svg = el("svg", {}, plot);
+  const P = { p, kind, units, unitTxt, card, plot, svg, val: card.querySelector(".val"), W: 0, H: 0, xOf: xOfW(600), tOf: tOfW(600), yOf: () => 0, lines: [], dots: [], annoEls: [] };
+  hoverable(svg, x => P.tOf(x));
+  P.note = document.createElement("div"); P.note.className = "note"; P.note.innerHTML = `<svg><line class="ld" stroke="var(--accent)" stroke-width="1"/><circle class="nd" r="4" fill="var(--bg)" stroke="var(--accent)" stroke-width="2"/></svg><div class="nl"></div>`; plot.appendChild(P.note);
+  new ResizeObserver(() => { buildPanel(P); scheduleRender(); }).observe(plot);
+  return P;
+});
+// 1 column up to 4 charts, 2 columns above that; the pane scrolls inside when panels overflow
+dashGrid.style.setProperty("--cols", panels.filter(P => P.kind === "chart").length > 4 ? 2 : 1);
+function buildPanel(P) {
+  const W = Math.round(P.plot.clientWidth), H = Math.round(P.plot.clientHeight); if (!W || !H) return;
+  P.W = W; P.H = H; P.xOf = xOfW(W); P.tOf = tOfW(W);
+  const svg = P.svg; svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.replaceChildren(); P.annoEls = [];
+  const xOf = P.xOf;
+  if (P.kind === "lane") {
+    const y = 11;
+    el("line", { x1: PL, x2: W - PR, y1: y, y2: y, class: "grid" }, svg);
+    for (let m = 0; m <= D; m += 60) { const tx = el("text", { x: xOf(m), y: H - 2, class: "axis", "text-anchor": m === 0 ? "start" : m >= D ? "end" : "middle" }, svg); tx.textContent = m / 60 + "m"; }
+    annos.forEach(a => {
+      const g = el("g", {}, svg), dep = a.kind === "deploy";
+      el("circle", { cx: xOf(a.t), cy: y, r: dep ? 3 : 3.5, fill: dep ? "var(--faint)" : "var(--red)" }, g);
+      if (!dep) { const tx = el("text", { x: xOf(a.t) + 6, y: y + 4, class: "alab", style: "fill:var(--red)" }, g); tx.textContent = a.label; }
+      const tt = el("title", {}, g); tt.textContent = `${fmtT(a.t)} · ${dep ? "deploy: " : ""}${a.title}`;
+      P.annoEls.push({ t: a.t, g });
+    });
+    P.cur = el("line", { y1: 2, y2: y + 7, stroke: "var(--fg)", "stroke-width": 1, opacity: 0.5 }, svg); P._hot = null;
+    return;
+  }
+  const PT = 6, PBm = 4;
+  let max = 0; P.p.metrics.forEach(m => series[m].forEach(v => (max = Math.max(max, v)))); if (P.p.threshold) max = Math.max(max, P.p.threshold.value);
+  const pct = P.p.metrics.every(m => metricById[m].unit === "%");
+  max = P.p.max != null ? P.p.max : pct && max <= 100 ? 100 : niceCeil(max * 1.05);
+  const yOf = v => PT + (1 - v / max) * (H - PT - PBm); P.yOf = yOf;
+  // quiet frame: a baseline, one faint top line with the only y label, no vertical gridlines
+  el("line", { x1: PL, x2: W - PR, y1: yOf(0), y2: yOf(0), class: "grid" }, svg);
+  el("line", { x1: PL, x2: W - PR, y1: yOf(max), y2: yOf(max), class: "grid", opacity: 0.5 }, svg);
+  const tx = el("text", { x: PL - 6, y: yOf(max) + 4, class: "axis", "text-anchor": "end" }, svg); tx.textContent = fmtV(max, P.units);
+  annos.forEach(a => { const g = el("g", {}, svg); el("line", { x1: xOf(a.t), x2: xOf(a.t), y1: PT, y2: H - PBm, stroke: a.kind === "deploy" ? "var(--faint)" : "var(--red)", "stroke-dasharray": "2 3", opacity: a.kind === "deploy" ? 0.8 : 0.45 }, g); P.annoEls.push({ t: a.t, g }); });
+  if (P.p.threshold) {
+    el("line", { x1: PL, x2: W - PR, y1: yOf(P.p.threshold.value), y2: yOf(P.p.threshold.value), stroke: "var(--red)", "stroke-dasharray": "5 4", opacity: 0.55 }, svg);
+    const t2 = el("text", { x: W - PR - 2, y: yOf(P.p.threshold.value) - 4, class: "alab", "text-anchor": "end", style: "fill:var(--red)" }, svg); t2.textContent = P.p.threshold.label;
+  }
+  P.lines = P.p.metrics.map((m, i) => el("polyline", { fill: "none", stroke: seriesColor(P, i), "stroke-width": P.p.metrics.length > 1 && i === 0 ? 1.2 : 1.7, "stroke-linejoin": "round", "stroke-dasharray": P.p.metrics.length > 1 && i === 0 ? "4 3" : "none" }, svg));
+  P.cur = el("line", { y1: PT, y2: H - PBm, stroke: "var(--fg)", "stroke-width": 1, opacity: 0.5 }, svg); P._hot = null;
+  P.dots = P.p.metrics.map((m, i) => el("circle", { r: 3, fill: seriesColor(P, i) }, svg));
+}
+// per-chart "why it moved" note, pinned to the curve at the key moment
+function placeNote(P, viewT) {
+  const n = activeBeat && (activeBeat.beat.notes || []).find(x => x.panel === P.p.id), box = P.note;
+  if (!n) { box.classList.remove("show"); return; }
+  const lab = box.querySelector(".nl"); if (lab.textContent !== n.text) lab.textContent = n.text;
+  box.style.width = P.W + "px"; box.style.height = P.H + "px";
+  const m = n.metric || P.p.metrics[P.p.metrics.length - 1], t = activeBeat.t;
+  const lane = P.kind === "lane", x = P.xOf(t), y = lane ? 11 : P.yOf(at(m, t));
+  lab.style.whiteSpace = lane ? "nowrap" : ""; lab.style.padding = lane ? "1px 8px" : "";
+  const lo = PL + 4, hi = P.W - PR - 4; // stay right of the y-axis labels and inside the panel
+  lab.style.maxWidth = Math.min(220, hi - lo) + "px";
+  const w = lab.offsetWidth, h = lab.offsetHeight, gap = 14;
+  let lx = x + gap <= hi - w ? x + gap : x - gap - w; lx = Math.max(lo, Math.min(hi - w, lx));
+  let ly = y - h / 2; ly = Math.max(2, Math.min(P.H - h - 2, ly));
+  // if the label would cover the dot, move it above or below
+  if (x >= lx - 4 && x <= lx + w + 4 && y >= ly - 4 && y <= ly + h + 4) ly = y > P.H / 2 ? Math.max(2, y - h - gap) : Math.min(P.H - h - 2, y + gap);
+  lab.style.left = lx + "px"; lab.style.top = ly + "px";
+  const ex = Math.max(lx, Math.min(lx + w, x)), ey = Math.max(ly, Math.min(ly + h, y));
+  const ld = box.querySelector(".ld"), nd = box.querySelector(".nd");
+  ld.setAttribute("x1", x); ld.setAttribute("y1", y); ld.setAttribute("x2", ex); ld.setAttribute("y2", ey);
+  nd.setAttribute("cx", x); nd.setAttribute("cy", y);
+  box.classList.add("show");
+}
+function renderPanels(playT, viewT) {
+  panels.forEach(P => {
+    if (!P.W) return;
+    const xOf = P.xOf;
+    P.annoEls.forEach(a => (a.g.style.display = a.t <= playT ? "" : "none"));
+    P.cur.setAttribute("x1", xOf(viewT)); P.cur.setAttribute("x2", xOf(viewT));
+    // at a key moment the time cursor itself is the indicator: accent and a little thicker on every chart
+    const hot = !!activeBeat && hoverT == null;
+    if (P._hot !== hot) { P._hot = hot; P.cur.setAttribute("stroke", hot ? "var(--accent)" : "var(--fg)"); P.cur.setAttribute("stroke-width", hot ? 2 : 1); P.cur.setAttribute("opacity", hot ? 1 : 0.5); }
+    if (P.kind === "lane") { placeNote(P, viewT); P.val.textContent = fmtV(at(P.p.metrics[0], viewT), "count"); return; }
+    const step = Math.max(1, Math.round(D / (P.W - PL - PR) * 1.5));
+    P.p.metrics.forEach((m, i) => {
+      const pts = []; for (let s = 0; s <= playT; s += step) pts.push(`${xOf(s).toFixed(1)},${P.yOf(series[m][s]).toFixed(1)}`);
+      pts.push(`${xOf(playT).toFixed(1)},${P.yOf(at(m, playT)).toFixed(1)}`);
+      P.lines[i].setAttribute("points", pts.join(" "));
+      P.dots[i].setAttribute("cx", xOf(viewT)); P.dots[i].setAttribute("cy", P.yOf(at(m, viewT)));
+    });
+    const v0 = at(P.p.metrics[0], viewT), st = statusOf(P.p, v0, viewT);
+    P.val.className = "val " + st;
+    placeNote(P, viewT);
+    P.val.innerHTML = P.p.metrics.map((m, i) => `<span style="${P.p.metrics.length > 1 && i === 0 ? "color:var(--muted)" : ""}">${fmtV(at(m, viewT), P.units)}</span>`).join(" / ") + (P.unitTxt ? `<small>${P.unitTxt}</small>` : "");
+  });
+}
+
+/* ===================== Feed: always visible, one line per entry, linked to the shared cursor ===================== */
+const feedEl = $("#feed"); let feedShown = -1, feedNear = null, feedHoverLi = null;
+const liHTML = (f, fresh) => `<li class="k-${f.kind}${fresh ? " fresh" : ""}" data-i="${feedItems.indexOf(f)}" data-t="${f.t}"><time>${fmtT(f.t)}</time><span class="msg"><span class="who">${esc(f.from)}</span><span class="txt">${esc(f.text)}</span></span></li>`;
+function feedScrollTo(top, smooth) { if (!smooth) feedEl.style.scrollBehavior = "auto"; feedEl.scrollTop = top; if (!smooth) feedEl.style.scrollBehavior = ""; }
+function renderFeed(playT, viewT) {
+  const vis = feedItems.filter(f => f.t <= playT);
+  if (vis.length !== feedShown) {
+    const atBottom = feedEl.scrollHeight - feedEl.scrollTop - feedEl.clientHeight < 24;
+    if (playing && feedShown >= 0 && vis.length > feedShown && vis.length - feedShown <= 3) {
+      // new entries arrive one by one: appended, faded in, and the list glides down only if you were already at the bottom
+      if (feedShown === 0) feedEl.replaceChildren();
+      feedEl.insertAdjacentHTML("beforeend", vis.slice(feedShown).map(f => liHTML(f, true)).join(""));
+      if (atBottom) feedScrollTo(feedEl.scrollHeight, true);
+    } else {
+      feedEl.innerHTML = vis.length ? vis.map(f => liHTML(f, false)).join("") : `<li class="empty">Chat, logs and alerts appear here as the story plays.</li>`;
+      feedScrollTo(feedEl.scrollHeight, false);
+    }
+    feedShown = vis.length; feedNear = null;
+  }
+  let near = null; vis.forEach(f => { if (f.t <= viewT) near = f.t; }); // current entry: at the playhead, or at the hovered time
+  if (near !== feedNear) {
+    feedNear = near;
+    let first = null;
+    feedEl.querySelectorAll("li[data-t]").forEach(li => { const on = near != null && +li.dataset.t === near; li.classList.toggle("near", on); if (on && !first) first = li; });
+    // hovering a chart or the scrubber brings the matching entry into view (not when the pointer is in the feed itself)
+    if (first && !feedHoverLi) setTimeout(() => { if (!first.isConnected) return; const top = first.offsetTop, bottom = top + first.offsetHeight * (feedEl.querySelectorAll(`li[data-t="${near}"]`).length); if (top < feedEl.scrollTop || bottom > feedEl.scrollTop + feedEl.clientHeight) feedScrollTo(Math.max(0, top - feedEl.clientHeight / 2), true); }, 260)
+  }
+}
+feedEl.addEventListener("mouseover", e => { const li = e.target.closest("li[data-t]"); if (li && li !== feedHoverLi) { feedHoverLi = li; hoverT = +li.dataset.t; render(); } });
+feedEl.addEventListener("mouseleave", () => { feedHoverLi = null; hoverT = null; render(); });
+feedEl.addEventListener("click", e => { const li = e.target.closest("li[data-t]"); if (li) seek(+li.dataset.t); });
+
+/* ===================== Caption (key moments only) ===================== */
+function fitAboveSheet(on) {
+  const sh = $("#caption"), box = comp.parentElement;
+  if (!on) { comp.style.transform = ""; return; }
+  requestAnimationFrame(() => { const H = box.clientHeight, free = H - sh.offsetHeight - 6; comp.style.transform = free > 60 && free < H ? `scale(${(free / H).toFixed(3)})` : ""; });
+}
+function renderNarr(v) { const ch = chapters[chapterAt(v)]; const t = v < beats[0].t ? "Intro" : `${chapterAt(v) + 1}/${chapters.length} · ${ch.title}`; if ($("#sheetStrip").textContent !== t) $("#sheetStrip").textContent = t; }
+function placeCallout() {}
+
+/* ===================== Popups: one family, one enter/exit animation ===================== */
+function showPop(el) { clearTimeout(el._t); el.classList.remove("leaving"); el.hidden = false; el.classList.remove("pop-in"); void el.offsetWidth; el.classList.add("pop-in"); }
+function hidePop(el, done) {
+  if (el.hidden) { if (done) done(); return; }
+  clearTimeout(el._t); el.classList.add("leaving");
+  el._t = setTimeout(() => { el.hidden = true; el.classList.remove("leaving"); if (done) done(); }, 160);
+}
+const showModal = scrim => { showPop(scrim); showPop(scrim.querySelector(".pop")); };
+const hideModal = (scrim, done) => { hidePop(scrim.querySelector(".pop")); hidePop(scrim, done); };
+const isOpen = el => !el.hidden && !el.classList.contains("leaving");
+
+/* ===================== Playback (implicit: Space, the status chip, or the keys) ===================== */
+let playT = 0, hoverT = null, playing = false, lastFrame = 0, speed = 4, activeBeat = null, reportSeen = false, ready = false, hudFlash = null;
+const SPEEDS = [2, 4, 8, 16], speedLabel = v => ({ 2: "0.5×", 4: "1×", 8: "2×", 16: "4×" })[v];
+const viewT = () => hoverT == null ? playT : Math.min(hoverT, playT);
+function render() {
+  if (!ready) return;
+  const v = viewT();
+  renderComponents(v); renderPanels(playT, v); renderFeed(playT, v); renderNarr(v); renderHud(v); placeCallout();
+}
+// progress hairline + status chip: the only playback chrome
+function renderHud(v) {
+  $("#progress i").style.width = (playT / D * 100).toFixed(2) + "%";
+  const st = $("#status"), ch = esc(chapters[chapterAt(v)].title);
+  $("#app").classList.toggle("hovering", hoverT != null);
+  let html;
+  if (hudFlash && hudFlash.until > performance.now()) html = `<span class="ic">•</span>${hudFlash.text}`;
+  else if (isOpen($("#intro"))) html = `<span class="ic">▶</span><kbd>Space</kbd> to start`;
+  else if (hoverT != null && hoverT < playT - 0.5) html = `<span class="ic">◷</span>viewing <b>${fmtT(v)}</b><span class="ch">${ch}</span>`;
+  else if (activeBeat) html = `<span class="ic">◆</span>key moment ${beats.indexOf(activeBeat) + 1}/${beats.length} · <kbd>Space</kbd> continue`;
+  else if (playT >= D) html = `<span class="ic">↺</span><b>${fmtT(D)}</b> · <kbd>Space</kbd> replay`;
+  else html = `<span class="ic">${playing ? "❚❚" : "▶"}</span><b>${fmtT(v)} / ${fmtT(D)}</b><span class="ch">${ch}</span>${speed !== 4 ? `<span>${speedLabel(speed)}</span>` : ""}<kbd>Space</kbd>${playing ? "pause" : "play"}`;
+  if (st._h !== html) { st._h = html; st.innerHTML = html; }
+  st.classList.toggle("flash", !!(hudFlash && hudFlash.until > performance.now()));
+}
+function flash(text) { hudFlash = { text, until: performance.now() + 1400 }; renderHud(viewT()); setTimeout(() => renderHud(viewT()), 1450); }
+function setPlaying(p) {
+  playing = p && playT < D;
+  $("#app").classList.toggle("playing", playing);
+  lastFrame = performance.now();
+  if (ready) renderHud(viewT());
+}
+function seek(t) { hideBeat(); playT = Math.max(0, Math.min(D, t)); hoverT = null; render(); }
+function applyFocus(e) {
+  document.querySelectorAll(".dimmable").forEach(d => d.classList.remove("focused"));
+  $("#compCard").classList.add("focused");
+  const noted = (e.beat.notes || []).map(n => "panel:" + n.panel);
+  const f = new Set(noted.length ? [...e.beat.focus.filter(id => !id.startsWith("panel:")), ...noted] : e.beat.focus);
+  document.querySelectorAll("[data-id]").forEach(d => { if (f.has(d.dataset.id)) d.classList.add("focused"); });
+  PB.components.edges.forEach(ed => { if (f.has(ed.from) && f.has(ed.to)) edgeEls[ed.id].g.classList.add("focused"); });
+}
+const emit = (type, data) => { try { host && host.onPlayerEvent && host.onPlayerEvent(type, data); } catch (err) { /* host gone */ } };
+function showBeat(e) {
+  activeBeat = e; setPlaying(false); emit("key_moment", { n: beats.indexOf(e) + 1, t: e.t });
+  $("#capK").textContent = `Key moment ${beats.indexOf(e) + 1} of ${beats.length} · ${fmtT(e.t)}`; $("#capT").textContent = e.title || ""; $("#capH").textContent = e.beat.hint;
+  $("#caption").classList.add("open"); $("#beatGo").tabIndex = 0; fitAboveSheet(true);
+  $("#app").classList.add("focus-mode");
+  applyFocus(e);
+  render();
+  revealFocusedPanels(e);
+  renderHud(viewT());
+}
+// a focused panel that is scrolled out of the dashboard pane is brought into view
+function revealFocusedPanels(e) {
+  if (dashGrid.scrollHeight <= dashGrid.clientHeight + 1) return;
+  const cards = ((e.beat.notes || []).length ? e.beat.notes.map(n => "panel:" + n.panel) : e.beat.focus.filter(id => id.startsWith("panel:"))).map(id => dashGrid.querySelector(`[data-id="${id}"]`)).filter(Boolean);
+  if (!cards.length) return;
+  const top = Math.min(...cards.map(c => c.offsetTop)), bottom = Math.max(...cards.map(c => c.offsetTop + c.offsetHeight));
+  const vt = dashGrid.scrollTop, vb = vt + dashGrid.clientHeight;
+  if (top >= vt && bottom <= vb) return;
+  dashGrid.scrollTo({ top: bottom - top <= dashGrid.clientHeight ? top - 4 - Math.max(0, (dashGrid.clientHeight - (bottom - top)) / 2) : top - 4 });
+}
+function hideBeat() {
+  if (!activeBeat) return;
+  activeBeat = null; panels.forEach(P => P.note && P.note.classList.remove("show")); $("#app").classList.remove("focus-mode"); $("#caption").classList.remove("open"); $("#beatGo").tabIndex = -1; fitAboveSheet(false);
+}
+function frame(now) {
+  if (playing) {
+    const prev = playT; playT = Math.min(D, playT + Math.max(0, (now - lastFrame) / 1000) * speed); lastFrame = Math.max(lastFrame, now);
+    const b = beats.find(e => e.t > prev && e.t <= playT);
+    if (b) { playT = b.t; render(); showBeat(b); } else render();
+    if (playT >= D) { setPlaying(false); render(); emit("end", { t: D }); if (!reportSeen) { reportSeen = true; openReport(); } }
+  }
+  requestAnimationFrame(frame);
+}
+// Space does the one obvious thing for the current state
+function primaryAction() {
+  closeMenus();
+  if (isOpen($("#intro"))) return startRun();
+  if (isOpen($("#scrim"))) return watchAgain();
+  if (activeBeat) { hideBeat(); setPlaying(true); render(); return; }
+  if (playT >= D) { seek(0); setPlaying(true); return; }
+  setPlaying(!playing); render();
+}
+function jumpBeat(dir) {
+  const b = dir > 0 ? beats.find(x => x.t > playT + 0.01) : [...beats].reverse().find(x => x.t < playT - 0.01);
+  if (!b) { if (dir < 0) { seek(0); setPlaying(false); flash("start"); } else flash("no more key moments"); return; }
+  seek(b.t); showBeat(b);
+}
+function setSpeed(v) { speed = v; document.querySelectorAll("#speedSeg button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.speed === v))); }
+function stepSpeed(d) { const i = Math.max(0, Math.min(SPEEDS.length - 1, SPEEDS.indexOf(speed) + d)); setSpeed(SPEEDS[i]); flash(`speed ${speedLabel(speed)}`); }
+$("#beatGo").onclick = () => primaryAction();
+dashGrid.addEventListener("scroll", () => placeCallout(), { passive: true });
+$("#status").onclick = () => primaryAction();
+$("#speedSeg").onclick = e => { const b = e.target.closest("[data-speed]"); if (b) { setSpeed(+b.dataset.speed); flash(`speed ${speedLabel(speed)}`); } };
+// corner menus
+function toggleMenu(id, on) { const m = $("#" + id), btn = $(id === "menu" ? "#menuBtn" : "#helpBtn"); on = on ?? m.hidden; closeMenus(id); if (on) showPop(m); else hidePop(m); btn.setAttribute("aria-expanded", String(on)); }
+function closeMenus(except) { let any = false; ["menu", "help"].forEach(id => { if (id !== except && isOpen($("#" + id))) { hidePop($("#" + id)); $(id === "menu" ? "#menuBtn" : "#helpBtn").setAttribute("aria-expanded", "false"); any = true; } }); return any; }
+$("#menuBtn").onclick = e => { e.stopPropagation(); toggleMenu("menu"); };
+$("#helpBtn").onclick = e => { e.stopPropagation(); toggleMenu("help"); };
+document.addEventListener("pointerdown", e => { if (!e.target.closest(".hud")) closeMenus(); });
+document.addEventListener("keydown", e => {
+  if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.target.matches && e.target.matches("input,select,textarea")) return;
+  if (e.key === "Escape") { if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); if (closeMenus()) return; if (isOpen($("#scrim"))) closeReport(); return; }
+  if (e.code === "Space") { e.preventDefault(); if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); primaryAction(); return; }
+  if (e.key === "?") { toggleMenu("help"); return; }
+  if (isOpen($("#intro"))) return;
+  if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); if (isOpen($("#scrim"))) closeReport(); jumpBeat(e.key === "ArrowLeft" ? -1 : 1); return; }
+  if (e.key === "r" || e.key === "R") { if (isOpen($("#scrim"))) closeReport(); else openReport(); return; }
+  if (e.key === "+" || e.key === "=") { stepSpeed(1); return; }
+  if (e.key === "-" || e.key === "_" || e.key === "−") { stepSpeed(-1); return; }
+});
+function hoverable(svg, toTime) {
+  const toT = ev => { const r = svg.getBoundingClientRect(); const vb = svg.viewBox.baseVal; return toTime(((ev.clientX - r.left) / r.width) * (vb && vb.width ? vb.width : r.width)); };
+  svg.addEventListener("pointermove", ev => { if (ev.pointerType === "mouse" && !document.body.classList.contains("resizing") && !document.body.classList.contains("reordering")) { hoverT = toT(ev); render(); } });
+  svg.addEventListener("pointerleave", () => { hoverT = null; render(); });
+  svg.addEventListener("click", ev => { const t = toT(ev); if (t <= playT) seek(t); });
+}
+
+/* ===================== Report (opens itself at the end; R or the menu reopen it) ===================== */
+$("#pbTitle").textContent = PB.meta.title;
+const R = PB.report;
+function chainSVG() {
+  const n = R.chain.length, W = 880, bw = 116, gap = (W - n * bw) / (n - 1), bh = 60, y0 = 4;
+  const tags = { cause: "cause", effect: "effect", amp: "amplifies", fix: "fix" };
+  const wrap = t => { const w = t.split(" "), L = [""]; w.forEach(x => { const c = L[L.length - 1]; if ((c + " " + x).trim().length > 19 && c) L.push(x); else L[L.length - 1] = (c + " " + x).trim(); }); return L.slice(0, 3); };
+  const X = i => i * (bw + gap), idx = id => R.chain.findIndex(c => c.id === id);
+  let g = `<defs><marker id="rpA" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="var(--faint)"/></marker><marker id="rpL" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="var(--red)"/></marker></defs>`;
+  R.chain.forEach((c, i) => {
+    g += `<g class="k-${c.kind}"><rect class="bx" x="${X(i)}" y="${y0}" width="${bw}" height="${bh}" rx="7"/><text class="tag" x="${X(i) + 9}" y="${y0 + 13}">${tags[c.kind]}</text>`;
+    wrap(c.text).forEach((l, j) => (g += `<text x="${X(i) + 9}" y="${y0 + 27 + j * 12}" font-size="10.5">${esc(l)}</text>`));
+    g += `</g>`;
+    if (i < n - 1) g += `<line class="ar" x1="${X(i) + bw + 2}" x2="${X(i + 1) - 3}" y1="${y0 + bh / 2}" y2="${y0 + bh / 2}" marker-end="url(#rpA)"${R.chain[i + 1].kind === "fix" ? ' stroke-dasharray="3 3"' : ""}/>`;
+  });
+  if (R.loop) {
+    const a = X(idx(R.loop.from)) + bw / 2, b = X(idx(R.loop.to)) + bw / 2, yb = y0 + bh, yl = yb + 22;
+    g += `<path class="lp" d="M${a} ${yb + 2} V${yl - 6} Q${a} ${yl} ${a - 6} ${yl} H${b + 6} Q${b} ${yl} ${b} ${yl - 6} V${yb + 4}" marker-end="url(#rpL)"/><text class="lpl" x="${(a + b) / 2}" y="${yl + 12}" text-anchor="middle">↻ ${esc(R.loop.label)}</text>`;
+  }
+  return `<svg viewBox="-2 0 ${W + 4} ${R.loop ? 106 : 70}" role="img" aria-label="Causal chain">${g}</svg>`;
+}
+function stripSVG() {
+  const W = 880, H = 72, top = 14, bot = 44, m = (PB.report && PB.report.sparkline) || PB.dashboard[0].metrics[0]; let max = 0; clean[m].forEach(v => (max = Math.max(max, v)));
+  const x = t => (t / D) * W, y = v => bot - (v / max) * (bot - top);
+  const step = Math.max(1, Math.round(D / 300)); const pts = []; for (let t = 0; t <= D; t += step) pts.push(`${x(t).toFixed(1)},${y(series[m][t]).toFixed(1)}`);
+  let g = `<line class="ax" x1="0" x2="${W}" y1="${bot}" y2="${bot}"/><path class="ar2" d="M0 ${bot} L${pts.join(" L")} L${W} ${bot}Z"/><polyline class="sp" points="${pts.join(" ")}"/>`;
+  g += `<text class="ml" x="0" y="9">${esc(metricById[m].label)} · peak ${fmtV(max, metricById[m].unit)}${metricById[m].unit && metricById[m].unit !== "count" && metricById[m].unit !== "ms" ? " " + metricById[m].unit : ""}</text>`;
+  beats.forEach((b, i) => { const bx = x(b.t), by = y(at(m, b.t)), anc = i === 0 ? "start" : i === beats.length - 1 ? "end" : "middle";
+    g += `<circle class="mk" cx="${bx}" cy="${by}" r="6.5"/><text class="mn" x="${bx}" y="${by + 3}" text-anchor="middle">${i + 1}</text><text class="ml" x="${bx}" y="${i % 2 ? H - 1 : H - 12}" text-anchor="${anc}">${esc(b.title.length > 26 ? b.title.slice(0, 25) + "…" : b.title)}</text>`; });
+  return `<svg viewBox="-8 0 ${W + 16} ${H}" role="img" aria-label="The run over time with the key moments">${g}</svg>`;
+}
+function statVals(st) {
+  // whole run: peak (or low) vs the end; delta = how much it moved before vs after the fix
+  const s = clean[st.metric], f = Number.isInteger(R.fix_t) ? R.fix_t : D;
+  if (st.agg === "delta") return [s[f] - s[0], s[D] - s[f]];
+  if (st.agg === "min") return [Math.min(...s), s[D]];
+  return [Math.max(...s), s[D]];
+}
+$("#report").innerHTML = `
+  <span class="eb">Report · ${fmtT(D)} · ${beats.length} key moments</span>
+  <h2 id="repT">${esc(PB.meta.title)}</h2>
+  <div class="pbody">
+    <p class="rp-tldr">${esc(R.tldr)}</p>
+    <div class="rp-sec"><h4>How it happened</h4><div class="rp-chain">${chainSVG()}</div></div>
+    <div class="rp-sec"><h4>${esc(metricById[(PB.report && PB.report.sparkline) || PB.dashboard[0].metrics[0]].label)} across the key moments</h4><div class="rp-strip">${stripSVG()}</div></div>
+    <div class="rp-sec"><h4>Takeaways</h4><div class="rp-grid">${R.learnings.map(l => `<div class="rp-card"><b><i aria-hidden="true">${l.glyph}</i>${esc(l.title)}</b><span>${esc(l.body)}</span></div>`).join("")}</div></div>
+    <div class="rp-sec"><h4>Worst → at the end</h4><div class="rp-stats">${R.stats.map(st => { const [b, a] = statVals(st); return `<div class="rp-stat"><span class="lb">${esc(st.label)}</span><span class="bf">${fmtV(b, st.unit)}</span>→<span class="af">${fmtV(a, st.unit)}</span></div>`; }).join("")}</div></div>
+  </div>
+  <div class="foot"><kbd>Esc</kbd><button class="ghost" id="repClose">Close</button><span class="spacer"></span><kbd>Space</kbd><button class="primary" id="repAgain">↺ Watch again</button></div>`;
+function openReport() { closeMenus(); setPlaying(false); showModal($("#scrim")); renderHud(viewT()); }
+function closeReport(done) { hideModal($("#scrim"), () => { renderHud(viewT()); if (done) done(); }); }
+function watchAgain() { closeReport(); seek(0); setPlaying(true); }
+$("#reportBtn").onclick = () => openReport();
+$("#scrim").addEventListener("click", e => {
+  if (e.target.id === "scrim" || e.target.closest("#repClose")) return closeReport();
+  if (e.target.closest("#repAgain")) return watchAgain();
+});
+
+$("#schema").innerHTML = `<p>The agent writes one JSON file; the app only plays it. Layout coordinates in this proposal come from the app, not from the playbook.</p><pre>${JSON.stringify(PB, null, 2).replace(/</g, "&lt;")}</pre>`;
+
+
+/* ===================== Layout: resizable splitters, reorderable panels, saved per viewer ===================== */
+const LKEY = "sim-xp.layout.v1." + PB.meta.id;
+const loadLayout = () => { try { const v = JSON.parse(localStorage.getItem(LKEY)); return v && typeof v === "object" ? v : {}; } catch (e) { return {}; } };
+const saveLayout = () => { try { if (Object.keys(layout).length) localStorage.setItem(LKEY, JSON.stringify(layout)); else localStorage.removeItem(LKEY); } catch (e) { /* storage blocked: the layout still works for this visit */ } };
+let layout = loadLayout();
+const mainEl = $(".main"), leftEl = $(".left"), feedBox = $("#feedCard"), dropMark = document.createElement("div");
+dropMark.className = "dropmark"; dropMark.hidden = true; dash.style.position = "relative"; dash.appendChild(dropMark);
+// limits: the components graph never draws below 85% (labels stay >= ~8.5px), the dashboard keeps >= 430px,
+// the feed keeps header + 3 rows and never takes more than 45% of the left column
+const LEFT_MIN = 380, DASH_MIN = 430, FEED_MIN = 72, FEED_MAX_FRAC = 0.45, GRAPH_MIN_SCALE = 0.85;
+// the feed may only grow while the graph can still be drawn at >= 85% in one of its two layouts
+function feedMax() {
+  const colH = leftEl.clientHeight, w = leftEl.clientWidth;
+  const needH = Math.min(...["tall", "wide"].map(k => (w - 20) / LAYOUTS[k].vb[0] >= GRAPH_MIN_SCALE ? GRAPH_MIN_SCALE * LAYOUTS[k].vb[1] + 20 : Infinity));
+  return Math.max(FEED_MIN, Math.min(colH - needH - 9, colH * FEED_MAX_FRAC));
+}
+const chartCards = () => [...dashGrid.querySelectorAll(":scope > .panel.chart")];
+const defaultOrder = chartCards().map(c => c.dataset.id);
+function applyFeedH() {
+  if (layout.feedH == null) { feedBox.style.removeProperty("--feedH"); return; }
+  const max = feedMax();
+  feedBox.style.setProperty("--feedH", Math.round(Math.min(max, Math.max(FEED_MIN, layout.feedH))) + "px");
+}
+function applyLayout() {
+  if (layout.leftFrac != null) mainEl.style.setProperty("--left", `clamp(${LEFT_MIN}px, ${(layout.leftFrac * 100).toFixed(3)}%, calc(100% - ${DASH_MIN + 10}px))`);
+  else mainEl.style.removeProperty("--left");
+  applyFeedH();
+  const byId = Object.fromEntries(chartCards().map(c => [c.dataset.id, c]));
+  const order = (layout.order || defaultOrder).filter(id => byId[id]);
+  [...order, ...Object.keys(byId).filter(id => !order.includes(id))].forEach(id => dashGrid.appendChild(byId[id]));
+  $("#resetLayout").disabled = !Object.keys(layout).length;
+}
+new ResizeObserver(() => { if (layout.feedH != null) applyFeedH(); }).observe(leftEl);
+
+// splitters: drag, double-click to reset, arrow keys for keyboard users
+function splitter(elm, axis, place, reset) {
+  elm.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return;
+    e.preventDefault(); elm.setPointerCapture(e.pointerId); elm.classList.add("active");
+    document.body.classList.add("resizing", axis === "x" ? "col" : "row");
+    if (hoverT != null) { hoverT = null; scheduleRender(); }
+    const move = ev => { place(axis === "x" ? ev.clientX : ev.clientY); applyLayout(); };
+    const end = () => { elm.removeEventListener("pointermove", move); elm.classList.remove("active"); document.body.classList.remove("resizing", "col", "row"); saveLayout(); applyLayout(); };
+    elm.addEventListener("pointermove", move);
+    elm.addEventListener("pointerup", end, { once: true }); elm.addEventListener("pointercancel", end, { once: true });
+  });
+  elm.addEventListener("dblclick", () => { reset(); saveLayout(); applyLayout(); });
+  elm.addEventListener("keydown", e => {
+    const d = { ArrowLeft: -16, ArrowUp: -16, ArrowRight: 16, ArrowDown: 16 }[e.key]; if (d == null) return;
+    e.preventDefault(); e.stopPropagation();
+    const r = elm.getBoundingClientRect(); place((axis === "x" ? r.left + r.width / 2 : r.top + r.height / 2) + d); saveLayout(); applyLayout();
+  });
+}
+splitter($("#vsplit"), "x", x => {
+  const r = mainEl.getBoundingClientRect(), w = Math.min(Math.max(x - r.left - 5, LEFT_MIN), r.width - DASH_MIN - 10);
+  layout.leftFrac = w / r.width;
+}, () => { delete layout.leftFrac; });
+splitter($("#hsplit"), "y", y => { layout.feedH = leftEl.getBoundingClientRect().bottom - y - 4.5; }, () => { delete layout.feedH; });
+
+// reorder: drag a chart by its title; a bar shows where it will land; the grid only changes on drop
+let reorder = null;
+function dropTarget(x, y) {
+  const cards = chartCards().filter(c => c !== reorder.card); if (!cards.length) return null;
+  const two = getComputedStyle(dashGrid).gridTemplateColumns.split(" ").length > 1;
+  let best = null, bd = Infinity;
+  cards.forEach(c => { const r = c.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, d = Math.hypot(x - cx, y - cy); if (d < bd) { bd = d; best = { c, r, cx, cy } }; });
+  const before = two && Math.abs(y - best.cy) <= best.r.height / 2 ? x < best.cx : y < best.cy;
+  return { card: best.c, rect: best.r, before, vertical: two && Math.abs(y - best.cy) <= best.r.height / 2 };
+}
+function showDropMark(t) {
+  const d = dash.getBoundingClientRect(), r = t.rect; dropMark.hidden = false;
+  if (t.vertical) Object.assign(dropMark.style, { left: (t.before ? r.left : r.right) - d.left - 2 + "px", top: r.top - d.top + 6 + "px", width: "3px", height: r.height - 12 + "px" });
+  else Object.assign(dropMark.style, { left: r.left - d.left + 8 + "px", top: (t.before ? r.top : r.bottom) - d.top - 2 + "px", width: r.width - 16 + "px", height: "3px" });
+}
+function endReorder(commit) {
+  if (!reorder) return;
+  const { card, target, started } = reorder; reorder = null;
+  dropMark.hidden = true; card.classList.remove("lifted"); document.body.classList.remove("reordering");
+  if (commit && started && target && target.card !== card) {
+    dashGrid.insertBefore(card, target.before ? target.card : target.card.nextSibling);
+    const ids = chartCards().map(c => c.dataset.id);
+    if (ids.join() === defaultOrder.join()) delete layout.order; else layout.order = ids;
+    saveLayout(); applyLayout(); if (activeBeat) revealFocusedPanels(activeBeat);
+  }
+}
+dashGrid.addEventListener("pointerdown", e => {
+  const h = e.target.closest(".panel.chart > .panel-h"); if (!h || e.button !== 0) return;
+  e.preventDefault(); h.setPointerCapture(e.pointerId);
+  reorder = { card: h.parentElement, head: h, x0: e.clientX, y0: e.clientY, started: false, target: null };
+});
+dashGrid.addEventListener("pointermove", e => {
+  if (!reorder) return;
+  if (!reorder.started) { if (Math.hypot(e.clientX - reorder.x0, e.clientY - reorder.y0) < 5) return; reorder.started = true; reorder.card.classList.add("lifted"); document.body.classList.add("reordering"); if (hoverT != null) { hoverT = null; scheduleRender(); } }
+  const g = dashGrid.getBoundingClientRect();
+  if (e.clientY < g.top + 28) dashGrid.scrollTop -= 12; else if (e.clientY > g.bottom - 28) dashGrid.scrollTop += 12;
+  reorder.target = dropTarget(e.clientX, e.clientY); if (reorder.target) showDropMark(reorder.target);
+});
+dashGrid.addEventListener("pointerup", () => endReorder(true));
+dashGrid.addEventListener("pointercancel", () => endReorder(false));
+document.addEventListener("keydown", e => { if (e.key === "Escape" && reorder) { e.stopPropagation(); endReorder(false); } }, true);
+
+$("#resetLayout").onclick = () => { layout = {}; saveLayout(); applyLayout(); flash("layout reset"); };
+applyLayout();
+
+ready = true; setSpeed(speed);
+render();
+// story popup first; nothing plays until Space or Start
+$("#introT").textContent = PB.meta.title; $("#introStory").textContent = PB.meta.story;
+$("#introTags").innerHTML = PB.meta.tags.map(t => `<span>${esc(t)}</span>`).join("");
+$("#introMeta").textContent = `Story · ${Math.round(D / 60)} min · ${beats.length} key moments`;
+function startRun() { hideModal($("#intro"), () => renderHud(viewT())); seek(0); setPlaying(true); }
+$("#start").onclick = startRun;
+$("#pbTitle").textContent = PB.meta.title; document.title = PB.meta.title;
+$("#libraryBtn").onclick = () => { closeMenus(); host && host.showLibrary && host.showLibrary(); };
+requestAnimationFrame(frame);
+
+// Playback API for the host page. Speeds are multipliers: 0.5, 1, 2, 4.
+const SPEED_X = { 0.5: 2, 1: 4, 2: 8, 4: 16 };
+window.player = {
+  status: () => ({
+    t: Math.round(playT * 10) / 10, playing, speed: speed / 4,
+    key_moment: activeBeat ? beats.indexOf(activeBeat) + 1 : null,
+    intro_open: isOpen($("#intro")), report_open: isOpen($("#scrim")), ended: playT >= D,
+  }),
+  start() { if (isOpen($("#intro"))) startRun(); else { if (isOpen($("#scrim"))) closeReport(); hideBeat(); setPlaying(true); } },
+  pause() { setPlaying(false); render(); },
+  seek(t) { if (isOpen($("#intro"))) hideModal($("#intro")); if (isOpen($("#scrim"))) closeReport(); setPlaying(false); seek(t); },
+  keyMoment(n) {
+    const b = beats[n - 1]; if (!b) throw new Error(`key moment ${n} does not exist; this playbook has ${beats.length}`);
+    if (isOpen($("#intro"))) hideModal($("#intro")); if (isOpen($("#scrim"))) closeReport();
+    seek(b.t); showBeat(b);
+  },
+  step(dir) { if (isOpen($("#intro"))) hideModal($("#intro")); if (isOpen($("#scrim"))) closeReport(); jumpBeat(dir); },
+  report(open) { if (open) openReport(); else if (isOpen($("#scrim"))) closeReport(); },
+  restart() { if (isOpen($("#intro"))) hideModal($("#intro")); if (isOpen($("#scrim"))) closeReport(); reportSeen = false; seek(0); setPlaying(true); },
+  speed(x) { if (!SPEED_X[x]) throw new Error("speed must be 0.5, 1, 2 or 4"); setSpeed(SPEED_X[x]); flash(`speed ${speedLabel(speed)}`); },
+};
+emit("ready", {});
+</script>
+</body>
+</html>

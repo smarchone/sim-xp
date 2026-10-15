@@ -1,0 +1,62 @@
+[
+ {
+  "id": "kafka-rebalance-storm",
+  "file": "kafka-rebalance-storm.json",
+  "title": "The rebalance storm: when slow looks dead",
+  "story": "A payments team consumes an orders topic with three workers. A database migration makes each record slower to process. Nobody's consumer crashes, yet within minutes the group is stuck in a loop of rebalances and lag is climbing.",
+  "duration_s": 420,
+  "tags": [
+   "kafka",
+   "consumer-groups",
+   "rebalancing",
+   "backpressure"
+  ],
+  "key_moments": 6
+ },
+ {
+  "id": "pg-replication-lag",
+  "file": "pg-replication-lag.json",
+  "title": "Saved, refreshed, reverted: replica lag",
+  "story": "A profile service writes to a Postgres primary and serves reads from two streaming replicas. It has worked for years. This afternoon a user renames herself, gets a green 'Saved', hits refresh, and her old name is back.",
+  "duration_s": 300,
+  "tags": [
+   "postgres",
+   "replication",
+   "read-replicas",
+   "consistency"
+  ],
+  "key_moments": 6
+ },
+ {
+  "id": "cache-stampede-after-deploy",
+  "file": "cache-stampede-after-deploy.json",
+  "title": "The cold cache: a deploy that forgot everything",
+  "story": "A shop's product pages are served from Redis 96% of the time, and Postgres only sees the misses. A routine Thursday deploy rolls out across six web pods. Nothing in it touches the database, yet within a minute the site is returning 504s.",
+  "duration_s": 420,
+  "tags": [
+   "redis",
+   "caching",
+   "cache-stampede",
+   "thundering-herd",
+   "postgres",
+   "pgbouncer"
+  ],
+  "key_moments": 6
+ },
+ {
+  "id": "github-2018-split-brain",
+  "file": "github-2018-split-brain.json",
+  "title": "43 seconds, 24 hours: GitHub's split brain",
+  "story": "October 21, 2018, 22:52 UTC. Engineers replace a failing 100G optic at GitHub's US East Coast network hub, a routine job. Orchestrator watches over the MySQL clusters from three sites. Real time is compressed here: the first two minutes play close to real time, then each second stands for several minutes of a 24-hour recovery.",
+  "duration_s": 480,
+  "tags": [
+   "mysql",
+   "orchestrator",
+   "raft",
+   "failover",
+   "split-brain",
+   "network-partition"
+  ],
+  "key_moments": 7
+ }
+]

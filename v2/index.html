@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>sim-xp</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!-- The library: pick or drop a playbook. The player runs in the frame below once one is loaded. -->
+<main class="library" id="library">
+  <header class="top">
+    <div>
+      <h1>sim-xp</h1>
+      <p class="lede">Watch a system in motion: a story played as components, dashboards and a feed, pausing at the moments that explain it.</p>
+    </div>
+    <span class="chip" id="webmcp">checking for WebMCP…</span>
+  </header>
+
+  <section aria-labelledby="pbHead">
+    <div class="row">
+      <h2 id="pbHead">Playbooks</h2>
+      <label class="btn" for="file">Open a playbook file…</label>
+      <input type="file" id="file" accept=".json,application/json" hidden>
+    </div>
+    <div class="error" id="error" hidden></div>
+    <ul class="cards" id="cards"></ul>
+    <p class="small muted">Or drop a playbook <code>.json</code> anywhere on this page.</p>
+  </section>
+
+  <section aria-labelledby="ccHead" class="cc">
+    <h2 id="ccHead">Let Claude Code write and play one</h2>
+    <p class="small muted">Claude Code turns a story (a blog post, a postmortem, a one-line prompt) into a playbook, loads it here through WebMCP and plays it. Requires Node 22+ and Chrome.</p>
+    <ol class="steps">
+      <li><span>Add the WebMCP bridge to Claude Code, once</span>
+        <div class="copy"><code id="cmdAdd">claude mcp add webmcp -- npx -y @smarchone/webmcp-bridge</code><button data-copy="cmdAdd">Copy</button></div></li>
+      <li><span>From a clone of <a href="https://github.com/smarchone/sim-xp">sim-xp</a> (it has the story-to-playbook skill), ask for a story</span>
+        <div class="copy"><code id="cmdRun">claude "Use the story-to-playbook skill on: why Postgres replicas fall behind during a big backfill. Then open https://smarchone.github.io/sim-xp/v2/ with the webmcp tools and play it."</code><button data-copy="cmdRun">Copy</button></div></li>
+    </ol>
+  </section>
+</main>
+
+<iframe id="stage" title="Player" hidden></iframe>
+<div class="drop" id="drop" hidden><span>Drop the playbook to play it</span></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

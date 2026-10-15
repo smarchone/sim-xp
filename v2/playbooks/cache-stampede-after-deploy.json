@@ -1,0 +1,1116 @@
+{
+ "schema": "sim-xp/playbook@2",
+ "meta": {
+  "id": "cache-stampede-after-deploy",
+  "title": "The cold cache: a deploy that forgot everything",
+  "story": "A shop's product pages are served from Redis 96% of the time, and Postgres only sees the misses. A routine Thursday deploy rolls out across six web pods. Nothing in it touches the database, yet within a minute the site is returning 504s.",
+  "duration_s": 420,
+  "tags": [
+   "redis",
+   "caching",
+   "cache-stampede",
+   "thundering-herd",
+   "postgres",
+   "pgbouncer"
+  ]
+ },
+ "components": {
+  "nodes": [
+   {
+    "id": "users",
+    "label": "shoppers",
+    "kind": "browsers + mobile app"
+   },
+   {
+    "id": "lb",
+    "label": "edge-nginx",
+    "kind": "lb"
+   },
+   {
+    "id": "web",
+    "label": "storefront-web",
+    "kind": "rails pods",
+    "part_cols": 3,
+    "parts": [
+     {
+      "id": "a"
+     },
+     {
+      "id": "b"
+     },
+     {
+      "id": "c"
+     },
+     {
+      "id": "d"
+     },
+     {
+      "id": "e"
+     },
+     {
+      "id": "f"
+     }
+    ]
+   },
+   {
+    "id": "redis",
+    "label": "cache-redis",
+    "kind": "redis 7"
+   },
+   {
+    "id": "bouncer",
+    "label": "pgbouncer",
+    "kind": "pool: 20 server conns"
+   },
+   {
+    "id": "db",
+    "label": "catalog-db",
+    "kind": "postgres 16"
+   }
+  ],
+  "edges": [
+   {
+    "id": "e-users",
+    "from": "users",
+    "to": "lb"
+   },
+   {
+    "id": "e-lb",
+    "from": "lb",
+    "to": "web"
+   },
+   {
+    "id": "e-cache",
+    "from": "web",
+    "to": "redis"
+   },
+   {
+    "id": "e-pool",
+    "from": "web",
+    "to": "bouncer"
+   },
+   {
+    "id": "e-db",
+    "from": "bouncer",
+    "to": "db"
+   }
+  ]
+ },
+ "metrics": [
+  {
+   "id": "miss",
+   "label": "Cache miss ratio",
+   "unit": "%",
+   "start": 4,
+   "noise": 0.05,
+   "normal": [
+    0,
+    10
+   ]
+  },
+  {
+   "id": "rps",
+   "label": "Requests",
+   "unit": "req/s",
+   "start": 2400,
+   "noise": 0.04
+  },
+  {
+   "id": "dbqps",
+   "label": "DB queries",
+   "unit": "q/s",
+   "start": 220,
+   "noise": 0.05
+  },
+  {
+   "id": "dbp99",
+   "label": "DB query p99",
+   "unit": "ms",
+   "start": 38,
+   "noise": 0.08,
+   "normal": [
+    10,
+    120
+   ]
+  },
+  {
+   "id": "waiting",
+   "label": "Clients waiting for a conn",
+   "unit": "clients",
+   "start": 1,
+   "noise": 0.08,
+   "normal": [
+    0,
+    5
+   ]
+  },
+  {
+   "id": "err",
+   "label": "5xx rate",
+   "unit": "%",
+   "start": 0.2,
+   "noise": 0.1,
+   "normal": [
+    0,
+    1
+   ]
+  }
+ ],
+ "dashboard": [
+  {
+   "id": "miss",
+   "title": "Cache miss ratio",
+   "metrics": [
+    "miss"
+   ],
+   "threshold": {
+    "value": 20,
+    "label": "alert > 20%"
+   }
+  },
+  {
+   "id": "load",
+   "title": "Requests vs DB queries",
+   "metrics": [
+    "rps",
+    "dbqps"
+   ]
+  },
+  {
+   "id": "dbp99",
+   "title": "DB query p99",
+   "metrics": [
+    "dbp99"
+   ],
+   "threshold": {
+    "value": 4000,
+    "label": "statement_timeout 4s"
+   }
+  },
+  {
+   "id": "waiting",
+   "title": "pgbouncer cl_waiting",
+   "metrics": [
+    "waiting"
+   ]
+  },
+  {
+   "id": "err",
+   "title": "5xx rate at edge",
+   "metrics": [
+    "err"
+   ],
+   "threshold": {
+    "value": 5,
+    "label": "SLO page 5%"
+   }
+  }
+ ],
+ "alerts": [
+  {
+   "id": "miss-high",
+   "metric": "miss",
+   "op": ">",
+   "value": 20,
+   "for_s": 30,
+   "severity": "warning",
+   "component": "redis",
+   "summary": "cache miss ratio > 20% for 30s"
+  },
+  {
+   "id": "db-slow",
+   "metric": "dbp99",
+   "op": ">",
+   "value": 1000,
+   "for_s": 20,
+   "severity": "warning",
+   "component": "db",
+   "summary": "catalog-db p99 > 1s"
+  },
+  {
+   "id": "5xx",
+   "metric": "err",
+   "op": ">",
+   "value": 5,
+   "for_s": 20,
+   "severity": "critical",
+   "component": "lb",
+   "summary": "edge 5xx rate > 5% (SLO burn)"
+  }
+ ],
+ "initial": {
+  "effects": [
+   {
+    "target": "web/a",
+    "color": "teal",
+    "intensity": 0.5,
+    "label": "v41"
+   },
+   {
+    "target": "web/b",
+    "color": "teal",
+    "intensity": 0.5,
+    "label": "v41"
+   },
+   {
+    "target": "web/c",
+    "color": "teal",
+    "intensity": 0.5,
+    "label": "v41"
+   },
+   {
+    "target": "web/d",
+    "color": "teal",
+    "intensity": 0.5,
+    "label": "v41"
+   },
+   {
+    "target": "web/e",
+    "color": "teal",
+    "intensity": 0.5,
+    "label": "v41"
+   },
+   {
+    "target": "web/f",
+    "color": "teal",
+    "intensity": 0.5,
+    "label": "v41"
+   },
+   {
+    "target": "web",
+    "badge": "6 pods"
+   },
+   {
+    "target": "redis",
+    "color": "green",
+    "intensity": 0.3,
+    "label": "pdp:v41 · 96% hits"
+   },
+   {
+    "target": "bouncer",
+    "label": "queue empty"
+   },
+   {
+    "target": "db",
+    "label": "~220 q/s"
+   },
+   {
+    "target": "e-users",
+    "flow": 0.6
+   },
+   {
+    "target": "e-lb",
+    "flow": 0.6
+   },
+   {
+    "target": "e-cache",
+    "flow": 0.7,
+    "color": "green"
+   },
+   {
+    "target": "e-pool",
+    "flow": 0.1
+   },
+   {
+    "target": "e-db",
+    "flow": 0.1
+   }
+  ]
+ },
+ "timeline": [
+  {
+   "t": 3,
+   "title": "Meet the system",
+   "beat": {
+    "hint": "Each product page is cached in Redis under a versioned key like pdp:v41:sku-88213, TTL 6h. On a hit the pod never touches Postgres. Only the 4% of misses go through pgbouncer, which has just 20 real connections to the database.",
+    "focus": [
+     "web",
+     "redis",
+     "bouncer",
+     "e-cache"
+    ],
+    "notes": [
+     {
+      "panel": "miss",
+      "text": "Only 4% of page loads miss Redis and reach the DB"
+     },
+     {
+      "panel": "load",
+      "metric": "dbqps",
+      "text": "DB sees ~220 q/s while the edge takes 2,400 req/s"
+     }
+    ]
+   }
+  },
+  {
+   "t": 20,
+   "feed": {
+    "from": "Priya · #storefront",
+    "kind": "chat",
+    "text": "shipping the product badges change, rolling deploy starting now 🚢"
+   }
+  },
+  {
+   "t": 30,
+   "title": "Deploy v2026.10.15-1 rolls out",
+   "feed": {
+    "from": "argo-rollouts",
+    "kind": "deploy",
+    "text": "storefront-web v2026.10.15-1: serializer adds `badges`; PDP_CACHE_VERSION v41 → v42 (rolling, maxSurge=1)"
+   },
+   "effects": [
+    {
+     "target": "web/a",
+     "color": "blue",
+     "intensity": 0.6,
+     "label": "cold"
+    },
+    {
+     "target": "web/b",
+     "color": "blue",
+     "intensity": 0.6,
+     "label": "cold"
+    }
+   ],
+   "metrics": [
+    {
+     "id": "miss",
+     "to": 88,
+     "over_s": 45,
+     "shape": "linear"
+    },
+    {
+     "id": "dbqps",
+     "to": 520,
+     "over_s": 40
+    },
+    {
+     "id": "waiting",
+     "to": 40,
+     "over_s": 40
+    },
+    {
+     "id": "dbp99",
+     "to": 900,
+     "over_s": 45
+    }
+   ]
+  },
+  {
+   "t": 42,
+   "effects": [
+    {
+     "target": "web/c",
+     "color": "blue",
+     "intensity": 0.6,
+     "label": "cold"
+    },
+    {
+     "target": "web/d",
+     "color": "blue",
+     "intensity": 0.6,
+     "label": "cold"
+    },
+    {
+     "target": "e-pool",
+     "flow": 0.5
+    },
+    {
+     "target": "e-db",
+     "flow": 0.6
+    },
+    {
+     "target": "bouncer",
+     "color": "amber",
+     "intensity": 0.5,
+     "label": "20/20 busy"
+    }
+   ],
+   "feed": {
+    "from": "cache-redis",
+    "kind": "log",
+    "text": "INFO stats: keyspace_misses +41,880 in 10s (pdp:v42:* — 0 keys present)"
+   }
+  },
+  {
+   "t": 54,
+   "effects": [
+    {
+     "target": "web/e",
+     "color": "blue",
+     "intensity": 0.6,
+     "label": "cold"
+    },
+    {
+     "target": "web/f",
+     "color": "blue",
+     "intensity": 0.6,
+     "label": "cold"
+    },
+    {
+     "target": "redis",
+     "color": "blue",
+     "intensity": 0.5,
+     "label": "pdp:v42 empty"
+    },
+    {
+     "target": "e-cache",
+     "color": "blue",
+     "flow": 0.4
+    },
+    {
+     "target": "db",
+     "color": "amber",
+     "intensity": 0.5,
+     "pulse": true,
+     "label": "CPU 91%"
+    }
+   ]
+  },
+  {
+   "t": 62,
+   "title": "Every key misses at once",
+   "beat": {
+    "hint": "The deploy bumped the cache key version, so every pod now asks for pdp:v42:* keys that don't exist yet. Thousands of pages miss in the same second, and each miss runs the same 40ms catalog query. That's the stampede: the database suddenly receives the traffic the cache used to absorb.",
+    "focus": [
+     "web",
+     "redis",
+     "bouncer",
+     "db",
+     "panel:miss",
+     "panel:load"
+    ],
+    "notes": [
+     {
+      "panel": "miss",
+      "text": "Misses jump as each pod rolls to the new key version"
+     },
+     {
+      "panel": "load",
+      "metric": "dbqps",
+      "text": "DB queries capped near 520 q/s: the pool has only 20 conns"
+     },
+     {
+      "panel": "waiting",
+      "text": "Web threads start queueing for one of 20 connections"
+     }
+    ]
+   }
+  },
+  {
+   "t": 70,
+   "metrics": [
+    {
+     "id": "dbp99",
+     "to": 4000,
+     "over_s": 25
+    },
+    {
+     "id": "waiting",
+     "to": 230,
+     "over_s": 25
+    },
+    {
+     "id": "err",
+     "to": 31,
+     "over_s": 30
+    },
+    {
+     "id": "dbqps",
+     "to": 460,
+     "over_s": 25
+    }
+   ],
+   "effects": [
+    {
+     "target": "db",
+     "color": "red",
+     "intensity": 0.8,
+     "label": "CPU 100% · p99 4s"
+    },
+    {
+     "target": "bouncer",
+     "color": "red",
+     "intensity": 0.7,
+     "pulse": true,
+     "label": "cl_waiting 230"
+    },
+    {
+     "target": "lb",
+     "color": "amber",
+     "intensity": 0.5
+    },
+    {
+     "target": "e-pool",
+     "flow": 0.9,
+     "color": "red"
+    },
+    {
+     "target": "e-db",
+     "flow": 0.8,
+     "color": "red"
+    }
+   ],
+   "feed": {
+    "from": "catalog-db",
+    "kind": "log",
+    "text": "ERROR: canceling statement due to statement timeout (4000ms) — SELECT ... FROM products JOIN inventory ..."
+   }
+  },
+  {
+   "t": 88,
+   "feed": {
+    "from": "edge-nginx",
+    "kind": "log",
+    "text": "upstream timed out (110: Connection timed out) while reading response header from upstream, request: \"GET /p/sku-88213\""
+   },
+   "effects": [
+    {
+     "target": "web/a",
+     "color": "red",
+     "intensity": 0.6,
+     "label": "504"
+    },
+    {
+     "target": "web/b",
+     "color": "red",
+     "intensity": 0.6,
+     "label": "504"
+    },
+    {
+     "target": "web/c",
+     "color": "red",
+     "intensity": 0.6,
+     "label": "504"
+    },
+    {
+     "target": "web/d",
+     "color": "red",
+     "intensity": 0.6,
+     "label": "504"
+    },
+    {
+     "target": "web/e",
+     "color": "red",
+     "intensity": 0.6,
+     "label": "504"
+    },
+    {
+     "target": "web/f",
+     "color": "red",
+     "intensity": 0.6,
+     "label": "504"
+    },
+    {
+     "target": "lb",
+     "color": "red",
+     "intensity": 0.7,
+     "label": "504s"
+    }
+   ]
+  },
+  {
+   "t": 96,
+   "feed": {
+    "from": "Marco · #support",
+    "kind": "chat",
+    "text": "getting a flood of 'site is down' tickets, product pages spin then error"
+   },
+   "metrics": [
+    {
+     "id": "rps",
+     "to": 3300,
+     "over_s": 30
+    },
+    {
+     "id": "miss",
+     "to": 85,
+     "over_s": 30
+    },
+    {
+     "id": "err",
+     "to": 42,
+     "over_s": 30
+    }
+   ],
+   "effects": [
+    {
+     "target": "users",
+     "color": "amber",
+     "intensity": 0.6,
+     "label": "retrying"
+    },
+    {
+     "target": "e-users",
+     "flow": 0.9
+    },
+    {
+     "target": "e-lb",
+     "flow": 0.9
+    }
+   ]
+  },
+  {
+   "t": 122,
+   "title": "The cache never refills",
+   "beat": {
+    "hint": "A page is only cached after its query succeeds. Queued behind 20 connections, queries now hit statement_timeout=4s and get cancelled, so nothing is written to Redis and the next request misses again. Failed pages also make the mobile app retry, adding traffic.",
+    "focus": [
+     "bouncer",
+     "db",
+     "users",
+     "panel:miss",
+     "panel:dbp99",
+     "panel:err"
+    ],
+    "notes": [
+     {
+      "panel": "miss",
+      "text": "Stuck near 85%: cancelled queries never write the cache"
+     },
+     {
+      "panel": "dbp99",
+      "text": "p99 pinned at the 4s statement_timeout"
+     },
+     {
+      "panel": "load",
+      "metric": "rps",
+      "text": "Requests up ~35%: app retries on 5xx without backoff"
+     },
+     {
+      "panel": "err",
+      "text": "4 in 10 page loads fail at the edge"
+     }
+    ]
+   }
+  },
+  {
+   "t": 135,
+   "feed": {
+    "from": "Priya · #storefront",
+    "kind": "chat",
+    "text": "pods are maxed on threads. scaling web 6 → 12 so we can serve more"
+   }
+  },
+  {
+   "t": 142,
+   "title": "Scale out to 12 pods",
+   "feed": {
+    "from": "kubectl",
+    "kind": "deploy",
+    "text": "deployment/storefront-web scaled: replicas 6 → 12"
+   },
+   "effects": [
+    {
+     "target": "web",
+     "badge": "12 pods"
+    },
+    {
+     "target": "bouncer",
+     "label": "cl_waiting 470"
+    }
+   ],
+   "metrics": [
+    {
+     "id": "waiting",
+     "to": 470,
+     "over_s": 20
+    },
+    {
+     "id": "err",
+     "to": 48,
+     "over_s": 25
+    },
+    {
+     "id": "dbqps",
+     "to": 430,
+     "over_s": 20
+    },
+    {
+     "id": "miss",
+     "to": 87,
+     "over_s": 20
+    }
+   ]
+  },
+  {
+   "t": 168,
+   "title": "Scaling out made it worse",
+   "beat": {
+    "hint": "The bottleneck is 20 database connections, not web threads. Twelve pods just put twice as many clients in the pgbouncer queue, so each waits longer and more hit the 4s timeout. New pods also start with nothing to share: the shared Redis is still empty.",
+    "focus": [
+     "web",
+     "bouncer",
+     "panel:waiting",
+     "panel:err"
+    ],
+    "notes": [
+     {
+      "panel": "waiting",
+      "text": "Queue doubles with 12 pods: same 20 conns, twice the clients"
+     },
+     {
+      "panel": "err",
+      "text": "Errors rise to ~48%: more requests time out in the queue"
+     }
+    ]
+   }
+  },
+  {
+   "t": 182,
+   "feed": {
+    "from": "Lena · #storefront",
+    "kind": "chat",
+    "text": "wait — v42 changed the key prefix. the old pdp:v41 keys are still in redis, TTL is 6h. can we point back at v41?"
+   }
+  },
+  {
+   "t": 196,
+   "title": "Fix: back to warm v41 keys",
+   "feed": {
+    "from": "Lena · #storefront",
+    "kind": "deploy",
+    "text": "feature flag PDP_CACHE_VERSION v42 → v41 (badges render as empty until warmup)"
+   },
+   "effects": [
+    {
+     "target": "web/a",
+     "color": "teal",
+     "intensity": 0.5,
+     "label": "v41"
+    },
+    {
+     "target": "web/b",
+     "color": "teal",
+     "intensity": 0.5,
+     "label": "v41"
+    },
+    {
+     "target": "web/c",
+     "color": "teal",
+     "intensity": 0.5,
+     "label": "v41"
+    },
+    {
+     "target": "web/d",
+     "color": "teal",
+     "intensity": 0.5,
+     "label": "v41"
+    },
+    {
+     "target": "web/e",
+     "color": "teal",
+     "intensity": 0.5,
+     "label": "v41"
+    },
+    {
+     "target": "web/f",
+     "color": "teal",
+     "intensity": 0.5,
+     "label": "v41"
+    },
+    {
+     "target": "redis",
+     "color": "green",
+     "intensity": 0.3,
+     "label": "pdp:v41 · 94% hits"
+    },
+    {
+     "target": "e-cache",
+     "color": "green",
+     "flow": 0.7
+    },
+    {
+     "target": "users",
+     "color": null,
+     "intensity": 0,
+     "label": null
+    }
+   ],
+   "metrics": [
+    {
+     "id": "miss",
+     "to": 6,
+     "over_s": 12
+    },
+    {
+     "id": "dbqps",
+     "to": 240,
+     "over_s": 30
+    },
+    {
+     "id": "waiting",
+     "to": 2,
+     "over_s": 30
+    },
+    {
+     "id": "dbp99",
+     "to": 60,
+     "over_s": 40
+    },
+    {
+     "id": "err",
+     "to": 0.4,
+     "over_s": 40
+    },
+    {
+     "id": "rps",
+     "to": 2500,
+     "over_s": 40
+    }
+   ]
+  },
+  {
+   "t": 218,
+   "title": "Why the fix works",
+   "beat": {
+    "hint": "The old v41 entries never left Redis, so flipping the version back turns 90% of requests into hits again in seconds. The database only sees misses again, the pgbouncer queue drains, and queries finish inside the timeout.",
+    "focus": [
+     "redis",
+     "e-cache",
+     "bouncer",
+     "panel:miss",
+     "panel:waiting"
+    ],
+    "notes": [
+     {
+      "panel": "miss",
+      "text": "Misses back to ~6%: the old keys were still warm"
+     },
+     {
+      "panel": "waiting",
+      "text": "Queue drains as misses drop back to a trickle"
+     },
+     {
+      "panel": "dbp99",
+      "text": "p99 falling fast now that queries stop queueing"
+     }
+    ]
+   }
+  },
+  {
+   "t": 226,
+   "effects": [
+    {
+     "target": "bouncer",
+     "color": "amber",
+     "intensity": 0.3,
+     "pulse": false,
+     "label": "draining"
+    },
+    {
+     "target": "e-pool",
+     "flow": 0.2,
+     "color": null
+    },
+    {
+     "target": "e-db",
+     "flow": 0.2,
+     "color": null
+    },
+    {
+     "target": "lb",
+     "color": "amber",
+     "intensity": 0.3,
+     "label": null
+    }
+   ],
+   "feed": {
+    "from": "pgbouncer",
+    "kind": "log",
+    "text": "stats: cl_active=38 cl_waiting=3 sv_active=11 sv_idle=9 avg_wait=2ms"
+   }
+  },
+  {
+   "t": 234,
+   "feed": {
+    "from": "alertmanager",
+    "kind": "resolved",
+    "text": "edge 5xx rate back under SLO"
+   },
+   "effects": [
+    {
+     "target": "db",
+     "color": null,
+     "intensity": 0,
+     "pulse": false,
+     "label": "~240 q/s"
+    },
+    {
+     "target": "lb",
+     "color": null,
+     "intensity": 0
+    },
+    {
+     "target": "bouncer",
+     "color": null,
+     "intensity": 0,
+     "label": "20 conns, no queue"
+    },
+    {
+     "target": "e-users",
+     "flow": 0.6
+    },
+    {
+     "target": "e-lb",
+     "flow": 0.6
+    }
+   ]
+  },
+  {
+   "t": 265,
+   "feed": {
+    "from": "kubectl",
+    "kind": "deploy",
+    "text": "deployment/storefront-web scaled: replicas 12 → 6"
+   },
+   "effects": [
+    {
+     "target": "web",
+     "badge": "6 pods"
+    }
+   ]
+  },
+  {
+   "t": 300,
+   "feed": {
+    "from": "Lena · #storefront",
+    "kind": "chat",
+    "text": "plan for v42: warm the new keys with a backfill job first, and add per-key lock + serve-stale so a miss only queries once"
+   }
+  },
+  {
+   "t": 330,
+   "feed": {
+    "from": "cache-warmer",
+    "kind": "log",
+    "text": "warm pdp:v42:* 18,400 / 61,000 keys (50 keys/s, rate-limited to protect catalog-db)"
+   },
+   "effects": [
+    {
+     "target": "redis",
+     "label": "warming pdp:v42"
+    }
+   ],
+   "metrics": [
+    {
+     "id": "dbqps",
+     "to": 290,
+     "over_s": 10
+    },
+    {
+     "id": "miss",
+     "to": 5,
+     "over_s": 20
+    }
+   ]
+  },
+  {
+   "t": 380,
+   "title": "Recovered",
+   "beat": {
+    "hint": "Nothing broke in the code that shipped. A version bump quietly emptied the cache for every page at once, and timeouts kept it from refilling. Next time the new keys are warmed before the switch, and a lock per key makes one miss hit the database once.",
+    "focus": [
+     "redis",
+     "db",
+     "web"
+    ],
+    "notes": [
+     {
+      "panel": "err",
+      "text": "5xx holding near 0.4% since the flag flip"
+     },
+     {
+      "panel": "load",
+      "metric": "dbqps",
+      "text": "DB steady under 300 q/s: misses plus a rate-limited warmup"
+     }
+    ]
+   }
+  }
+ ],
+ "report": {
+  "tldr": "Bumping the cache key version made every product page miss at once. 2,400 req/s fell onto 20 DB connections, queries timed out before they could refill the cache, and the site returned 504s until the old keys were used again.",
+  "fix_t": 196,
+  "sparkline": "err",
+  "chain": [
+   {
+    "id": "bump",
+    "kind": "cause",
+    "text": "Deploy bumps cache key v41 → v42"
+   },
+   {
+    "id": "miss",
+    "kind": "effect",
+    "text": "Every page misses Redis at once"
+   },
+   {
+    "id": "queue",
+    "kind": "effect",
+    "text": "20 DB conns, 230+ clients queued"
+   },
+   {
+    "id": "timeout",
+    "kind": "amp",
+    "text": "Queries hit 4s timeout, never cached"
+   },
+   {
+    "id": "retry",
+    "kind": "amp",
+    "text": "504s + retries + scale-out add load"
+   },
+   {
+    "id": "fix",
+    "kind": "fix",
+    "text": "Fix: flag back to warm v41 keys"
+   }
+  ],
+  "loop": {
+   "from": "timeout",
+   "to": "miss",
+   "label": "nothing refills the cache"
+  },
+  "stats": [
+   {
+    "label": "Peak cache miss ratio",
+    "metric": "miss",
+    "unit": "%",
+    "agg": "max"
+   },
+   {
+    "label": "Peak 5xx rate",
+    "metric": "err",
+    "unit": "%",
+    "agg": "max"
+   },
+   {
+    "label": "Peak conn queue",
+    "metric": "waiting",
+    "unit": "clients",
+    "agg": "max"
+   }
+  ],
+  "learnings": [
+   {
+    "glyph": "🔥",
+    "title": "Warm new keys before switching",
+    "body": "Backfill a new cache version at a rate the DB can take, then flip the flag."
+   },
+   {
+    "glyph": "🔒",
+    "title": "Coalesce misses per key",
+    "body": "A lock or singleflight per key plus serve-stale means one query per miss, not thousands."
+   },
+   {
+    "glyph": "⏱",
+    "title": "Let slow fills still land",
+    "body": "If timeouts cancel the fill, an overloaded cache can never recover by itself."
+   },
+   {
+    "glyph": "✕",
+    "title": "More pods won't fix a pool cap",
+    "body": "Scaling web adds clients to the same 20 DB connections; find the real bottleneck."
+   }
+  ]
+ }
+}

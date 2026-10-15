@@ -1,0 +1,935 @@
+{
+ "schema": "sim-xp/playbook@2",
+ "meta": {
+  "id": "pg-replication-lag",
+  "title": "Saved, refreshed, reverted: replica lag",
+  "story": "A profile service writes to a Postgres primary and serves reads from two streaming replicas. It has worked for years. This afternoon a user renames herself, gets a green 'Saved', hits refresh, and her old name is back.",
+  "duration_s": 300,
+  "tags": [
+   "postgres",
+   "replication",
+   "read-replicas",
+   "consistency"
+  ]
+ },
+ "components": {
+  "nodes": [
+   {
+    "id": "browser",
+    "label": "maya's browser",
+    "kind": "client"
+   },
+   {
+    "id": "api",
+    "label": "profile-api",
+    "kind": "service · v2.13"
+   },
+   {
+    "id": "backfill",
+    "label": "backfill_user_tz",
+    "kind": "batch job"
+   },
+   {
+    "id": "primary",
+    "label": "pg-primary",
+    "kind": "postgres 16 · primary"
+   },
+   {
+    "id": "r1",
+    "label": "pg-replica-1",
+    "kind": "hot standby · async"
+   },
+   {
+    "id": "r2",
+    "label": "pg-replica-2",
+    "kind": "hot standby · async"
+   }
+  ],
+  "edges": [
+   {
+    "id": "e-user",
+    "from": "browser",
+    "to": "api"
+   },
+   {
+    "id": "e-write",
+    "from": "api",
+    "to": "primary"
+   },
+   {
+    "id": "e-bf",
+    "from": "backfill",
+    "to": "primary"
+   },
+   {
+    "id": "e-read1",
+    "from": "api",
+    "to": "r1"
+   },
+   {
+    "id": "e-read2",
+    "from": "api",
+    "to": "r2"
+   },
+   {
+    "id": "e-wal1",
+    "from": "primary",
+    "to": "r1"
+   },
+   {
+    "id": "e-wal2",
+    "from": "primary",
+    "to": "r2"
+   }
+  ]
+ },
+ "metrics": [
+  {
+   "id": "lag",
+   "label": "Replica replay lag",
+   "unit": "s",
+   "start": 0.03,
+   "noise": 0.08,
+   "normal": [
+    0,
+    1
+   ]
+  },
+  {
+   "id": "wal_gen",
+   "label": "WAL generated (primary)",
+   "unit": "MB/s",
+   "start": 8,
+   "noise": 0.06
+  },
+  {
+   "id": "wal_replay",
+   "label": "WAL replayed (replica)",
+   "unit": "MB/s",
+   "start": 8,
+   "noise": 0.06
+  },
+  {
+   "id": "stale",
+   "label": "Stale read-after-write",
+   "unit": "%",
+   "start": 0.2,
+   "noise": 0.1,
+   "normal": [
+    0,
+    1
+   ]
+  },
+  {
+   "id": "primary_reads",
+   "label": "Reads on primary",
+   "unit": "qps",
+   "start": 120,
+   "noise": 0.05
+  }
+ ],
+ "dashboard": [
+  {
+   "id": "lag",
+   "title": "Replica replay lag",
+   "metrics": [
+    "lag"
+   ],
+   "threshold": {
+    "value": 5,
+    "label": "alert 5s"
+   }
+  },
+  {
+   "id": "wal",
+   "title": "WAL: generated vs replayed",
+   "metrics": [
+    "wal_gen",
+    "wal_replay"
+   ]
+  },
+  {
+   "id": "stale",
+   "title": "Reads that miss your own write",
+   "metrics": [
+    "stale"
+   ],
+   "threshold": {
+    "value": 5,
+    "label": "alert 5%"
+   }
+  },
+  {
+   "id": "primary_reads",
+   "title": "Reads served by primary",
+   "metrics": [
+    "primary_reads"
+   ]
+  }
+ ],
+ "alerts": [
+  {
+   "id": "lag-high",
+   "metric": "lag",
+   "op": ">",
+   "value": 5,
+   "for_s": 15,
+   "severity": "critical",
+   "component": "r2",
+   "summary": "pg-replica replay_lag > 5s"
+  },
+  {
+   "id": "stale-high",
+   "metric": "stale",
+   "op": ">",
+   "value": 5,
+   "for_s": 10,
+   "severity": "warning",
+   "component": "api",
+   "summary": "profile-api stale read-after-write > 5%"
+  }
+ ],
+ "initial": {
+  "effects": [
+   {
+    "target": "primary",
+    "color": "teal",
+    "intensity": 0.25,
+    "label": "LSN 3A/0F…"
+   },
+   {
+    "target": "r1",
+    "color": "blue",
+    "intensity": 0.2,
+    "label": "lag 30ms"
+   },
+   {
+    "target": "r2",
+    "color": "blue",
+    "intensity": 0.2,
+    "label": "lag 30ms"
+   },
+   {
+    "target": "backfill",
+    "color": "grey",
+    "intensity": 0.2,
+    "label": "idle"
+   },
+   {
+    "target": "e-user",
+    "flow": 0.5
+   },
+   {
+    "target": "e-write",
+    "flow": 0.2,
+    "color": "teal"
+   },
+   {
+    "target": "e-read1",
+    "flow": 0.5,
+    "color": "blue"
+   },
+   {
+    "target": "e-read2",
+    "flow": 0.5,
+    "color": "blue"
+   },
+   {
+    "target": "e-wal1",
+    "flow": 0.2,
+    "color": "teal"
+   },
+   {
+    "target": "e-wal2",
+    "flow": 0.2,
+    "color": "teal"
+   },
+   {
+    "target": "e-bf",
+    "flow": 0
+   }
+  ]
+ },
+ "timeline": [
+  {
+   "t": 3,
+   "title": "Meet the system",
+   "beat": {
+    "focus": [
+     "primary",
+     "r1",
+     "r2",
+     "e-wal1",
+     "e-wal2"
+    ],
+    "hint": "Writes go to pg-primary. Reads go to two replicas that replay the primary's WAL (its change log) over async streaming replication. Replay lag is about 30ms, so a read right after a write almost always sees it.",
+    "notes": [
+     {
+      "panel": "lag",
+      "text": "Replay lag ~30ms: replicas are effectively current"
+     },
+     {
+      "panel": "wal",
+      "text": "Replicas replay WAL as fast as the primary writes it"
+     }
+    ]
+   }
+  },
+  {
+   "t": 15,
+   "feed": {
+    "from": "profile-api",
+    "kind": "log",
+    "text": "PATCH /v1/profile user=2291 → pg-primary 200 (6ms); GET → pg-replica-1 200 (2ms)"
+   }
+  },
+  {
+   "t": 28,
+   "feed": {
+    "from": "Priya · #data-eng",
+    "kind": "chat",
+    "text": "kicking off the users.tz backfill now, 42M rows in 50k batches. should be done by EOD"
+   }
+  },
+  {
+   "t": 40,
+   "title": "Backfill starts",
+   "feed": {
+    "from": "backfill_user_tz",
+    "kind": "deploy",
+    "text": "UPDATE users SET tz = … WHERE id BETWEEN $1 AND $1+50000 (no pause between batches)"
+   },
+   "effects": [
+    {
+     "target": "backfill",
+     "color": "amber",
+     "intensity": 0.6,
+     "pulse": true,
+     "label": "batch 1/840"
+    },
+    {
+     "target": "e-bf",
+     "flow": 1,
+     "color": "amber"
+    },
+    {
+     "target": "e-wal1",
+     "flow": 0.9,
+     "width": 0.8
+    },
+    {
+     "target": "e-wal2",
+     "flow": 0.9,
+     "width": 0.8
+    },
+    {
+     "target": "primary",
+     "color": "amber",
+     "intensity": 0.4
+    }
+   ],
+   "metrics": [
+    {
+     "id": "wal_gen",
+     "to": 70,
+     "over_s": 8
+    },
+    {
+     "id": "wal_replay",
+     "to": 50,
+     "over_s": 10
+    }
+   ]
+  },
+  {
+   "t": 45,
+   "metrics": [
+    {
+     "id": "lag",
+     "to": 36,
+     "over_s": 125,
+     "shape": "linear"
+    },
+    {
+     "id": "stale",
+     "to": 65,
+     "over_s": 45
+    }
+   ]
+  },
+  {
+   "t": 55,
+   "feed": {
+    "from": "pg-primary",
+    "kind": "log",
+    "text": "pg_stat_replication: pg-replica-2 state=streaming replay_lag=00:00:03.1"
+   },
+   "effects": [
+    {
+     "target": "r1",
+     "color": "amber",
+     "intensity": 0.4,
+     "label": "lag 3s"
+    },
+    {
+     "target": "r2",
+     "color": "amber",
+     "intensity": 0.4,
+     "label": "lag 3s"
+    }
+   ]
+  },
+  {
+   "t": 62,
+   "feed": {
+    "from": "profile-api",
+    "kind": "log",
+    "text": "PATCH /v1/profile user=4812 display_name='Maya R.' → pg-primary 200 (7ms) commit_lsn=3A/1F00C2D8"
+   },
+   "effects": [
+    {
+     "target": "browser",
+     "color": "green",
+     "intensity": 0.4,
+     "label": "✓ Saved: Maya R."
+    },
+    {
+     "target": "e-write",
+     "flow": 0.8
+    }
+   ]
+  },
+  {
+   "t": 65,
+   "feed": {
+    "from": "profile-api",
+    "kind": "log",
+    "text": "GET /v1/profile user=4812 → pg-replica-2 (replay_lsn=3A/1C9E0410) display_name='Maya Rao'"
+   },
+   "effects": [
+    {
+     "target": "browser",
+     "color": "red",
+     "intensity": 0.5,
+     "label": "refresh: Maya Rao ?!"
+    },
+    {
+     "target": "e-read2",
+     "color": "red",
+     "flow": 0.6
+    },
+    {
+     "target": "r2",
+     "color": "red",
+     "intensity": 0.5,
+     "label": "lag 6s · old row"
+    },
+    {
+     "target": "e-write",
+     "flow": 0.2
+    }
+   ]
+  },
+  {
+   "t": 68,
+   "feed": {
+    "from": "support-bot",
+    "kind": "chat",
+    "text": "ticket #88213: 'changed my name, it said saved, refreshed 3 times and it's back to the old one'"
+   }
+  },
+  {
+   "t": 72,
+   "title": "Saved, refreshed, old value",
+   "beat": {
+    "focus": [
+     "browser",
+     "api",
+     "r2",
+     "e-read2",
+     "feed"
+    ],
+    "hint": "The write committed on the primary and returned 200. But the refresh was routed to pg-replica-2, which had only replayed WAL up to 3A/1C9E…, before Maya's commit at 3A/1F00…. Nothing is broken: async replicas are allowed to be behind.",
+    "notes": [
+     {
+      "panel": "stale",
+      "text": "Reads right after a write now return the old row"
+     },
+     {
+      "panel": "lag",
+      "text": "Replica ~8s behind: any read inside that window is stale"
+     }
+    ]
+   }
+  },
+  {
+   "t": 90,
+   "feed": {
+    "from": "Dan · #infra-oncall",
+    "kind": "chat",
+    "text": "replica lag 13s and climbing, replica CPU is only 30%. add a third replica to spread the reads?"
+   },
+   "effects": [
+    {
+     "target": "r1",
+     "label": "lag 13s"
+    },
+    {
+     "target": "r2",
+     "label": "lag 13s"
+    },
+    {
+     "target": "backfill",
+     "label": "batch 61/840"
+    }
+   ]
+  },
+  {
+   "t": 100,
+   "feed": {
+    "from": "pg-replica-2",
+    "kind": "log",
+    "text": "LOG: startup process (PID 812) recovering 000000010000003A000000F4; wal_receiver 2.1 GB ahead"
+   },
+   "effects": [
+    {
+     "target": "r1",
+     "color": "red",
+     "intensity": 0.5
+    },
+    {
+     "target": "r2",
+     "pulse": true
+    }
+   ]
+  },
+  {
+   "t": 108,
+   "title": "Replay can't keep up",
+   "beat": {
+    "focus": [
+     "primary",
+     "r1",
+     "r2",
+     "backfill",
+     "panel:wal"
+    ],
+    "hint": "The backfill makes the primary write 70 MB/s of WAL. Each replica replays it in one startup process, topping out near 50 MB/s, so lag grows ~0.3s every second. A third replica would replay the same WAL just as slowly: it adds read capacity, not freshness.",
+    "notes": [
+     {
+      "panel": "wal",
+      "metric": "wal_replay",
+      "text": "Replay held flat at its ~50 MB/s ceiling; 70 MB/s arrives"
+     },
+     {
+      "panel": "lag",
+      "text": "Lag grows at the gap: ~0.3s per second"
+     }
+    ]
+   }
+  },
+  {
+   "t": 122,
+   "feed": {
+    "from": "Dan · #infra-oncall",
+    "kind": "chat",
+    "text": "two fixes: app reads its own writes from primary, and Priya throttles the backfill"
+   },
+   "effects": [
+    {
+     "target": "r1",
+     "label": "lag 22s"
+    },
+    {
+     "target": "r2",
+     "label": "lag 22s"
+    }
+   ]
+  },
+  {
+   "t": 130,
+   "title": "Read-your-writes routing",
+   "feed": {
+    "from": "deploy-bot",
+    "kind": "deploy",
+    "text": "profile-api v2.14: after a write, store commit LSN in session; read from primary until replica replay_lsn ≥ it"
+   },
+   "effects": [
+    {
+     "target": "api",
+     "color": "teal",
+     "intensity": 0.4,
+     "label": "v2.14 · LSN-aware",
+     "badge": "RYW"
+    },
+    {
+     "target": "e-write",
+     "flow": 0.8,
+     "color": "teal"
+    },
+    {
+     "target": "e-read2",
+     "color": "blue",
+     "flow": 0.4
+    },
+    {
+     "target": "e-read1",
+     "flow": 0.4
+    },
+    {
+     "target": "browser",
+     "color": "green",
+     "intensity": 0.4,
+     "label": "refresh: Maya R. ✓"
+    },
+    {
+     "target": "r2",
+     "color": "red",
+     "intensity": 0.4,
+     "label": "lag 25s"
+    }
+   ],
+   "metrics": [
+    {
+     "id": "stale",
+     "to": 0.2,
+     "over_s": 10
+    },
+    {
+     "id": "primary_reads",
+     "to": 1100,
+     "over_s": 10
+    }
+   ]
+  },
+  {
+   "t": 143,
+   "title": "Fresh reads, still lagging",
+   "beat": {
+    "focus": [
+     "api",
+     "primary",
+     "e-write",
+     "panel:stale",
+     "panel:primary_reads"
+    ],
+    "hint": "Lag is still ~28s, yet nobody sees their old name. A user who just wrote reads from the primary until a replica has replayed past their commit LSN (pg_last_wal_replay_lsn). The cost: those reads now land on the primary.",
+    "notes": [
+     {
+      "panel": "stale",
+      "text": "Stale reads gone even though replicas are still behind"
+     },
+     {
+      "panel": "primary_reads",
+      "text": "Cost: ~1,100 qps of recent-writer reads moved to primary"
+     }
+    ]
+   }
+  },
+  {
+   "t": 158,
+   "feed": {
+    "from": "Priya · #data-eng",
+    "kind": "chat",
+    "text": "sorry! switching to 5k batches + pg_sleep while replay_lag > 2s"
+   }
+  },
+  {
+   "t": 165,
+   "title": "Backfill throttled",
+   "feed": {
+    "from": "backfill_user_tz",
+    "kind": "deploy",
+    "text": "restart: batch 5000 rows, pause when max(replay_lag) > 2s"
+   },
+   "effects": [
+    {
+     "target": "backfill",
+     "color": "grey",
+     "intensity": 0.4,
+     "pulse": false,
+     "label": "throttled · 5k/batch"
+    },
+    {
+     "target": "e-bf",
+     "flow": 0.25,
+     "color": null
+    },
+    {
+     "target": "primary",
+     "color": "teal",
+     "intensity": 0.25
+    }
+   ],
+   "metrics": [
+    {
+     "id": "wal_gen",
+     "to": 15,
+     "over_s": 6
+    },
+    {
+     "id": "lag",
+     "to": 0.1,
+     "over_s": 72,
+     "shape": "linear"
+    }
+   ]
+  },
+  {
+   "t": 182,
+   "title": "Why the lag drains",
+   "beat": {
+    "focus": [
+     "backfill",
+     "r1",
+     "r2",
+     "panel:wal",
+     "panel:lag"
+    ],
+    "hint": "WAL now arrives at 15 MB/s while replicas still replay at their 50 MB/s ceiling. The 2.4 GB backlog shrinks by ~35 MB/s, so lag falls steadily. A backfill that watches replay_lag paces itself to what the replicas can absorb.",
+    "notes": [
+     {
+      "panel": "wal",
+      "metric": "wal_gen",
+      "text": "Generation below replay capacity: backlog shrinks"
+     },
+     {
+      "panel": "lag",
+      "text": "Lag falls ~0.5s per second as the backlog drains"
+     }
+    ]
+   }
+  },
+  {
+   "t": 200,
+   "feed": {
+    "from": "pg-primary",
+    "kind": "log",
+    "text": "pg_stat_replication: pg-replica-2 replay_lag=00:00:18.2 (catching up)"
+   },
+   "effects": [
+    {
+     "target": "r1",
+     "color": "amber",
+     "intensity": 0.4,
+     "pulse": false,
+     "label": "lag 18s"
+    },
+    {
+     "target": "r2",
+     "color": "amber",
+     "intensity": 0.4,
+     "pulse": false,
+     "label": "lag 18s"
+    }
+   ]
+  },
+  {
+   "t": 238,
+   "feed": {
+    "from": "pg-primary",
+    "kind": "log",
+    "text": "pg_stat_replication: replay_lag=00:00:00.09 on both standbys"
+   },
+   "effects": [
+    {
+     "target": "r1",
+     "color": "blue",
+     "intensity": 0.2,
+     "label": "lag 90ms"
+    },
+    {
+     "target": "r2",
+     "color": "blue",
+     "intensity": 0.2,
+     "label": "lag 90ms"
+    },
+    {
+     "target": "e-read1",
+     "flow": 0.5
+    },
+    {
+     "target": "e-read2",
+     "flow": 0.5
+    },
+    {
+     "target": "e-write",
+     "flow": 0.25
+    }
+   ],
+   "metrics": [
+    {
+     "id": "wal_replay",
+     "to": 15,
+     "over_s": 6
+    },
+    {
+     "id": "primary_reads",
+     "to": 180,
+     "over_s": 12
+    }
+   ]
+  },
+  {
+   "t": 244,
+   "feed": {
+    "from": "Dan · #infra-oncall",
+    "kind": "chat",
+    "text": "primary reads dropped back on their own: replicas pass the LSN check again, so v2.14 stops pinning"
+   }
+  },
+  {
+   "t": 250,
+   "title": "Backfill done",
+   "feed": {
+    "from": "backfill_user_tz",
+    "kind": "deploy",
+    "text": "done: 42,000,000 rows updated, max replay_lag 1.9s since throttle"
+   },
+   "effects": [
+    {
+     "target": "backfill",
+     "color": null,
+     "intensity": 0,
+     "label": "done"
+    },
+    {
+     "target": "e-bf",
+     "flow": 0
+    },
+    {
+     "target": "e-wal1",
+     "flow": 0.2,
+     "width": null
+    },
+    {
+     "target": "e-wal2",
+     "flow": 0.2,
+     "width": null
+    }
+   ],
+   "metrics": [
+    {
+     "id": "wal_gen",
+     "to": 8,
+     "over_s": 8
+    },
+    {
+     "id": "wal_replay",
+     "to": 8,
+     "over_s": 8
+    }
+   ]
+  },
+  {
+   "t": 262,
+   "title": "Recovered",
+   "beat": {
+    "focus": [
+     "primary",
+     "r1",
+     "r2",
+     "api"
+    ],
+    "hint": "Replication lag never goes to zero, it only gets small. Treat replicas as slightly in the past: route a user's reads after their own write by LSN, and pace bulk writes to what replay can absorb.",
+    "notes": [
+     {
+      "panel": "lag",
+      "text": "Lag back under 100ms after the backlog drained"
+     },
+     {
+      "panel": "primary_reads",
+      "text": "Primary reads back to normal: LSN check passes on replicas"
+     }
+    ]
+   }
+  },
+  {
+   "t": 285,
+   "feed": {
+    "from": "support-bot",
+    "kind": "chat",
+    "text": "ticket #88213 closed: 'all good now, thanks'"
+   }
+  }
+ ],
+ "report": {
+  "tldr": "A bulk backfill made the primary write WAL faster than replicas could replay it. Lag grew to ~35s, so reads routed to replicas returned rows from before the user's own save.",
+  "fix_t": 130,
+  "sparkline": "lag",
+  "chain": [
+   {
+    "id": "bf",
+    "kind": "cause",
+    "text": "Backfill: 50k-row batches, no pause"
+   },
+   {
+    "id": "wal",
+    "kind": "effect",
+    "text": "Primary writes 70 MB/s of WAL"
+   },
+   {
+    "id": "replay",
+    "kind": "amp",
+    "text": "Single-threaded replay caps at 50 MB/s"
+   },
+   {
+    "id": "lag",
+    "kind": "effect",
+    "text": "Replica lag grows to ~35s"
+   },
+   {
+    "id": "stale",
+    "kind": "effect",
+    "text": "Read after save hits replica: old name"
+   },
+   {
+    "id": "fix",
+    "kind": "fix",
+    "text": "Fix: LSN-aware reads + throttled backfill"
+   }
+  ],
+  "stats": [
+   {
+    "label": "Peak replay lag",
+    "metric": "lag",
+    "unit": "s",
+    "agg": "max"
+   },
+   {
+    "label": "Peak stale reads",
+    "metric": "stale",
+    "unit": "%",
+    "agg": "max"
+   },
+   {
+    "label": "Peak reads on primary",
+    "metric": "primary_reads",
+    "unit": "qps",
+    "agg": "max"
+   }
+  ],
+  "learnings": [
+   {
+    "glyph": "⇢",
+    "title": "Read your writes from fresh data",
+    "body": "After a write, route that user's reads to the primary until a replica's replay LSN passes the commit LSN."
+   },
+   {
+    "glyph": "⏱",
+    "title": "Pace bulk writes to replay",
+    "body": "Batch backfills and pause while replay_lag is high; replicas replay WAL in one process."
+   },
+   {
+    "glyph": "✕",
+    "title": "More replicas ≠ fresher reads",
+    "body": "Every replica replays the same WAL at the same speed; scale reads, not freshness."
+   },
+   {
+    "glyph": "◔",
+    "title": "Alert on lag, not just uptime",
+    "body": "Watch pg_stat_replication.replay_lag; a streaming replica can be healthy and 30s behind."
+   }
+  ]
+ }
+}
