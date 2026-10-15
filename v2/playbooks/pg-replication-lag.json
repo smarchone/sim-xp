@@ -235,7 +235,8 @@
    "threshold": {
     "value": 5,
     "label": "alert 5s"
-   }
+   },
+   "why": "How far a replica is behind the primary. Anything a user reads from a lagging replica can be stale."
   },
   {
    "id": "wal",
@@ -243,7 +244,8 @@
    "metrics": [
     "wal_gen",
     "wal_replay"
-   ]
+   ],
+   "why": "The primary writes WAL; each replica must replay it. When generated outruns replayed, a backlog builds."
   },
   {
    "id": "stale",
@@ -254,21 +256,24 @@
    "threshold": {
     "value": 5,
     "label": "alert 5%"
-   }
+   },
+   "why": "The user-visible symptom: a read right after your own write returns the old value."
   },
   {
    "id": "primary_reads",
    "title": "Reads served by primary",
    "metrics": [
     "primary_reads"
-   ]
+   ],
+   "why": "The cost of the fix: reads pinned to the primary add load to the one server that takes all writes."
   },
   {
    "id": "bf_rows",
    "title": "Backfill rows / s",
    "metrics": [
     "bf_rows"
-   ]
+   ],
+   "why": "The trigger. The backfill's speed sets how much WAL the primary produces."
   },
   {
    "id": "replica_cpu",
@@ -276,7 +281,8 @@
    "metrics": [
     "replica_cpu"
    ],
-   "max": 100
+   "max": 100,
+   "why": "Rules out the obvious wrong fix: replicas are not busy, so more hardware would not help."
   },
   {
    "id": "primary_cpu",
@@ -284,28 +290,32 @@
    "metrics": [
     "primary_cpu"
    ],
-   "max": 100
+   "max": 100,
+   "why": "Shows what the backfill and the pinned reads cost the primary."
   },
   {
    "id": "api_p99",
    "title": "profile-api p99",
    "metrics": [
     "api_p99"
-   ]
+   ],
+   "why": "What users feel on the API. Reads moved to the primary get a bit slower."
   },
   {
    "id": "tickets",
    "title": "Support tickets / 5 min",
    "metrics": [
     "tickets"
-   ]
+   ],
+   "why": "The business signal. Support tickets are often the first alarm for stale reads."
   },
   {
    "id": "wal_disk",
    "title": "WAL on disk (replica-2)",
    "metrics": [
     "wal_disk"
-   ]
+   ],
+   "why": "The backlog itself: WAL the replica has received but not yet replayed."
   }
  ],
  "alerts": [

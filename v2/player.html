@@ -20,7 +20,7 @@
   --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;
   --serif:"Newsreader",Georgia,"Times New Roman",serif;
   --mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
-  --s:10px; --m:11.5px; --l:14px;
+  --s:12.5px; --m:14.4px; --l:17.5px;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#131311; --panel:#1b1b18; --sunk:#22221e; --line:#2c2b27; --line2:#3a3933; --fg:#e8e3d8; --muted:#9c9585; --faint:#6b6657; --node:#21211d; --glass:rgba(27,27,24,.96);
@@ -63,12 +63,15 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--p
 .feed .fh b{font-weight:600;color:var(--muted)}
 .feedbox{position:relative;flex:1;min-height:0}
 .feed ol{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 10px);mask-image:linear-gradient(to bottom,transparent 0,#000 10px);position:absolute;inset:0;list-style:none;margin:0;padding:0 6px 6px;overflow-y:auto;scroll-behavior:smooth;scrollbar-width:thin}
-.feed li{display:grid;grid-template-columns:30px minmax(0,1fr);gap:8px;align-items:baseline;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:var(--s);line-height:1.4;box-shadow:inset 2px 0 0 transparent}
+.feed li{display:grid;grid-template-columns:var(--tcol,38px) minmax(0,1fr);gap:8px;align-items:baseline;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:var(--s);line-height:1.4;box-shadow:inset 2px 0 0 transparent}
 .feed li .msg{overflow-wrap:anywhere}
 .feed li .who{margin-right:6px}
 .feed li:hover{background:var(--sunk)}
-.feed li{transition:font-size .25s ease,background .25s ease}
-.feed li.near{font-size:var(--m);background:color-mix(in srgb,var(--accent) 12%,transparent);box-shadow:inset 3px 0 0 var(--accent);padding-top:4px;padding-bottom:4px}
+.feed li{transition:background .3s ease,box-shadow .3s ease,color .3s ease}
+.feed li.near{background:color-mix(in srgb,var(--accent) 12%,transparent);box-shadow:inset 3px 0 0 var(--accent)}
+.feed li.key{background:color-mix(in srgb,var(--amber) 9%,transparent);box-shadow:inset 2px 0 0 color-mix(in srgb,var(--amber) 70%,transparent)}
+.feed li.key .txt{color:var(--fg)}
+.feed li.key .who{color:var(--fg);font-weight:500}
 .feed li.near .txt,.feed li.near .who{color:var(--fg)}
 .feed li.near time{color:var(--muted)}
 .feed li.fresh{animation:arrive .6s ease-out}
@@ -83,8 +86,12 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--p
 
 /* charts: same size, tight gaps */
 .panel{display:flex;flex-direction:column;padding:6px 10px 4px;min-width:0;min-height:0}
-.panel-h{display:flex;align-items:baseline;gap:10px;min-height:18px;white-space:nowrap;min-width:0;font-size:var(--s)}
+.panel-h{position:relative;display:flex;align-items:baseline;gap:8px;min-height:23px;white-space:nowrap;min-width:0;font-size:var(--s)}
 .panel-h b{font-weight:600;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+.panel .why{position:static;display:inline-grid;place-items:center;flex:none;width:15px;height:15px;border-radius:50%;border:1px solid var(--line2);color:var(--faint);font:500 10px var(--sans);cursor:help;transition:color .2s,border-color .2s,background .2s;align-self:center}
+.panel .why:hover,.panel .why:focus-visible{color:var(--accent);border-color:var(--accent);outline:none}
+.panel .why .tip{position:absolute;left:0;right:0;top:calc(100% + 3px);z-index:9;padding:8px 10px;border-radius:8px;background:var(--glass);border:1px solid var(--line2);box-shadow:0 8px 22px rgba(0,0,0,.16);color:var(--fg);font:400 var(--s)/1.45 var(--sans);white-space:normal;opacity:0;visibility:hidden;transform:translateY(-3px);transition:opacity .18s ease,transform .18s ease,visibility .18s;pointer-events:none}
+.panel .why:hover .tip,.panel .why:focus-visible .tip{opacity:1;visibility:visible;transform:none}
 .panel .legend{display:flex;gap:10px;color:var(--faint);overflow:hidden}
 .panel .legend i{display:inline-block;width:10px;height:2px;margin-right:4px;vertical-align:middle}
 .panel .val{margin-left:auto;font:500 var(--m) var(--mono);font-variant-numeric:tabular-nums;text-align:right;color:var(--fg)}
@@ -93,21 +100,21 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--p
 .plot{position:relative;flex:1;min-height:0}
 .plot svg{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
 .panel.lane{flex:none}
-.panel.lane .plot{flex:none;height:34px}
+.panel.lane .plot{flex:none;height:42px}
 
 /* ---------- no play bar: progress hairline + status chip + corner menus ---------- */
 .progress{position:fixed;top:0;left:0;right:0;height:2px;z-index:15;pointer-events:none}
 .progress i{display:block;height:100%;width:0;background:var(--accent)}
-.masthead{display:flex;align-items:center;gap:10px;min-height:26px;min-width:0}
+.masthead{display:flex;align-items:center;gap:10px;min-height:32px;min-width:0}
 .hud{margin-left:auto;display:flex;align-items:center;gap:6px;position:relative;flex:none}
-.status{display:flex;align-items:center;gap:6px;font-size:var(--s);color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px 10px;max-width:520px;transition:opacity .35s ease}
+.status{display:flex;align-items:center;gap:6px;font-size:var(--s);color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px 10px;max-width:640px;transition:opacity .35s ease}
 .status b{color:var(--fg);font:500 var(--s) var(--mono);font-variant-numeric:tabular-nums}
-.status .ch{color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px}
+.status .ch{color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:330px}
 .status .ic{width:10px;text-align:center;color:var(--accent)}
 .status.flash{border-color:var(--accent)}
 .app.playing:not(.hovering) .status:not(:hover):not(.flash){opacity:.4}
-.iconbtn{width:26px;height:26px;padding:0;border-radius:999px;display:grid;place-items:center;font-size:var(--m);color:var(--muted);border-color:var(--line)}
-.menu{position:absolute;top:calc(100% + 6px);right:0;width:270px;z-index:30;padding:10px 12px 10px;gap:4px}
+.iconbtn{width:32px;height:32px;padding:0;border-radius:999px;display:grid;place-items:center;font-size:var(--m);color:var(--muted);border-color:var(--line)}
+.menu{position:absolute;top:calc(100% + 6px);right:0;width:330px;z-index:30;padding:10px 12px 10px;gap:4px}
 .menu .mi{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:left;background:none;border-color:transparent;padding:5px 6px}
 .menu .mi:hover:not(:disabled){background:var(--sunk)}
 .menu .mi:disabled{color:var(--faint);cursor:default}
@@ -134,9 +141,9 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--p
 
 /* svg text: two sizes only */
 /* components text is sized for the screen, not the viewBox: ~10.5px names and ~9px labels whatever the graph's scale (set from JS) */
-.t{fill:var(--fg);font:600 var(--ct,10.5px) var(--sans)}
-.ts{fill:var(--muted);font:var(--cs,9px) var(--mono)}
-.tp{fill:var(--fg);font:500 var(--cs,9px) var(--mono)}
+.t{fill:var(--fg);font:600 var(--ct,16.4px) var(--sans)}
+.ts{fill:var(--muted);font:var(--cs,14px) var(--mono)}
+.tp{fill:var(--fg);font:500 var(--cs,14px) var(--mono)}
 .axis{fill:var(--faint);font:var(--s) var(--mono);font-variant-numeric:tabular-nums}
 .alab{font:500 var(--s) var(--mono);paint-order:stroke;stroke:var(--panel);stroke-width:3px}
 .grid{stroke:var(--line);stroke-width:1}
@@ -178,9 +185,9 @@ kbd{font:500 var(--s) var(--mono);color:var(--muted);border:1px solid var(--line
 .modal{width:min(560px,100%);max-height:calc(100dvh - 32px)}
 .modal.wide{width:min(680px,100%)}
 /* key moment: a compact sheet that rises from the bottom of the components view (overlay, never pushes layout) */
-.sheet{position:absolute;left:0;right:0;bottom:0;z-index:3;max-height:calc(100% - 12px);display:flex;flex-direction:column;background:var(--glass);border-top:1px solid var(--line2);border-radius:8px 8px 0 0;transform:translateY(calc(100% - 20px));transition:transform .38s cubic-bezier(.2,.8,.2,1),box-shadow .38s,border-color .38s}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:3;max-height:calc(100% - 12px);display:flex;flex-direction:column;background:var(--glass);border-top:1px solid var(--line2);border-radius:8px 8px 0 0;transform:translateY(calc(100% - 25px));transition:transform .38s cubic-bezier(.2,.8,.2,1),box-shadow .38s,border-color .38s}
 .sheet.open{transform:none;border-top-color:color-mix(in srgb,var(--accent) 60%,transparent);box-shadow:0 -8px 22px rgba(0,0,0,.12)}
-.sheet .strip{flex:none;height:20px;line-height:20px;padding:0 10px;font-size:var(--s);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sheet .strip{flex:none;height:25px;line-height:25px;padding:0 10px;font-size:var(--s);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sheet.open .strip{display:none}
 .sheet .sb{display:flex;flex-direction:column;gap:2px;padding:6px 10px 7px;min-height:0;overflow-y:auto}
 .sheet .top{display:flex;align-items:baseline;gap:8px}
@@ -196,7 +203,7 @@ kbd{font:500 var(--s) var(--mono);color:var(--muted);border:1px solid var(--line
 .sheet .foot button{padding:2px 10px;font-size:var(--s)}
 .note{position:absolute;left:0;top:0;z-index:2;pointer-events:none;opacity:0;transition:opacity .3s}
 .note.show{opacity:1}
-.note .nl{position:absolute;max-width:220px;padding:4px 8px;font-size:var(--s);line-height:1.35;color:var(--fg);background:var(--glass);border:1px solid color-mix(in srgb,var(--accent) 60%,transparent);border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.18);white-space:normal}
+.note .nl{position:absolute;max-width:275px;padding:4px 8px;font-size:var(--s);line-height:1.35;color:var(--fg);background:var(--glass);border:1px solid color-mix(in srgb,var(--accent) 60%,transparent);border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.18);white-space:normal}
 .note svg{position:absolute;inset:0;overflow:visible}
 @media (prefers-reduced-motion:reduce){.note{transition:none}}
 @media (prefers-reduced-motion:reduce){.sheet{transition:none}.feed li{transition:none!important}}
@@ -207,49 +214,49 @@ kbd{font:500 var(--s) var(--mono);color:var(--muted);border:1px solid var(--line
 /* reading screens: intro and report. One calm column, serif prose. */
 .modal.report{width:min(720px,100%)}
 .modal.intro{width:min(max(60vw,760px),100%);max-height:calc(100dvh - 32px);padding:22px 28px 16px;gap:10px}
-.intro h2{font:500 28px/1.15 var(--serif);letter-spacing:-.01em}
-.intro .hook{font:400 17px/1.5 var(--serif);color:var(--fg);margin:0;text-wrap:pretty}
+.intro h2{font:500 35px/1.15 var(--serif);letter-spacing:-.01em}
+.intro .hook{font:400 21.2px/1.5 var(--serif);color:var(--fg);margin:0;text-wrap:pretty}
 .intro .icols{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:28px;margin-top:6px;overflow-y:auto;min-height:0}
 .intro .icols.one{grid-template-columns:minmax(0,1fr)}
 .intro .story,.intro .side{display:flex;flex-direction:column;gap:14px;min-width:0}
 .intro h4{margin:0 0 3px;font-size:var(--s);font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.intro .story p{font:400 15px/1.6 var(--serif);color:var(--fg)}
+.intro .story p{font:400 18.8px/1.6 var(--serif);color:var(--fg)}
 .intro ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px}
-.intro li{font-size:12.5px;line-height:1.45;color:var(--fg)}
+.intro li{font-size:15.6px;line-height:1.45;color:var(--fg)}
 .intro .cast li b{font-weight:600}
 .intro .cast li span{color:var(--muted)}
 .intro .watch li{display:flex;gap:8px;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--line);padding-bottom:4px}
-.intro .watch li em{font:normal 11px var(--mono);color:var(--green);white-space:nowrap}
+.intro .watch li em{font:normal 13.8px var(--mono);color:var(--green);white-space:nowrap}
 .intro .learn li{padding-left:16px;position:relative}
 .intro .learn li::before{content:"→";position:absolute;left:0;color:var(--accent)}
 .rp{display:flex;flex-direction:column;gap:20px;padding:4px 2px 6px}
 .rp h4{margin:0 0 6px;font-size:var(--s);font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.modal.report h2{font:500 26px/1.15 var(--serif);letter-spacing:-.01em}
-.rp-tldr{font:400 19px/1.5 var(--serif);margin:0;text-wrap:pretty}
-.rp-num{width:100%;border-collapse:collapse;font-size:12.5px}
+.modal.report h2{font:500 32.5px/1.15 var(--serif);letter-spacing:-.01em}
+.rp-tldr{font:400 23.8px/1.5 var(--serif);margin:0;text-wrap:pretty}
+.rp-num{width:100%;border-collapse:collapse;font-size:15.6px}
 .rp-num th{font-size:var(--s);font-weight:500;color:var(--muted);text-align:right;padding:0 0 4px}
 .rp-num th:first-child{text-align:left}
 .rp-num td{padding:5px 0;border-top:1px solid var(--line);font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
 .rp-num td:first-child{font-family:var(--sans);text-align:left;color:var(--fg)}
 .rp-num .bf{color:var(--red)} .rp-num .af{color:var(--green)}
 .rp-chain{list-style:none;margin:0;padding:0 0 0 14px;border-left:2px solid var(--line2);display:flex;flex-direction:column;gap:8px}
-.rp-chain li{display:flex;gap:10px;align-items:baseline;font:400 15px/1.45 var(--serif);position:relative}
+.rp-chain li{display:flex;gap:10px;align-items:baseline;font:400 18.8px/1.45 var(--serif);position:relative}
 .rp-chain li::before{content:"";position:absolute;left:-20px;top:.5em;width:8px;height:8px;border-radius:50%;background:var(--panel);border:2px solid var(--line2)}
-.rp-chain .tag{flex:none;width:68px;font:600 9.5px var(--sans);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.rp-chain .tag{flex:none;width:86px;font:600 11.9px var(--sans);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
 .rp-chain .k-cause .tag{color:var(--amber)} .rp-chain .k-amp .tag{color:var(--red)} .rp-chain .k-fix .tag{color:var(--green)}
 .rp-chain .k-cause::before{border-color:var(--amber)} .rp-chain .k-amp::before{border-color:var(--red)} .rp-chain .k-fix::before{border-color:var(--green)}
-.rp-loop{margin:12px 0 0;font:italic 400 14px/1.5 var(--serif);color:var(--muted)}
+.rp-loop{margin:12px 0 0;font:italic 400 17.5px/1.5 var(--serif);color:var(--muted)}
 .rp-loop b{font-style:normal;color:var(--red);font-weight:500}
-.rp-math{font:12px/1.7 var(--mono);background:var(--sunk);border-radius:8px;padding:10px 14px;margin:0;white-space:pre-wrap;max-height:none;overflow:visible}
+.rp-math{font:15px/1.7 var(--mono);background:var(--sunk);border-radius:8px;padding:10px 14px;margin:0;white-space:pre-wrap;max-height:none;overflow:visible}
 .rp-take{list-style:none;counter-reset:t;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
 .rp-take li{counter-increment:t;display:grid;grid-template-columns:22px minmax(0,1fr);gap:4px 8px}
-.rp-take li::before{content:counter(t);font:500 12px var(--mono);color:var(--accent);padding-top:3px}
-.rp-take b{font:600 14px/1.4 var(--sans)}
-.rp-take span{grid-column:2;font:400 15px/1.55 var(--serif);color:var(--fg)}
+.rp-take li::before{content:counter(t);font:500 15px var(--mono);color:var(--accent);padding-top:3px}
+.rp-take b{font:600 17.5px/1.4 var(--sans)}
+.rp-take span{grid-column:2;font:400 18.8px/1.55 var(--serif);color:var(--fg)}
 .rp-myth{border-left:2px solid var(--line2);padding:2px 0 2px 12px;margin:0 0 10px}
-.rp-myth q{font:italic 400 15px/1.5 var(--serif);color:var(--muted);quotes:"\201C" "\201D"}
-.rp-myth p{margin:3px 0 0;font:400 15px/1.55 var(--serif)}
-.rp-links{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px}
+.rp-myth q{font:italic 400 18.8px/1.5 var(--serif);color:var(--muted);quotes:"\201C" "\201D"}
+.rp-myth p{margin:3px 0 0;font:400 18.8px/1.55 var(--serif)}
+.rp-links{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:15.6px}
 .rp-links a{color:var(--accent)}
 
 /* reviewer-only section */
@@ -358,7 +365,27 @@ const NS = "http://www.w3.org/2000/svg";
 const el = (tag, attrs = {}, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
 const COLORS = ["red","amber","green","blue","teal","violet","pink","grey"];
 const col = c => c == null ? null : COLORS.includes(c) ? `var(--${c})` : c;
-const fmtT = t => { t = Math.max(0, Math.floor(t)); return String(Math.floor(t / 60)).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0"); };
+// Story time. By default one playbook second is one story second; meta.clock { start?, scale?, changes? } makes a long story
+// (hours, days, months) show its real time on the clock, the feed, the axes and the key moments while playback stays short.
+const CLOCK = PB.meta.clock || {};
+const segs = [{ t: 0, k: CLOCK.scale > 0 ? CLOCK.scale : 1 }, ...(CLOCK.changes || []).filter(c => c.scale > 0).sort((a, b) => a.t - b.t).map(c => ({ t: c.t, k: c.scale }))];
+const storyS = t => { let s = 0; for (let i = 0; i < segs.length; i++) { const a = segs[i].t, b = i + 1 < segs.length ? segs[i + 1].t : Infinity; if (t <= a) break; s += (Math.min(t, b) - a) * segs[i].k; } return s; };
+const T0 = CLOCK.start ? Date.parse(CLOCK.start) : NaN, TOTAL = storyS(D), MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const p2 = n => String(n).padStart(2, "0");
+const fmtT = t => {
+  const s = Math.max(0, Math.floor(storyS(Math.max(0, t))));
+  if (!isNaN(T0)) {
+    const d = new Date(T0 + s * 1000), hm = `${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}`;
+    if (TOTAL < 3 * 3600) return `${hm}:${p2(d.getUTCSeconds())}`;
+    const day = `${MON[d.getUTCMonth()]} ${d.getUTCDate()}${TOTAL >= 300 * 86400 ? ", " + d.getUTCFullYear() : ""}`;
+    return TOTAL < 14 * 86400 ? `${day} ${hm}` : day;
+  }
+  const dd = Math.floor(s / 86400), r = s % 86400, hh = Math.floor(r / 3600), mm = Math.floor((r % 3600) / 60), ss = r % 60;
+  if (TOTAL < 3600) return `${p2(mm)}:${p2(ss)}`;
+  if (TOTAL < 86400) return `${hh}:${p2(mm)}:${p2(ss)}`;
+  return TOTAL < 14 * 86400 ? `Day ${dd + 1} ${p2(hh)}:${p2(mm)}` : `Day ${dd + 1}`;
+};
+const humanDur = s => s < 90 ? `${Math.round(s)} s` : s < 5400 ? `${Math.round(s / 60)} min` : s < 172800 ? `${Math.round(s / 3600)} hours` : s < 86400 * 90 ? `${Math.round(s / 86400)} days` : s < 86400 * 730 ? `${Math.round(s / 86400 / 30.4)} months` : `${Math.round(s / 86400 / 365)} years`;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 // metric series: keyframes + shape, plus deterministic jitter (unchanged)
@@ -401,7 +428,10 @@ function stateAt(T) {
   PB.timeline.forEach(e => { if (e.t <= T) (e.effects || []).forEach(apply); });
   return st;
 }
+const beatTimes = new Set(PB.timeline.filter(e => e.beat).map(e => e.t));
 const feedItems = PB.timeline.filter(e => e.feed).map(e => ({ t: e.t, ...e.feed })).concat(alertFeed).sort((a, b) => a.t - b.t);
+feedItems.forEach(f => (f.key = f.key === true || beatTimes.has(f.t) || f.kind === "alert" || f.kind === "resolved"));
+$("#feedCard").style.setProperty("--tcol", (Math.max(...feedItems.map(f => fmtT(f.t).length), 5) * 0.62 + 0.4).toFixed(1) + "em");
 const beats = PB.timeline.filter(e => e.beat);
 const titled = PB.timeline.filter(e => e.title);
 // chapters = the key moments; chapter i runs from its beat (the first one from 0) to the next beat
@@ -584,7 +614,7 @@ let compText = null;
 function fitCompText() {
   const r = comp.getBoundingClientRect(), vb = LAYOUTS[layoutKey].vb; if (!r.width) return;
   const sc = Math.min(r.width / vb[0], r.height / vb[1]) || 1;
-  const ct = Math.min(11.5, Math.max(8.5, 10.5 / sc)), cs = Math.min(10, Math.max(7.5, 9 / sc));
+  const ct = Math.min(14.4, Math.max(10.6, 13.1 / sc)), cs = Math.min(12.5, Math.max(9.4, 11.25 / sc));
   if (compText && Math.abs(compText.ct - ct) < 0.05 && Math.abs(compText.cs - cs) < 0.05) return;
   compText = { ct, cs, charW: cs * 0.62 };
   comp.style.setProperty("--ct", ct.toFixed(2) + "px"); comp.style.setProperty("--cs", cs.toFixed(2) + "px");
@@ -601,7 +631,7 @@ new ResizeObserver(() => { if (pickLayout() !== layoutKey) { buildComponents(); 
    - count metrics (rebalances) are events, not a curve: they become an event lane under the charts,
      and their steps (plus deploys) are drawn as annotations on every chart;
    - annotations and the event lane only show what has happened so far (no spoilers). */
-const PL = 46, PR = 12;
+const PL = 58, PR = 14;
 // one colour for data. In a multi-series panel the first series is the reference (e.g. produced) and is drawn quietly;
 // teal/violet/pink stay reserved for partition ownership in the components view
 const seriesColor = (P, i) => P.p.metrics.length > 1 && i === 0 ? "var(--muted)" : "var(--accent)";
@@ -624,9 +654,11 @@ const dash = $("#dash"), dashGrid = $("#dashgrid");
 const panels = [...PB.dashboard.filter(p => !isEvent(p)), ...PB.dashboard.filter(isEvent)].map(p => {
   const kind = isEvent(p) ? "lane" : "chart", units = metricById[p.metrics[0]].unit;
   const card = document.createElement("div"); card.className = `pn panel ${kind} dimmable`; card.dataset.id = "panel:" + p.id;
+  const whyText = p.why || metricById[p.metrics[0]].why || "";
+  const whyHTML = whyText ? `<span class="why" tabindex="0" role="note" aria-label="Why this matters">i<span class="tip"><b>Why it matters.</b> ${esc(whyText)}</span></span>` : "";
   const unitTxt = units === "msg/s" ? "msg/s" : units === "msgs" ? "msgs" : "";
   const legend = p.metrics.length > 1 ? `<span class="legend">${p.metrics.map((m, i) => `<span><i style="background:${seriesColor({ p }, i)}"></i>${esc(metricById[m].label)}</span>`).join("")}</span>` : "";
-  card.innerHTML = `<div class="panel-h"><b>${esc(p.title)}</b>${legend}<span class="val"></span></div><div class="plot"></div>`;
+  card.innerHTML = `<div class="panel-h"><b>${esc(p.title)}</b>${whyHTML}${legend}<span class="val"></span></div><div class="plot"></div>`;
   (kind === "lane" ? dash : dashGrid).appendChild(card);
   const plot = card.querySelector(".plot"), svg = el("svg", {}, plot);
   const P = { p, kind, units, unitTxt, card, plot, svg, val: card.querySelector(".val"), W: 0, H: 0, xOf: xOfW(600), tOf: tOfW(600), yOf: () => 0, lines: [], dots: [], annoEls: [] };
@@ -643,7 +675,7 @@ function buildPanel(P) {
   if (P.kind === "lane") {
     const y = 11;
     el("line", { x1: PL, x2: W - PR, y1: y, y2: y, class: "grid" }, svg);
-    for (let m = 0; m <= D; m += 60) { const tx = el("text", { x: xOf(m), y: H - 2, class: "axis", "text-anchor": m === 0 ? "start" : m >= D ? "end" : "middle" }, svg); tx.textContent = m / 60 + "m"; }
+    for (let i = 0; i <= 4; i++) { const m = (D * i) / 4, tx = el("text", { x: xOf(m), y: H - 2, class: "axis", "text-anchor": i === 0 ? "start" : i === 4 ? "end" : "middle" }, svg); tx.textContent = fmtT(m); }
     annos.forEach(a => {
       const g = el("g", {}, svg), dep = a.kind === "deploy";
       el("circle", { cx: xOf(a.t), cy: y, r: dep ? 3 : 3.5, fill: dep ? "var(--faint)" : "var(--red)" }, g);
@@ -682,7 +714,7 @@ function placeNote(P, viewT) {
   const lane = P.kind === "lane", x = P.xOf(t), y = lane ? 11 : P.yOf(at(m, t));
   lab.style.whiteSpace = lane ? "nowrap" : ""; lab.style.padding = lane ? "1px 8px" : "";
   const lo = PL + 4, hi = P.W - PR - 4; // stay right of the y-axis labels and inside the panel
-  lab.style.maxWidth = Math.min(220, hi - lo) + "px";
+  lab.style.maxWidth = Math.min(275, hi - lo) + "px";
   const w = lab.offsetWidth, h = lab.offsetHeight, gap = 14;
   let lx = x + gap <= hi - w ? x + gap : x - gap - w; lx = Math.max(lo, Math.min(hi - w, lx));
   let ly = y - h / 2; ly = Math.max(2, Math.min(P.H - h - 2, ly));
@@ -721,7 +753,7 @@ function renderPanels(playT, viewT) {
 
 /* ===================== Feed: always visible, one line per entry, linked to the shared cursor ===================== */
 const feedEl = $("#feed"); let feedShown = -1, feedNear = null, feedHoverLi = null;
-const liHTML = (f, fresh) => `<li class="k-${f.kind}${fresh ? " fresh" : ""}" data-i="${feedItems.indexOf(f)}" data-t="${f.t}"><time>${fmtT(f.t)}</time><span class="msg"><span class="who">${esc(f.from)}</span><span class="txt">${esc(f.text)}</span></span></li>`;
+const liHTML = (f, fresh) => `<li class="k-${f.kind}${f.key ? " key" : ""}${fresh ? " fresh" : ""}" data-i="${feedItems.indexOf(f)}" data-t="${f.t}"><time>${fmtT(f.t)}</time><span class="msg"><span class="who">${esc(f.from)}</span><span class="txt">${esc(f.text)}</span></span></li>`;
 function feedScrollTo(top, smooth) { if (!smooth) feedEl.style.scrollBehavior = "auto"; feedEl.scrollTop = top; if (!smooth) feedEl.style.scrollBehavior = ""; }
 function renderFeed(playT, viewT) {
   const vis = feedItems.filter(f => f.t <= playT);
@@ -747,8 +779,8 @@ function renderFeed(playT, viewT) {
     if (first && !feedHoverLi) setTimeout(() => { if (!first.isConnected) return; const top = first.offsetTop, bottom = top + first.offsetHeight * (feedEl.querySelectorAll(`li[data-t="${near}"]`).length); if (top < feedEl.scrollTop || bottom > feedEl.scrollTop + feedEl.clientHeight) feedScrollTo(Math.max(0, top - feedEl.clientHeight / 2), true); }, 260)
   }
 }
-feedEl.addEventListener("mouseover", e => { const li = e.target.closest("li[data-t]"); if (li && li !== feedHoverLi) { feedHoverLi = li; hoverT = +li.dataset.t; render(); } });
-feedEl.addEventListener("mouseleave", () => { feedHoverLi = null; hoverT = null; render(); });
+feedEl.addEventListener("mouseover", e => { const li = e.target.closest("li[data-t]"); if (li && li !== feedHoverLi) { feedHoverLi = li; hoverT = +li.dataset.t; } });
+feedEl.addEventListener("mouseleave", () => { feedHoverLi = null; hoverT = null; });
 feedEl.addEventListener("click", e => { const li = e.target.closest("li[data-t]"); if (li) seek(+li.dataset.t); });
 
 /* ===================== Caption (key moments only) ===================== */
@@ -776,7 +808,9 @@ const isOpen = el => !el.hidden && !el.classList.contains("leaving");
 /* ===================== Playback (implicit: Space, the status chip, or the keys) ===================== */
 let playT = 0, hoverT = null, playing = false, lastFrame = 0, speed = 4, activeBeat = null, reportSeen = false, ready = false, hudFlash = null;
 const SPEEDS = [2, 4, 8, 16], speedLabel = v => ({ 2: "0.5×", 4: "1×", 8: "2×", 16: "4×" })[v];
-const viewT = () => hoverT == null ? playT : Math.min(hoverT, playT);
+const wantT = () => hoverT == null ? playT : Math.min(hoverT, playT);
+let shownT = 0, lastNow = 0; // the cursor eases toward the hovered time instead of jumping
+const viewT = () => shownT;
 function render() {
   if (!ready) return;
   const v = viewT();
@@ -804,7 +838,7 @@ function setPlaying(p) {
   lastFrame = performance.now();
   if (ready) renderHud(viewT());
 }
-function seek(t) { hideBeat(); playT = Math.max(0, Math.min(D, t)); hoverT = null; render(); }
+function seek(t) { hideBeat(); playT = Math.max(0, Math.min(D, t)); hoverT = null; shownT = playT; render(); }
 function applyFocus(e) {
   document.querySelectorAll(".dimmable").forEach(d => d.classList.remove("focused"));
   $("#compCard").classList.add("focused");
@@ -839,12 +873,19 @@ function hideBeat() {
   activeBeat = null; panels.forEach(P => P.note && P.note.classList.remove("show")); $("#app").classList.remove("focus-mode"); $("#caption").classList.remove("open"); $("#beatGo").tabIndex = -1; fitAboveSheet(false);
 }
 function frame(now) {
+  const dt = Math.min(0.1, Math.max(0, (now - (lastNow || now)) / 1000)); lastNow = now;
+  const before = shownT, want = wantT();
+  if (playing && hoverT == null) shownT = want;
+  else if (Math.abs(want - shownT) > 0.02) shownT += (want - shownT) * (1 - Math.exp(-dt / 0.085));
+  else shownT = want;
+  const eased = shownT !== before;
   if (playing) {
     const prev = playT; playT = Math.min(D, playT + Math.max(0, (now - lastFrame) / 1000) * speed); lastFrame = Math.max(lastFrame, now);
     const b = beats.find(e => e.t > prev && e.t <= playT);
-    if (b) { playT = b.t; render(); showBeat(b); } else render();
+    if (playing && hoverT == null) shownT = playT;
+    if (b) { playT = b.t; shownT = playT; render(); showBeat(b); } else render();
     if (playT >= D) { setPlaying(false); render(); emit("end", { t: D }); if (!reportSeen) { reportSeen = true; openReport(); } }
-  }
+  } else if (eased) render();
   requestAnimationFrame(frame);
 }
 // Space does the one obvious thing for the current state
@@ -887,8 +928,8 @@ document.addEventListener("keydown", e => {
 });
 function hoverable(svg, toTime) {
   const toT = ev => { const r = svg.getBoundingClientRect(); const vb = svg.viewBox.baseVal; return toTime(((ev.clientX - r.left) / r.width) * (vb && vb.width ? vb.width : r.width)); };
-  svg.addEventListener("pointermove", ev => { if (ev.pointerType === "mouse") { hoverT = toT(ev); render(); } });
-  svg.addEventListener("pointerleave", () => { hoverT = null; render(); });
+  svg.addEventListener("pointermove", ev => { if (ev.pointerType === "mouse") { hoverT = toT(ev); } });
+  svg.addEventListener("pointerleave", () => { hoverT = null; });
   svg.addEventListener("click", ev => { const t = toT(ev); if (t <= playT) seek(t); });
 }
 
@@ -912,7 +953,7 @@ const chainHTML = () => {
 const safeUrl = u => /^https?:\/\//i.test(u) ? u : "#";
 const sec = (title, body) => body ? `<section><h4>${title}</h4>${body}</section>` : "";
 $("#report").innerHTML = `
-  <span class="eb">Report · ${fmtT(D)} · ${beats.length} key moments</span>
+  <span class="eb">Report · ${humanDur(TOTAL)} of story · ${beats.length} key moments</span>
   <h2 id="repT">${esc(PB.meta.title)}</h2>
   <div class="pbody"><div class="rp">
     <p class="rp-tldr">${esc(R.tldr)}</p>
@@ -982,7 +1023,7 @@ $("#introT").textContent = M.title; $("#introStory").textContent = M.story;
   box.innerHTML = (story ? `<div class="story">${story}</div>` : "") + (side ? `<div class="side">${side}</div>` : "");
   box.classList.toggle("one", !story || !side); box.hidden = !story && !side;
 }
-$("#introMeta").textContent = `Story · ${Math.round(D / 60)} min · ${beats.length} key moments${(M.tags || []).length ? " · " + M.tags.slice(0, 3).join(" · ") : ""}`;
+$("#introMeta").textContent = `Story · ${humanDur(TOTAL)}${TOTAL > D * 1.5 ? " (plays in ~" + Math.max(1, Math.round(D / 4 / 60)) + " min)" : ""} · ${beats.length} key moments${(M.tags || []).length ? " · " + M.tags.slice(0, 3).join(" · ") : ""}`;
 function startRun() { hideModal($("#intro"), () => renderHud(viewT())); seek(0); setPlaying(true); }
 $("#start").onclick = startRun;
 $("#pbTitle").textContent = PB.meta.title; document.title = PB.meta.title;

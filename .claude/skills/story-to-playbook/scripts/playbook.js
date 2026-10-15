@@ -55,6 +55,20 @@ export function validate(PB) {
   for (const k of ["id", "title", "story", "duration_s"]) if (m[k] == null) err(`meta.${k} is required`);
   const D = m.duration_s;
   if (!isNum(D) || D < 60 || D > 1800) err("meta.duration_s must be a number between 60 and 1800");
+  // real story time: scale = story seconds per playbook second; changes switch the scale at playbook second t
+  if (m.clock != null) {
+    const c = m.clock;
+    if (typeof c !== "object" || Array.isArray(c)) err("meta.clock must be { start?, scale?, changes? }");
+    else {
+      if (c.start != null && Number.isNaN(Date.parse(c.start))) err("meta.clock.start must be a date such as 2018-10-21T22:51:18Z");
+      if (c.scale != null && !(isNum(c.scale) && c.scale > 0)) err("meta.clock.scale must be a number > 0 (story seconds per playbook second)");
+      let last = -1;
+      for (const [i, ch] of (c.changes || []).entries()) {
+        if (!ch || !Number.isInteger(ch.t) || ch.t <= last || ch.t > D || !(isNum(ch.scale) && ch.scale > 0)) err(`meta.clock.changes[${i}] needs an increasing integer t within the run and scale > 0`);
+        else last = ch.t;
+      }
+    }
+  }
   // intro context (all optional, but a good playbook has them: the intro is where the viewer learns what they are looking at)
   const str = (v) => typeof v === "string" && v.trim().length > 0;
   if (m.background != null) {
@@ -107,6 +121,8 @@ export function validate(PB) {
     }
   }
   for (const p of panels) {
+    if (!p.why) warn(`panel ${p.id}: add "why", one sentence on why this metric matters (shown behind the ⓘ)`);
+    else if (typeof p.why !== "string" || p.why.length > 160) warn(`panel ${p.id}: "why" should be a string under ~140 chars`);
     if (panelIds.has(p.id)) err(`duplicate panel ${p.id}`); panelIds.add(p.id);
     if (!p.metrics?.length) err(`panel ${p.id} has no metrics`);
     if (p.max != null && !isNum(p.max)) err(`panel ${p.id}: max must be a number`);
@@ -155,6 +171,7 @@ export function validate(PB) {
     if (e.feed) {
       if (!e.feed.from || !e.feed.text) err(`${w}: feed needs from and text`);
       if (e.feed.kind && !FEED_KINDS.includes(e.feed.kind)) err(`${w}: feed.kind must be ${FEED_KINDS.join("/")}`);
+      if (e.feed.key != null && typeof e.feed.key !== "boolean") err(`${w}: feed.key must be true or false`);
       if (e.feed.text && e.feed.text.length > 200) warn(`${w}: feed text over 200 chars`);
     }
     if (e.beat) {

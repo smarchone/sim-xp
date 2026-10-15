@@ -257,7 +257,8 @@
    "threshold": {
     "value": 20,
     "label": "alert > 20%"
-   }
+   },
+   "why": "Share of requests the cache could not answer. A jump means the database suddenly takes the traffic."
   },
   {
    "id": "load",
@@ -265,7 +266,8 @@
    "metrics": [
     "rps",
     "dbqps"
-   ]
+   ],
+   "why": "Requests in vs queries out. Normally the cache keeps queries far below requests."
   },
   {
    "id": "dbp99",
@@ -276,14 +278,16 @@
    "threshold": {
     "value": 4000,
     "label": "statement_timeout 4s"
-   }
+   },
+   "why": "How long queries take. Past the statement timeout they are cancelled and never cached."
   },
   {
    "id": "waiting",
    "title": "pgbouncer cl_waiting",
    "metrics": [
     "waiting"
-   ]
+   ],
+   "why": "Clients queued for one of 20 database connections. This is the real bottleneck."
   },
   {
    "id": "err",
@@ -294,7 +298,8 @@
    "threshold": {
     "value": 5,
     "label": "SLO page 5%"
-   }
+   },
+   "why": "What shoppers see: pages failing with 5xx."
   },
   {
    "id": "db_conns",
@@ -302,7 +307,8 @@
    "metrics": [
     "db_conns"
    ],
-   "max": 24
+   "max": 24,
+   "why": "Pool usage. At 20 of 20 every extra query has to wait."
   },
   {
    "id": "web_cpu",
@@ -310,21 +316,24 @@
    "metrics": [
     "web_cpu"
    ],
-   "max": 100
+   "max": 100,
+   "why": "Busy threads waiting on the database look like load, which tempts you to scale out."
   },
   {
    "id": "pods",
    "title": "Web pods",
    "metrics": [
     "pods"
-   ]
+   ],
+   "why": "The tempting wrong fix: more pods send more misses to the same 20 connections."
   },
   {
    "id": "web_p95",
    "title": "Page latency p95",
    "metrics": [
     "web_p95"
-   ]
+   ],
+   "why": "Slow pages, even before errors. Users leave at this point."
   }
  ],
  "alerts": [

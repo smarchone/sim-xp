@@ -59,6 +59,7 @@ Top level: `schema`, `meta`, `components`, `metrics`, `dashboard`, `alerts`, `in
 - `title`: short and evocative ("The rebalance storm: when slow looks dead").
 - `story`: the hook, 1–2 sentences, shown large at the top of the intro and as the subtitle in the gallery. Sets the scene, does not spoil the cause.
 - `duration_s`: 240–600 is typical (the viewer watches at 1×–4×).
+- `clock` (optional) `{ start?, scale?, changes? }`: real story time. By default one playbook second is one story second. For a long story set `scale` = story seconds per playbook second (a 2-month story in 420 s: 12,500; one hour per second: 3,600) and the clock, feed times, chart axes and key moments show story time ("Day 23", "Oct 21 22:52"), so nothing is shown as "8 seconds". `start` is an ISO date ("2018-10-21T22:51:18Z", shown in UTC) if the real dates matter, otherwise the clock counts "Day N". `changes` `[{ t, scale }]` switches the scale at playbook second `t` (real time through the trigger, then fast-forward through a long recovery). Keep event times (`t`) in playbook seconds and make sure feed text, durations and curves agree with the clock.
 - `layout` (optional) `{ columns: 1|2|3, rows: 1–8 }`: how the charts are arranged. The components (left) and feed (right) are fixed and the viewer cannot move anything. `columns` is the number of chart columns between them (default 2); `rows` is how many chart rows fit on one screen before the board scrolls (default: fit all charts, between 2 and 5). Use 2 columns × 4–5 rows for ~8–10 charts; 3 columns for many small charts; 1 column × 3 rows for a few tall ones.
 - The rest is the **intro**: it is how a viewer who has never seen this system gets the context. Write for an engineer who knows software but not this stack.
   - `background`: 2–4 `{ title, body }` paragraphs, each ≤ ~400 chars, plain words. A good set is "The system" (what it is, rough scale, why it is built this way), "How it normally works" (the mechanism, in the normal state), "Today" (what is about to happen). Do not spoil the cause.
@@ -82,7 +83,8 @@ Top level: `schema`, `meta`, `components`, `metrics`, `dashboard`, `alerts`, `in
 - Pick the signals an engineer would really watch for this system.
 
 ### dashboard
-`[{ id, title, metrics: [metricId...], threshold?: { value, label } }]`
+`[{ id, title, why, metrics: [metricId...], threshold?: { value, label } }]`
+- `why` (one sentence, ≤ ~140 chars): why this metric matters in this story. Shown behind an ⓘ on the panel. Say what a rise or fall means, or what wrong conclusion it rules out. Every panel gets one.
 - 6–10 panels (the board scrolls past ~10). Put two metrics on one panel when comparing them is the point (produced vs consumed),
   and only when they have the same unit and similar size: the panel has one y-axis.
 - A threshold line on a panel makes "crossed the limit" visible.
@@ -100,7 +102,7 @@ Top level: `schema`, `meta`, `components`, `metrics`, `dashboard`, `alerts`, `in
 
 ### timeline
 Sorted list of events: `{ t, title?, feed?, effects?, metrics?, beat? }`
-- **feed** `{ from, kind, text }`, kind one of `chat`, `log`, `deploy`, `alert`, `resolved`.
+- **feed** `{ from, kind, text, key? }`, kind one of `chat`, `log`, `deploy`, `alert`, `resolved`. Entries on a key moment and alert entries are softly highlighted automatically; set `key: true` on any other line the viewer must not miss (the message that explains the cause, the decision, the fix).
   Write real-looking log lines and Slack-style chat ("db looks a bit slower since the migration, but nothing is failing").
   Deploys also show as markers on every chart. 8–20 feed entries make a run feel alive.
 - **metrics** `[{ id, to, over_s, shape }]`: a keyframe. The metric moves from its current value to
