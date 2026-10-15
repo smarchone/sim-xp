@@ -6,7 +6,7 @@
 <title>sim-xp</title>
 <link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="v2/style.css">
 <style>
   .library{gap:20px}
@@ -28,9 +28,10 @@
   .what p{margin:1px 0 0;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .list .meta{margin:0;flex-wrap:nowrap;overflow:hidden}
   .play{font:500 12px var(--sans);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);border-radius:6px;padding:2px 12px}
-  .list a:hover .play{color:#fff;background:var(--accent)}
+  .list a:hover .play{color:var(--panel);background:var(--accent)}
   .empty{padding:12px 14px;color:var(--muted);font-size:12px}
 </style>
+<script>try{var t=localStorage.getItem("sim-xp.theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
 </head>
 <body>
 <!-- The list of playbooks: each opens in the v2 player at v2/?pb=<id>. The list comes from v2/playbooks/index.json. -->

@@ -12,7 +12,70 @@
    "thundering-herd",
    "postgres",
    "pgbouncer"
-  ]
+  ],
+  "background": [
+   {
+    "title": "The system",
+    "body": "storefront-web serves product pages at about 2,400 requests a second. Page data comes from Redis 96% of the time; only misses reach Postgres, through pgbouncer, which has just 20 real connections to the database."
+   },
+   {
+    "title": "How it normally works",
+    "body": "A miss costs one catalog query (about 40 ms), the result is written back to Redis with a 6-hour TTL, and the next request hits. The database only ever sees the misses."
+   },
+   {
+    "title": "Today",
+    "body": "A routine deploy bumps the cache key version from v41 to v42 to ship a new product badge. Nothing in it touches the database."
+   }
+  ],
+  "cast": [
+   {
+    "name": "shoppers",
+    "role": "about 2,400 requests a second"
+   },
+   {
+    "name": "edge-nginx",
+    "role": "routes requests to the web pods"
+   },
+   {
+    "name": "storefront-web",
+    "role": "six pods, reads through the cache"
+   },
+   {
+    "name": "cache-redis",
+    "role": "holds product pages under versioned keys"
+   },
+   {
+    "name": "pgbouncer",
+    "role": "20 server connections to the database"
+   },
+   {
+    "name": "catalog-db",
+    "role": "the source of truth"
+   }
+  ],
+  "watch": [
+   {
+    "label": "Cache miss ratio",
+    "normal": "normal about 4%"
+   },
+   {
+    "label": "Clients waiting for a connection",
+    "normal": "normal 0"
+   },
+   {
+    "label": "5xx rate",
+    "normal": "normal about 0%"
+   }
+  ],
+  "learn": [
+   "why a deploy that never touches the database can take it down",
+   "why queries that time out never refill the cache",
+   "how to warm, coalesce and shed so a cold cache does not become an outage"
+  ],
+  "layout": {
+   "columns": 2,
+   "rows": 5
+  }
  },
  "components": {
   "nodes": [
@@ -154,6 +217,34 @@
     0,
     1
    ]
+  },
+  {
+   "id": "db_conns",
+   "label": "pgbouncer connections in use",
+   "unit": "conns",
+   "start": 8,
+   "noise": 0.05
+  },
+  {
+   "id": "web_cpu",
+   "label": "Web CPU",
+   "unit": "%",
+   "start": 30,
+   "noise": 0.05
+  },
+  {
+   "id": "pods",
+   "label": "Web pods",
+   "unit": "pods",
+   "start": 6,
+   "noise": 0.0
+  },
+  {
+   "id": "web_p95",
+   "label": "Page latency p95",
+   "unit": "ms",
+   "start": 120,
+   "noise": 0.06
   }
  ],
  "dashboard": [
@@ -204,6 +295,36 @@
     "value": 5,
     "label": "SLO page 5%"
    }
+  },
+  {
+   "id": "db_conns",
+   "title": "pgbouncer connections in use",
+   "metrics": [
+    "db_conns"
+   ],
+   "max": 24
+  },
+  {
+   "id": "web_cpu",
+   "title": "Web CPU",
+   "metrics": [
+    "web_cpu"
+   ],
+   "max": 100
+  },
+  {
+   "id": "pods",
+   "title": "Web pods",
+   "metrics": [
+    "pods"
+   ]
+  },
+  {
+   "id": "web_p95",
+   "title": "Page latency p95",
+   "metrics": [
+    "web_p95"
+   ]
   }
  ],
  "alerts": [
@@ -430,7 +551,24 @@
     "from": "cache-redis",
     "kind": "log",
     "text": "INFO stats: keyspace_misses +41,880 in 10s (pdp:v42:* — 0 keys present)"
-   }
+   },
+   "metrics": [
+    {
+     "id": "db_conns",
+     "to": 20,
+     "over_s": 15
+    },
+    {
+     "id": "web_cpu",
+     "to": 55,
+     "over_s": 15
+    },
+    {
+     "id": "web_p95",
+     "to": 900,
+     "over_s": 20
+    }
+   ]
   },
   {
    "t": 54,
@@ -519,6 +657,16 @@
      "id": "dbqps",
      "to": 460,
      "over_s": 25
+    },
+    {
+     "id": "web_cpu",
+     "to": 95,
+     "over_s": 30
+    },
+    {
+     "id": "web_p95",
+     "to": 5000,
+     "over_s": 15
     }
    ],
    "effects": [
@@ -730,6 +878,17 @@
      "id": "miss",
      "to": 87,
      "over_s": 20
+    },
+    {
+     "id": "web_cpu",
+     "to": 70,
+     "over_s": 10
+    },
+    {
+     "id": "pods",
+     "to": 12,
+     "over_s": 1,
+     "shape": "step"
     }
    ]
   },
@@ -857,6 +1016,21 @@
      "id": "rps",
      "to": 2500,
      "over_s": 40
+    },
+    {
+     "id": "db_conns",
+     "to": 9,
+     "over_s": 15
+    },
+    {
+     "id": "web_cpu",
+     "to": 40,
+     "over_s": 20
+    },
+    {
+     "id": "web_p95",
+     "to": 150,
+     "over_s": 20
     }
    ]
   },
@@ -969,6 +1143,14 @@
      "target": "web",
      "badge": "6 pods"
     }
+   ],
+   "metrics": [
+    {
+     "id": "pods",
+     "to": 6,
+     "over_s": 1,
+     "shape": "step"
+    }
    ]
   },
   {
@@ -1032,7 +1214,6 @@
  "report": {
   "tldr": "Bumping the cache key version made every product page miss at once. 2,400 req/s fell onto 20 DB connections, queries timed out before they could refill the cache, and the site returned 504s until the old keys were used again.",
   "fix_t": 196,
-  "sparkline": "err",
   "chain": [
    {
     "id": "bump",
@@ -1110,6 +1291,25 @@
     "glyph": "✕",
     "title": "More pods won't fix a pool cap",
     "body": "Scaling web adds clients to the same 20 DB connections; find the real bottleneck."
+   }
+  ],
+  "math": {
+   "title": "Why 20 connections cannot keep up",
+   "lines": [
+    "2,400 req/s, every one a miss  = 2,400 queries/s wanted",
+    "20 connections / 40 ms a query     = about 500 queries/s at best",
+    "2,400 / 500                       = about 5x what the pool can run",
+    "and queries only get slower as they queue; past 4 s they are cancelled and never cached"
+   ]
+  },
+  "myths": [
+   {
+    "myth": "Scale out the web tier.",
+    "truth": "More pods send more misses to the same 20 connections. It makes the stampede bigger."
+   },
+   {
+    "myth": "The database got slow.",
+    "truth": "It was fine. It was asked for about five times the queries its 20 connections can run."
    }
   ]
  }

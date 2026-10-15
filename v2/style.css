@@ -1,10 +1,10 @@
-/* Library page. Same tokens as the player so moving between them feels like one app. */
+/* Library page. Same cream/dark tokens and fonts as the player so moving between them feels like one app. */
 :root{
-  --bg:#eef1f5; --panel:#ffffff; --sunk:#f2f4f7; --line:#e3e7ed; --line2:#d5dbe3; --fg:#1b232d; --muted:#66727f; --accent:#2f6fd6; --red:#d6404e; --green:#1f9d63;
-  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --bg:#f3eee3; --panel:#fbf8f1; --sunk:#eee8da; --line:#e4dccb; --line2:#d5cab3; --fg:#28241d; --muted:#776d5c; --accent:#2c5a98; --red:#b8432f; --green:#2f7a4c;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0c1015;--panel:#13181e;--sunk:#181e26;--line:#212932;--line2:#2b343f;--fg:#d9e0e8;--muted:#8793a1;--accent:#6aa6ff;--red:#f0616d;--green:#4cc38a;color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#0c1015;--panel:#13181e;--sunk:#181e26;--line:#212932;--line2:#2b343f;--fg:#d9e0e8;--muted:#8793a1;--accent:#6aa6ff;--red:#f0616d;--green:#4cc38a;color-scheme:dark}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#131311;--panel:#1b1b18;--sunk:#22221e;--line:#2c2b27;--line2:#3a3933;--fg:#e8e3d8;--muted:#9c9585;--accent:#86aee6;--red:#e57a64;--green:#72c08e;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#131311;--panel:#1b1b18;--sunk:#22221e;--line:#2c2b27;--line2:#3a3933;--fg:#e8e3d8;--muted:#9c9585;--accent:#86aee6;--red:#e57a64;--green:#72c08e;color-scheme:dark}
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--fg);font:13px/1.5 var(--sans)}

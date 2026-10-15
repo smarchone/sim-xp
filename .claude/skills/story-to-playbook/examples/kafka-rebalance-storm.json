@@ -10,7 +10,62 @@
    "consumer-groups",
    "rebalancing",
    "backpressure"
-  ]
+  ],
+  "background": [
+   {
+    "title": "The system",
+    "body": "checkout-api publishes every order to a 6-partition orders topic. Three payments workers form one consumer group and charge the orders, each polling a batch of up to 500 records, processing them one by one against Postgres, then committing."
+   },
+   {
+    "title": "How it normally works",
+    "body": "A worker must call poll() again within max.poll.interval.ms (5 minutes). If it does not, the group coordinator decides it is dead, removes it, and rebalances: partitions are reassigned to whoever is left. Normally a batch takes seconds and this never comes up."
+   },
+   {
+    "title": "Today",
+    "body": "A database migration adds a fraud_score lookup with no index yet, which makes each record about 650 ms slower. Nothing crashes and nothing alerts."
+   }
+  ],
+  "cast": [
+   {
+    "name": "checkout-api",
+    "role": "produces about 1,200 orders a second"
+   },
+   {
+    "name": "orders topic",
+    "role": "6 partitions, two per worker"
+   },
+   {
+    "name": "payments-worker-1, -2, -3",
+    "role": "one consumer group, one batch each"
+   },
+   {
+    "name": "payments-db",
+    "role": "looked up for every record"
+   }
+  ],
+  "watch": [
+   {
+    "label": "Consumer lag",
+    "normal": "normal: near 0"
+   },
+   {
+    "label": "Group rebalances",
+    "normal": "normal: almost never"
+   },
+   {
+    "label": "DB query p99",
+    "normal": "normal: about 45 ms"
+   }
+  ],
+  "learn": [
+   "why a slow worker can look dead to Kafka",
+   "why a rebalance makes the next one more likely",
+   "how batch size, timeouts and rebalancing mode fit together"
+  ],
+  "layout": {
+   "columns": 2,
+   "rows": 4
+  }
  },
  "components": {
   "nodes": [
@@ -158,6 +213,34 @@
     0,
     5
    ]
+  },
+  {
+   "id": "worker_cpu",
+   "label": "Worker CPU",
+   "unit": "%",
+   "start": 35,
+   "noise": 0.05
+  },
+  {
+   "id": "db_cpu",
+   "label": "DB CPU",
+   "unit": "%",
+   "start": 25,
+   "noise": 0.05
+  },
+  {
+   "id": "batch_s",
+   "label": "Batch duration",
+   "unit": "s",
+   "start": 4,
+   "noise": 0.05
+  },
+  {
+   "id": "paused",
+   "label": "Workers paused",
+   "unit": "workers",
+   "start": 0,
+   "noise": 0.0
   }
  ],
  "dashboard": [
@@ -204,6 +287,41 @@
    "metrics": [
     "dupes"
    ]
+  },
+  {
+   "id": "worker_cpu",
+   "title": "Worker CPU",
+   "metrics": [
+    "worker_cpu"
+   ],
+   "max": 100
+  },
+  {
+   "id": "db_cpu",
+   "title": "DB CPU",
+   "metrics": [
+    "db_cpu"
+   ],
+   "max": 100
+  },
+  {
+   "id": "batch_s",
+   "title": "Batch duration",
+   "metrics": [
+    "batch_s"
+   ],
+   "threshold": {
+    "value": 300,
+    "label": "max.poll.interval"
+   }
+  },
+  {
+   "id": "paused",
+   "title": "Workers paused",
+   "metrics": [
+    "paused"
+   ],
+   "max": 3
   }
  ],
  "alerts": [
@@ -365,6 +483,22 @@
      "to": 650,
      "over_s": 45,
      "shape": "ease"
+    },
+    {
+     "id": "worker_cpu",
+     "to": 22,
+     "over_s": 30
+    },
+    {
+     "id": "db_cpu",
+     "to": 78,
+     "over_s": 30
+    },
+    {
+     "id": "batch_s",
+     "to": 290,
+     "over_s": 55,
+     "shape": "linear"
     }
    ]
   },
@@ -528,6 +662,17 @@
      "id": "db_p99",
      "to": 300,
      "over_s": 15
+    },
+    {
+     "id": "db_cpu",
+     "to": 92,
+     "over_s": 40
+    },
+    {
+     "id": "paused",
+     "to": 3,
+     "over_s": 1,
+     "shape": "step"
     }
    ],
    "beat": {
@@ -676,6 +821,12 @@
      "to": 29000,
      "over_s": 70,
      "shape": "linear"
+    },
+    {
+     "id": "paused",
+     "to": 0,
+     "over_s": 1,
+     "shape": "step"
     }
    ]
   },
@@ -835,6 +986,12 @@
      "to": 52000,
      "over_s": 30,
      "shape": "linear"
+    },
+    {
+     "id": "paused",
+     "to": 3,
+     "over_s": 1,
+     "shape": "step"
     }
    ]
   },
@@ -960,6 +1117,12 @@
      "to": 56000,
      "over_s": 25,
      "shape": "linear"
+    },
+    {
+     "id": "paused",
+     "to": 0,
+     "over_s": 1,
+     "shape": "step"
     }
    ]
   },
@@ -1078,6 +1241,12 @@
      "to": 80000,
      "over_s": 30,
      "shape": "linear"
+    },
+    {
+     "id": "paused",
+     "to": 3,
+     "over_s": 1,
+     "shape": "step"
     }
    ],
    "beat": {
@@ -1099,6 +1268,17 @@
     ],
     "hint": "This is a rebalance storm. Each rebalance creates more lag and more replayed work, which makes the next batch slower, which gets the next worker evicted. Scaling to 6 workers, as Ana suggested, would trigger yet another rebalance and add load to the database that is the real bottleneck."
    }
+  },
+  {
+   "t": 270,
+   "metrics": [
+    {
+     "id": "paused",
+     "to": 0,
+     "over_s": 1,
+     "shape": "step"
+    }
+   ]
   },
   {
    "t": 280,
@@ -1218,6 +1398,21 @@
      "id": "dupes",
      "to": 0,
      "over_s": 10
+    },
+    {
+     "id": "worker_cpu",
+     "to": 40,
+     "over_s": 15
+    },
+    {
+     "id": "db_cpu",
+     "to": 35,
+     "over_s": 20
+    },
+    {
+     "id": "batch_s",
+     "to": 33,
+     "over_s": 5
     }
    ]
   },
@@ -1304,6 +1499,11 @@
     {
      "id": "consumed",
      "to": 1200,
+     "over_s": 15
+    },
+    {
+     "id": "worker_cpu",
+     "to": 35,
      "over_s": 15
     }
    ]
@@ -1413,6 +1613,30 @@
     "glyph": "✕",
     "title": "Don't scale out mid-storm",
     "body": "New consumers trigger another rebalance; fix the slow dependency first."
+   }
+  ],
+  "math": {
+   "title": "Why a batch outlasts the deadline",
+   "lines": [
+    "500 records x 650 ms extra   = 325 s of extra work per batch",
+    "max.poll.interval.ms         = 300 s",
+    "325 s > 300 s                -> the worker is evicted, with its batch half done"
+   ]
+  },
+  "myths": [
+   {
+    "myth": "Add more workers.",
+    "truth": "Every new worker triggers another rebalance, and more workers means more partitions reassigned while the group is already unstable."
+   },
+   {
+    "myth": "The workers are crashing.",
+    "truth": "They were healthy. Kafka removed them for being slow to call poll(), which looks identical to dead from the coordinator's side."
+   }
+  ],
+  "links": [
+   {
+    "label": "Kafka docs: max.poll.interval.ms",
+    "url": "https://kafka.apache.org/documentation/#consumerconfigs_max.poll.interval.ms"
    }
   ]
  }
