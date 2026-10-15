@@ -69,7 +69,6 @@
    "what you can and cannot do with writes that exist on only one side"
   ],
   "layout": {
-   "components": 4,
    "columns": 2,
    "rows": 5
   },
