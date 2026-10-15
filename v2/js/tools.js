@@ -108,17 +108,17 @@ export function buildTools(ctx) {
     },
     {
       name: "control",
-      description: "Drive playback when the person asks you to. action: start (close the story and play), play, pause, seek (with t), key_moment (with n, 1-based), next, prev, report, close_report, restart, speed (with speed 0.5, 1, 2 or 4). Returns the new state.",
+      description: "Drive playback when the person asks you to. action: start (close the story and play), play, pause, seek (with t), key_moment (with n, 1-based), next, prev, report, close_report, restart, speed (with speed 0.5, 1, 2 or 4), detail (with detail standard or hardcore: hardcore shows the deeper layer of the same run, when the playbook has one). Returns the new state.",
       inputSchema: {
         type: "object",
         properties: {
-          action: { type: "string", enum: ["start", "play", "pause", "seek", "key_moment", "next", "prev", "report", "close_report", "restart", "speed"] },
-          t: { type: "number" }, n: { type: "integer" }, speed: { type: "number" },
+          action: { type: "string", enum: ["start", "play", "pause", "seek", "key_moment", "next", "prev", "report", "close_report", "restart", "speed", "detail"] },
+          t: { type: "number" }, n: { type: "integer" }, speed: { type: "number" }, detail: { type: "string", enum: ["standard", "hardcore"] },
         },
         required: ["action"],
       },
       execute: async (input) => {
-        checkArgs(input, ["action", "t", "n", "speed"]);
+        checkArgs(input, ["action", "t", "n", "speed", "detail"]);
         requireLoaded(); const p = requirePlayer();
         switch (input.action) {
           case "start": case "play": p.start(); break;
@@ -131,6 +131,7 @@ export function buildTools(ctx) {
           case "close_report": p.report(false); break;
           case "restart": p.restart(); break;
           case "speed": p.speed(input.speed); break;
+          case "detail": p.detail(input.detail); break;
           default: fail(`unknown action ${input.action}`);
         }
         return state();

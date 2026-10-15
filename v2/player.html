@@ -147,6 +147,39 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--p
 .focus-mode #comp g.focused{filter:drop-shadow(0 0 5px color-mix(in srgb,var(--accent) 75%,transparent))}
 .focus-mode #comp g.focused g.focused,.focus-mode #comp g[data-id^="e-"].focused{filter:none}
 
+/* hardcore mode: the same run with the engineer's-eye layer on (items tagged level "deep" in the playbook) */
+.panel-h b{flex:none;max-width:60%}
+.ctag{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;align-self:center;display:inline-flex;align-items:center;gap:4px;font:500 10px var(--sans);color:var(--faint);white-space:nowrap}
+.ctag i{width:6px;height:6px;border-radius:50%;background:var(--green);opacity:.8}
+.ctag.degrading{color:var(--amber)} .ctag.degrading i{background:var(--amber);opacity:1}
+.ctag.failing{color:var(--red)} .ctag.failing i{background:var(--red);opacity:1}
+.dtag{flex:none;align-self:center;font:500 9.5px var(--mono);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);border-radius:999px;padding:0 6px;line-height:14px}
+.feed li.lv-deep{opacity:.82;box-shadow:inset 2px 0 0 var(--line2)}
+.feed li.lv-deep .txt{font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+.feed li.lv-deep .who{font-size:10.5px}
+#capH .dh{display:block;margin-top:6px;font:var(--s)/1.5 var(--mono);color:var(--muted)}
+.quiet{display:flex;flex-direction:column;padding:6px 10px 8px;min-height:0}
+.quiet .qh{display:flex;gap:8px;align-items:baseline;font-size:var(--s);font-weight:600;color:var(--muted);padding-bottom:2px}
+.quiet .qh span{font-weight:400;color:var(--faint)}
+.qrows{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px}
+.qrow{display:grid;grid-template-columns:minmax(0,1fr) 72px auto;gap:8px;align-items:center;font-size:var(--s);color:var(--muted);padding:3px 0;border-top:1px solid var(--line);min-width:0}
+.qrow .ql{display:flex;gap:6px;align-items:center;min-width:0;overflow:hidden;white-space:nowrap}
+.qrow .ql b{font-weight:500;overflow:hidden;text-overflow:ellipsis}
+.qrow svg{width:72px;height:16px;display:block}
+.qrow .qv{font:500 var(--s) var(--mono);font-variant-numeric:tabular-nums;color:var(--fg);text-align:right}
+#ntip{position:fixed;z-index:40;width:240px;padding:8px 10px;border-radius:8px;background:var(--glass);border:1px solid var(--line2);box-shadow:0 8px 22px rgba(0,0,0,.16);font-size:var(--s);pointer-events:none}
+#ntip h5{margin:0 0 4px;font-size:var(--m);font-weight:600}
+#ntip h5 span{font-weight:400;color:var(--muted);margin-left:6px}
+#ntip table{width:100%;border-collapse:collapse}
+#ntip td{padding:1px 0;color:var(--muted)} #ntip td:last-child{text-align:right;font-family:var(--mono);color:var(--fg);white-space:nowrap;padding-left:10px}
+#ntip tr.d td:first-child::after{content:" ·deep";color:var(--accent);font-size:9px}
+.rp-deep{border:1px solid var(--line2);border-radius:10px;padding:8px 14px}
+.rp-deep summary{cursor:pointer;font:600 14.4px var(--sans)}
+.rp-deep summary span{font-weight:400;color:var(--muted);font-size:var(--s);margin-left:6px}
+.rp-deep h5{margin:12px 0 4px;font:600 var(--m) var(--sans);color:var(--muted)}
+.rp-deep ol{margin:0;padding-left:20px;font:400 15px/1.55 var(--serif)}
+body:not(.hc) .rp-deep{display:none}
+
 /* svg text: two sizes only */
 /* components text is sized for the screen, not the viewBox: ~10.5px names and ~9px labels whatever the graph's scale (set from JS) */
 .t{fill:var(--fg);font:600 var(--ct,16.4px) var(--sans)}
@@ -294,6 +327,7 @@ pre{font:var(--s)/1.5 var(--mono);background:var(--sunk);border-radius:8px;paddi
           <span><kbd>Esc</kbd></span><span>close</span>
           <span>drag · scroll</span><span>pan the components</span>
           <span>Ctrl + scroll</span><span>zoom them (or pinch)</span>
+          <span><kbd>H</kbd></span><span>Standard / Hardcore detail (when the playbook has it)</span>
           <span>hover</span><span>charts or feed to look back</span>
           <span>click</span><span>a feed line or chart to jump there</span>
         </div>
@@ -303,6 +337,7 @@ pre{font:var(--s)/1.5 var(--mono);background:var(--sunk);border-radius:8px;paddi
         <button class="mi" id="reportBtn" role="menuitem">Report <kbd>R</kbd></button>
         <div class="row"><span class="small" style="flex:1">Speed</span><div class="seg" id="speedSeg"><button data-speed="2">0.5×</button><button data-speed="4">1×</button><button data-speed="8">2×</button><button data-speed="16">4×</button></div></div>
         <div class="row"><span class="small" style="flex:1">Theme</span><div class="seg" id="themeSeg"><button data-theme-set="system">Auto</button><button data-theme-set="light">Light</button><button data-theme-set="dark">Dark</button></div></div>
+        <div class="row" id="detailRow" hidden><span class="small" style="flex:1" title="Hardcore shows the deeper layer of the same run: more charts, raw logs and commands, and a deep dive in the report">Detail <kbd>H</kbd></span><div class="seg" id="detailSeg"><button data-detail="standard">Standard</button><button data-detail="hardcore">Hardcore</button></div></div>
         <button class="mi" id="libraryBtn" role="menuitem">Open another playbook</button>
       </div>
     </div>
@@ -337,6 +372,7 @@ pre{font:var(--s)/1.5 var(--mono);background:var(--sunk);border-radius:8px;paddi
   <div id="schema" class="doc"></div>
 </details>
 
+<div id="ntip" hidden></div>
 <div class="scrim" id="intro">
   <div class="pop modal intro pop-in" role="dialog" aria-modal="true" aria-labelledby="introT">
     <span class="eb" id="introMeta"></span>
@@ -443,6 +479,14 @@ const feedItems = PB.timeline.filter(e => e.feed).map(e => ({ t: e.t, ...e.feed 
 feedItems.forEach(f => (f.key = f.key === true || beatTimes.has(f.t) || f.kind === "alert" || f.kind === "resolved"));
 $("#feedCard").style.setProperty("--tcol", (Math.max(...feedItems.map(f => fmtT(f.t).length), 5) * 0.62 + 0.4).toFixed(1) + "em");
 const beats = PB.timeline.filter(e => e.beat);
+// Detail: Standard or Hardcore. Hardcore reveals items the playbook tags level "deep"; the run itself never changes.
+const DETAIL_KEY = "sim-xp.detail";
+const hasDeep = PB.dashboard.some(p => p.level === "deep") || PB.timeline.some(e => (e.feed && e.feed.level === "deep") || (e.beat && e.beat.deep))
+  || PB.components.nodes.some(n => (n.details || []).some(d => d.level === "deep")) || !!(PB.report && PB.report.deep);
+let HC = false;
+try { HC = hasDeep && localStorage.getItem(DETAIL_KEY) === "hardcore"; } catch (e) { /* storage blocked */ }
+document.body.classList.toggle("hc", HC);
+const shownFeed = f => HC || f.level !== "deep";
 const titled = PB.timeline.filter(e => e.title);
 // chapters = the key moments; chapter i runs from its beat (the first one from 0) to the next beat
 const chapters = beats.map((b, i) => ({ beat: b, title: b.title, from: i === 0 ? 0 : b.t, to: i + 1 < beats.length ? beats[i + 1].t : D }));
@@ -486,6 +530,7 @@ function autoLayout(dir) {
   return { vb: [W + 2 * M, y - gapY + M], dir, n: out };
 }
 const LAYOUTS = { wide: autoLayout("LR"), tall: autoLayout("TB") };
+const nodeStatus = {};
 const comp = $("#comp"); let nodeEls = {}, partEls = {}, edgeEls = {}, nodes = {}, layoutKey = null;
 const ONE_SCREEN = matchMedia("(min-width:1000px) and (min-height:600px)");
 const stageEl = $("#compCard");
@@ -575,6 +620,7 @@ function buildComponents() {
     const badgeT = el("text", { y: n.y + 3, class: "tp", "text-anchor": "middle" }, badgeG);
     const alertG = el("g", {}, g); const alertC = el("circle", { cx: n.x + n.w - 12, cy: n.y + 14, r: 7 }, alertG);
     const alertT = el("text", { x: n.x + n.w - 12, y: n.y + 18, "text-anchor": "middle", class: "tp", style: "fill:var(--panel);font-weight:600" }, alertG); alertT.textContent = "!";
+    if ((n.details || []).length) { g.style.cursor = "help"; g.addEventListener("pointerenter", () => (tipNode = n.id)); g.addEventListener("pointermove", ev => showNodeTip(n.id, ev)); g.addEventListener("pointerleave", () => { tipNode = null; $("#ntip").hidden = true; }); }
     nodeEls[n.id] = { g, base, ov, sub, badgeG, badgeR, badgeT, alertG, alertC, lastSub: null };
     if (n.parts) {
       const cols = n.cols || n.part_cols || 2, rows = Math.ceil(n.parts.length / cols), top = n.y + 29, gap = 8;
@@ -590,6 +636,23 @@ function buildComponents() {
       });
     }
   });
+}
+// hover card on a node: its details rows, live values at the cursor time; deep rows only in Hardcore
+let tipNode = null;
+const unitSuffix = u => ["ms", "count", ""].includes(u) ? "" : u === "%" ? "%" : " " + u;
+function nodeTipHTML(id) {
+  const n = PB.components.nodes.find(x => x.id === id), rows = (n.details || []).filter(d => HC || d.level !== "deep"), v = viewT();
+  if (!rows.length) return "";
+  const val = d => d.metric ? fmtV(at(d.metric, v), metricById[d.metric].unit) + unitSuffix(metricById[d.metric].unit) : esc(d.text);
+  return `<h5>${esc(n.label)}<span>${esc(n.kind || "")}${nodeStatus[id] && nodeStatus[id] !== "calm" ? " · " + nodeStatus[id] : ""}</span></h5><table>${rows.map(d => `<tr class="${d.level === "deep" ? "d" : ""}"><td>${esc(d.label)}</td><td>${val(d)}</td></tr>`).join("")}</table>`;
+}
+function showNodeTip(id, ev) {
+  const tip = $("#ntip"); if (comp.classList.contains("panning")) { tip.hidden = true; return; }
+  const h = nodeTipHTML(id); if (!h) { tip.hidden = true; return; }
+  if (tip._h !== h) { tip._h = h; tip.innerHTML = h; }
+  tip.hidden = false;
+  tip.style.left = Math.min(ev.clientX + 14, innerWidth - tip.offsetWidth - 8) + "px";
+  tip.style.top = Math.min(ev.clientY + 12, innerHeight - tip.offsetHeight - 8) + "px";
 }
 // node labels wrap (up to three lines) instead of spilling out of the box
 function setLines(t, str, x, y, maxCh) {
@@ -624,6 +687,7 @@ function renderComponents(T) {
     let worst = null;
     PB.alerts.filter(a => a.component === id).forEach(a => { const s = alertState[a.id][Math.floor(T)]; if (s === "firing") worst = "firing"; else if (s === "pending" && !worst) worst = "pending"; });
     n.alertG.style.display = worst ? "" : "none";
+    nodeStatus[id] = k.down || worst === "firing" || (k.color === "red" && (k.intensity ?? 0.4) >= 0.3) ? "failing" : worst === "pending" || k.color === "red" || k.color === "amber" ? "degrading" : "calm";
     if (worst) n.alertC.setAttribute("fill", worst === "firing" ? "var(--red)" : "var(--amber)");
   }
   for (const id in partEls) { const p = partEls[id], k = st[id] || {}; knobsTo(p.pov, k, 0.6); const lab = k.label || "";
@@ -710,10 +774,13 @@ const panels = [...PB.dashboard.filter(p => !isEvent(p)), ...PB.dashboard.filter
   const whyHTML = whyText ? `<span class="why" tabindex="0" role="note" aria-label="Why this matters">i<span class="tip"><b>Why it matters.</b> ${esc(whyText)}</span></span>` : "";
   const unitTxt = units === "msg/s" ? "msg/s" : units === "msgs" ? "msgs" : "";
   const legend = p.metrics.length > 1 ? `<span class="legend">${p.metrics.map((m, i) => `<span><i style="background:${seriesColor({ p }, i)}"></i>${esc(metricById[m].label)}</span>`).join("")}</span>` : "";
-  card.innerHTML = `<div class="panel-h"><b>${esc(p.title)}</b>${whyHTML}${legend}<span class="val"></span></div><div class="plot"></div>`;
+  const cnode = p.component && PB.components.nodes.find(n => n.id === p.component);
+  const ctag = cnode ? `<span class="ctag" title="${esc(cnode.label)}"><i></i>${esc(cnode.label)}</span>` : "";
+  const dtag = p.level === "deep" ? `<span class="dtag" title="Hardcore detail">deep</span>` : "";
+  card.innerHTML = `<div class="panel-h"><b>${esc(p.title)}</b>${ctag}${whyHTML}${legend}${dtag}<span class="val"></span></div><div class="plot"></div>`;
   (kind === "lane" ? dash : dashGrid).appendChild(card);
   const plot = card.querySelector(".plot"), svg = el("svg", {}, plot);
-  const P = { p, kind, units, unitTxt, card, plot, svg, val: card.querySelector(".val"), W: 0, H: 0, xOf: xOfW(600), tOf: tOfW(600), yOf: () => 0, lines: [], dots: [], annoEls: [] };
+  const P = { p, kind, units, unitTxt, card, plot, svg, deep: p.level === "deep", ctag: card.querySelector(".ctag"), val: card.querySelector(".val"), W: 0, H: 0, xOf: xOfW(600), tOf: tOfW(600), yOf: () => 0, lines: [], dots: [], annoEls: [] };
   hoverable(svg, x => P.tOf(x));
   P.note = document.createElement("div"); P.note.className = "note"; P.note.innerHTML = `<svg><line class="ld" stroke="var(--accent)" stroke-width="1"/><circle class="nd" r="4" fill="var(--bg)" stroke="var(--accent)" stroke-width="2"/></svg><div class="nl"></div>`; plot.appendChild(P.note);
   new ResizeObserver(() => { buildPanel(P); scheduleRender(); }).observe(plot);
@@ -779,8 +846,14 @@ function placeNote(P, viewT) {
   nd.setAttribute("cx", x); nd.setAttribute("cy", y);
   box.classList.add("show");
 }
+// a deep chart is surfaced (drawn full size) while it matters: a note on it at the current key moment, or an alert on its metric
+const surfaced = P => !!(activeBeat && (activeBeat.beat.notes || []).some(n => n.panel === P.p.id))
+  || PB.alerts.some(a => P.p.metrics.includes(a.metric) && alertState[a.id][Math.floor(playT)] !== "ok");
+const panelShown = P => !P.deep || (HC && (P.kind === "lane" || surfaced(P)));
+const quietPanels = () => HC ? panels.filter(P => P.deep && P.kind === "chart" && !surfaced(P)) : [];
 function renderPanels(playT, viewT) {
   panels.forEach(P => {
+    if (P.ctag && P.p.component) { const st = nodeStatus[P.p.component] || "calm"; if (P._st !== st) { P._st = st; P.ctag.className = "ctag " + st; P.ctag.title = `${P.ctag.textContent}: ${st}`; } }
     if (!P.W) return;
     const xOf = P.xOf;
     P.annoEls.forEach(a => (a.g.style.display = a.t <= playT ? "" : "none"));
@@ -803,12 +876,35 @@ function renderPanels(playT, viewT) {
   });
 }
 
+// quiet deep signals (Hardcore): one line each, a tiny sparkline and the value; they grow into a full chart when they matter
+const quietEl = document.createElement("div"); quietEl.className = "pn quiet"; quietEl.hidden = true;
+quietEl.innerHTML = `<div class="qh">Quiet signals<span>deep detail · a signal becomes a full chart when it matters</span></div><div class="qrows"></div>`;
+dashGrid.appendChild(quietEl);
+let quietKey = "";
+function buildQuiet(list) {
+  quietEl.querySelector(".qrows").innerHTML = list.map(P => {
+    const cn = P.p.component && PB.components.nodes.find(n => n.id === P.p.component);
+    return `<div class="qrow" data-p="${esc(P.p.id)}" title="${esc(P.p.why || "")}"><span class="ql"><b>${esc(P.p.title)}</b>${cn ? `<span class="ctag" data-c="${esc(cn.id)}"><i></i>${esc(cn.label)}</span>` : ""}</span><svg viewBox="0 0 72 16" preserveAspectRatio="none"><polyline fill="none" stroke="var(--muted)" stroke-width="1.2" vector-effect="non-scaling-stroke"/></svg><span class="qv"></span></div>`;
+  }).join("");
+}
+function renderQuiet(playT, viewT) {
+  if (quietEl.hidden) return;
+  quietEl.querySelectorAll(".qrow").forEach(row => {
+    const P = panels.find(x => x.p.id === row.dataset.p), m = P.p.metrics[P.p.metrics.length - 1];
+    let max = 0; series[m].forEach(v => (max = Math.max(max, v))); max = max || 1;
+    const pts = []; for (let i = 0; i <= 36; i++) { const t = (D * i) / 36; if (t > playT) break; pts.push(`${(t / D * 72).toFixed(1)},${(15 - (at(m, t) / max) * 14).toFixed(1)}`); }
+    row.querySelector("polyline").setAttribute("points", pts.join(" "));
+    row.querySelector(".qv").innerHTML = fmtV(at(m, viewT), P.units) + (P.unitTxt ? ` <small>${P.unitTxt}</small>` : "");
+    const tg = row.querySelector(".ctag"); if (tg) tg.className = "ctag " + (nodeStatus[tg.dataset.c] || "calm");
+  });
+}
+
 /* ===================== Feed: always visible, one line per entry, linked to the shared cursor ===================== */
 const feedEl = $("#feed"); let feedShown = -1, feedNear = null, feedHoverLi = null;
-const liHTML = (f, fresh) => `<li class="k-${f.kind}${f.key ? " key" : ""}${fresh ? " fresh" : ""}" data-i="${feedItems.indexOf(f)}" data-t="${f.t}"><time>${fmtT(f.t)}</time><span class="msg"><span class="who">${esc(f.from)}</span><span class="txt">${esc(f.text)}</span></span></li>`;
+const liHTML = (f, fresh) => `<li class="k-${f.kind}${f.key ? " key" : ""}${f.level === "deep" ? " lv-deep" : ""}${fresh ? " fresh" : ""}" data-i="${feedItems.indexOf(f)}" data-t="${f.t}"><time>${fmtT(f.t)}</time><span class="msg"><span class="who">${esc(f.from)}</span><span class="txt">${esc(f.text)}</span></span></li>`;
 function feedScrollTo(top, smooth) { if (!smooth) feedEl.style.scrollBehavior = "auto"; feedEl.scrollTop = top; if (!smooth) feedEl.style.scrollBehavior = ""; }
 function renderFeed(playT, viewT) {
-  const vis = feedItems.filter(f => f.t <= playT);
+  const vis = feedItems.filter(f => f.t <= playT && shownFeed(f));
   if (vis.length !== feedShown) {
     const atBottom = feedEl.scrollHeight - feedEl.scrollTop - feedEl.clientHeight < 24;
     if (playing && feedShown >= 0 && vis.length > feedShown && vis.length - feedShown <= 3) {
@@ -866,7 +962,11 @@ const viewT = () => shownT;
 function render() {
   if (!ready) return;
   const v = viewT();
-  renderComponents(v); renderPanels(playT, v); renderFeed(playT, v); renderNarr(v); renderHud(v); placeCallout();
+  renderComponents(v);
+  const key = HC + "|" + panels.filter(panelShown).map(P => P.p.id).join(",");
+  if (key !== quietKey) { quietKey = key; renderLayout(); }
+  renderPanels(playT, v); renderQuiet(playT, v); renderFeed(playT, v);
+  if (tipNode) { const tip = $("#ntip"); const h = nodeTipHTML(tipNode); if (h && tip._h !== h) { tip._h = h; tip.innerHTML = h; } } renderNarr(v); renderHud(v); placeCallout();
 }
 // progress hairline + status chip: the only playback chrome
 function renderHud(v) {
@@ -902,13 +1002,17 @@ function applyFocus(e) {
 const emit = (type, data) => { try { host && host.onPlayerEvent && host.onPlayerEvent(type, data); } catch (err) { /* host gone */ } };
 function showBeat(e) {
   activeBeat = e; setPlaying(false); emit("key_moment", { n: beats.indexOf(e) + 1, t: e.t });
-  $("#capK").textContent = `Key moment ${beats.indexOf(e) + 1} of ${beats.length} · ${fmtT(e.t)}`; $("#capT").textContent = e.title || ""; $("#capH").textContent = e.beat.hint;
+  $("#capK").textContent = `Key moment ${beats.indexOf(e) + 1} of ${beats.length} · ${fmtT(e.t)}`; $("#capT").textContent = e.title || ""; setCapHint(e);
   setExpanded(false); $("#caption").classList.add("open"); $("#beatGo").tabIndex = 0; fitAboveSheet(true);
   $("#app").classList.add("focus-mode");
   applyFocus(e);
   render();
   revealFocusedPanels(e);
   renderHud(viewT());
+}
+function setCapHint(e) {
+  const h = $("#capH"); h.textContent = e.beat.hint;
+  if (HC && e.beat.deep) { const d = document.createElement("span"); d.className = "dh"; d.textContent = e.beat.deep; h.appendChild(d); }
 }
 // a focused panel that is scrolled out of the dashboard pane is brought into view
 function revealFocusedPanels(e) {
@@ -974,6 +1078,7 @@ document.addEventListener("keydown", e => {
   if (e.key === "?") { toggleMenu("help"); return; }
   if (isOpen($("#intro"))) return;
   if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); if (isOpen($("#scrim"))) closeReport(); jumpBeat(e.key === "ArrowLeft" ? -1 : 1); return; }
+  if ((e.key === "h" || e.key === "H") && hasDeep) { setDetail(!HC); return; }
   if (e.key === "r" || e.key === "R") { if (isOpen($("#scrim"))) closeReport(); else openReport(); return; }
   if (e.key === "+" || e.key === "=") { stepSpeed(1); return; }
   if (e.key === "-" || e.key === "_" || e.key === "−") { stepSpeed(-1); return; }
@@ -1014,6 +1119,7 @@ $("#report").innerHTML = `
     ${sec(esc((R.math && R.math.title) || "The arithmetic"), R.math ? `<pre class="rp-math">${esc(R.math.lines.join("\n"))}</pre>` : "")}
     ${sec("What to take away", `<ol class="rp-take">${R.learnings.map(l => `<li><b>${esc(l.title)}</b><span>${esc(l.body)}</span></li>`).join("")}</ol>`)}
     ${sec("Common myths", (R.myths || []).length ? R.myths.map(m => `<div class="rp-myth"><q>${esc(m.myth)}</q><p>${esc(m.truth)}</p></div>`).join("") : "")}
+    ${R.deep && ((R.deep.config || []).length || (R.deep.runbook || []).length) ? `<details class="rp-deep"><summary>Deep dive<span>Hardcore</span></summary>${(R.deep.config || []).length ? `<h5>Config involved</h5><pre class="rp-math">${esc(R.deep.config.join("\n"))}</pre>` : ""}${(R.deep.runbook || []).length ? `<h5>What to check next time</h5><ol>${R.deep.runbook.map(x => `<li>${esc(x)}</li>`).join("")}</ol>` : ""}</details>` : ""}
     ${sec("Read more", (R.links || []).length ? `<div class="rp-links">${R.links.map(l => `<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener noreferrer">${esc(l.label)} ↗</a>`).join("")}</div>` : "")}
   </div></div>
   <div class="foot"><kbd>Esc</kbd><button class="ghost" id="repClose">Close</button><span class="spacer"></span><kbd>Space</kbd><button class="primary" id="repAgain">↺ Watch again</button></div>`;
@@ -1034,7 +1140,7 @@ $("#schema").innerHTML = `<p>The agent writes one JSON file; the app only plays 
    on the right (3 columns), both full height and fixed. The charts share the middle columns, all the same size. The playbook may pick meta.layout { columns, rows };
    otherwise 2 columns, with as many rows per screen as fit all charts (2 to 5). More charts than fit: the board scrolls. */
 const COLS = 12, GAP = 4, MIN_H = 110;
-const board = dashGrid, charts = panels.filter(P => P.kind === "chart");
+const board = dashGrid, allCharts = panels.filter(P => P.kind === "chart");
 const tiles = [$("#compCard"), $("#feedCard")];
 const LAYOUT = PB.meta.layout || {};
 // the viewer drags the vertical divider on the components tile's right edge: width 3 (default, narrow) to 6 of 12 columns, taken from the charts only
@@ -1059,7 +1165,18 @@ split.onpointerdown = e => {
 split.ondblclick = () => setComp(CMIN);
 split.onkeydown = e => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); e.stopPropagation(); setComp(compCols + (e.key === "ArrowRight" ? 0.25 : -0.25)); } };
 function renderLayout() {
-  const all = [...tiles, ...charts.map(P => P.card)];
+  // a surfaced deep chart sits right after the standard charts of the same component, so related signals stay together
+  const charts = allCharts.filter(P => !P.deep);
+  allCharts.filter(P => P.deep && panelShown(P)).forEach(P => {
+    let i = -1; charts.forEach((Q, j) => { if (P.p.component && Q.p.component === P.p.component) i = j; });
+    charts.splice(i < 0 ? charts.length : i + 1, 0, P);
+  });
+  const quiet = quietPanels();
+  panels.forEach(P => (P.card.hidden = !panelShown(P)));
+  const qk = quiet.map(P => P.p.id).join(",");
+  if (quietEl._k !== qk) { quietEl._k = qk; buildQuiet(quiet); }
+  quietEl.hidden = !quiet.length;
+  const all = [...tiles, ...charts.map(P => P.card), quietEl];
   if (!ONE_SCREEN.matches) { // stacked: no grid areas
     board.style.gridTemplateRows = ""; board.style.gridTemplateColumns = "";
     all.forEach(e => { e.style.gridArea = ""; e.style.height = ""; e.classList.remove("stick"); });
@@ -1070,11 +1187,23 @@ function renderLayout() {
   let per = Number.isInteger(LAYOUT.rows) && LAYOUT.rows >= 1 ? LAYOUT.rows : Math.max(2, Math.min(5, R));
   per = Math.max(1, Math.min(per, R, Math.floor((H + GAP) / (MIN_H + GAP))));
   const rh = (H - (per - 1) * GAP) / per, rows = R, tileH = Math.min(H, rows * rh + (rows - 1) * GAP);
-  board.style.gridTemplateRows = `repeat(${rows}, ${rh}px)`;
+  board.style.gridTemplateRows = `repeat(${rows}, ${rh}px)` + (quiet.length ? " max-content" : "");
   board.style.gridTemplateColumns = `minmax(0,${CW}fr) repeat(${cols}, minmax(0,${M / cols}fr)) minmax(0,3fr)`;
   [[tiles[0], 1], [tiles[1], cols + 2]].forEach(([e, x]) => { e.style.gridArea = `1 / ${x} / ${rows + 1} / ${x + 1}`; e.style.height = `${tileH}px`; e.classList.add("stick"); });
   charts.forEach((P, i) => { const r = Math.floor(i / cols) + 1, c = 2 + (i % cols); P.card.style.gridArea = `${r} / ${c} / ${r + 1} / ${c + 1}`; });
+  quietEl.style.gridArea = `${rows + 1} / 2 / ${rows + 2} / ${cols + 2}`;
 }
+// Standard / Hardcore: the same run, with or without the deep layer
+function setDetail(on) {
+  HC = hasDeep && on; document.body.classList.toggle("hc", HC);
+  try { HC ? localStorage.setItem(DETAIL_KEY, "hardcore") : localStorage.removeItem(DETAIL_KEY); } catch (e) { /* storage blocked */ }
+  document.querySelectorAll("#detailSeg [data-detail]").forEach(b => b.setAttribute("aria-pressed", String((b.dataset.detail === "hardcore") === HC)));
+  feedShown = -1; if (activeBeat) setCapHint(activeBeat);
+  render(); if (activeBeat) revealFocusedPanels(activeBeat); if (ready) flash(HC ? "Hardcore: deeper detail on" : "Standard detail");
+}
+$("#detailRow").hidden = !hasDeep;
+document.querySelectorAll("#detailSeg [data-detail]").forEach(b => (b.onclick = () => setDetail(b.dataset.detail === "hardcore")));
+document.querySelectorAll("#detailSeg [data-detail]").forEach(b => b.setAttribute("aria-pressed", String((b.dataset.detail === "hardcore") === HC)));
 new ResizeObserver(() => renderLayout()).observe(board);
 ONE_SCREEN.addEventListener("change", () => renderLayout());
 document.querySelectorAll("#themeSeg [data-theme-set]").forEach(b => (b.onclick = () => applyTheme(b.dataset.themeSet, true)));
@@ -1097,7 +1226,7 @@ $("#introT").textContent = M.title; $("#introStory").textContent = M.story;
   box.innerHTML = (story ? `<div class="story">${story}</div>` : "") + (side ? `<div class="side">${side}</div>` : "");
   box.classList.toggle("one", !story || !side); box.hidden = !story && !side;
 }
-$("#introMeta").textContent = `Story · ${humanDur(TOTAL)}${TOTAL > D * 1.5 ? " (plays in ~" + Math.max(1, Math.round(D / 4 / 60)) + " min)" : ""} · ${beats.length} key moments${(M.tags || []).length ? " · " + M.tags.slice(0, 3).join(" · ") : ""}`;
+$("#introMeta").textContent = `${hasDeep ? "Hardcore detail available (H) · " : ""}Story · ${humanDur(TOTAL)}${TOTAL > D * 1.5 ? " (plays in ~" + Math.max(1, Math.round(D / 4 / 60)) + " min)" : ""} · ${beats.length} key moments${(M.tags || []).length ? " · " + M.tags.slice(0, 3).join(" · ") : ""}`;
 function startRun() { hideModal($("#intro"), () => renderHud(viewT())); seek(0); setPlaying(true); }
 $("#start").onclick = startRun;
 $("#pbTitle").textContent = PB.meta.title; document.title = PB.meta.title;
@@ -1111,6 +1240,7 @@ window.player = {
     t: Math.round(playT * 10) / 10, playing, speed: speed / 4,
     key_moment: activeBeat ? beats.indexOf(activeBeat) + 1 : null,
     intro_open: isOpen($("#intro")), report_open: isOpen($("#scrim")), ended: playT >= D,
+    detail: HC ? "hardcore" : "standard", has_deep: hasDeep,
   }),
   start() { if (isOpen($("#intro"))) startRun(); else { if (isOpen($("#scrim"))) closeReport(); hideBeat(); setPlaying(true); } },
   pause() { setPlaying(false); render(); },
@@ -1123,6 +1253,7 @@ window.player = {
   step(dir) { if (isOpen($("#intro"))) hideModal($("#intro")); if (isOpen($("#scrim"))) closeReport(); jumpBeat(dir); },
   report(open) { if (open) openReport(); else if (isOpen($("#scrim"))) closeReport(); },
   restart() { if (isOpen($("#intro"))) hideModal($("#intro")); if (isOpen($("#scrim"))) closeReport(); reportSeen = false; seek(0); setPlaying(true); },
+  detail(mode) { if (!["standard", "hardcore"].includes(mode)) throw new Error('detail must be "standard" or "hardcore"'); if (mode === "hardcore" && !hasDeep) throw new Error("this playbook has no deep layer"); setDetail(mode === "hardcore"); },
   speed(x) { if (!SPEED_X[x]) throw new Error("speed must be 0.5, 1, 2 or 4"); setSpeed(SPEED_X[x]); flash(`speed ${speedLabel(speed)}`); },
 };
 emit("ready", {});

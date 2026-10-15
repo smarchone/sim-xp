@@ -21,7 +21,7 @@ python3 -m http.server 3000      # open http://localhost:3000
 ```
 
 Pick a bundled playbook or drop a playbook `.json` on the page. Space plays and pauses, ←/→ jump between key
-moments, R opens the report.
+moments, R opens the report, and H switches Standard / Hardcore detail when the playbook has a deep layer.
 
 Tests: `node --test v2/test/*.test.mjs`
 
