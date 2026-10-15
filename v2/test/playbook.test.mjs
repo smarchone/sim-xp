@@ -76,3 +76,17 @@ test("intro and report context fields are checked, and bundled playbooks carry t
   delete pb.meta.background;
   assert.ok(validate(read("kafka-rebalance-storm.json")).ok);
 });
+
+test("every panel says why it matters, and meta.clock / feed.key are checked", () => {
+  for (const item of index) {
+    const pb = read(item.file), r = validate(pb);
+    assert.ok(pb.dashboard.every((p) => p.why), `${item.file}: panel why`);
+    assert.ok(!r.warnings.some((w) => w.includes('"why"') || w.includes("add \"why\"")), item.file);
+  }
+  const pb = read("github-2018-split-brain.json");
+  assert.equal(validate(pb).ok, true);
+  pb.meta.clock = { start: "nope", scale: -1, changes: [{ t: 50, scale: 2 }, { t: 40, scale: 3 }] };
+  pb.timeline.find((e) => e.feed).feed.key = "yes";
+  const r = validate(pb);
+  for (const bit of ["meta.clock.start", "meta.clock.scale", "meta.clock.changes[1]", "feed.key"]) assert.ok(r.errors.some((e) => e.includes(bit)), bit);
+});

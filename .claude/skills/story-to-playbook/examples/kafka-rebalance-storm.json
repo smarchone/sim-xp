@@ -253,7 +253,8 @@
    "threshold": {
     "value": 20000,
     "label": "alert 20k"
-   }
+   },
+   "why": "Messages waiting to be processed. Sustained growth means consumers are not keeping up."
   },
   {
    "id": "flow",
@@ -261,7 +262,8 @@
    "metrics": [
     "produced",
     "consumed"
-   ]
+   ],
+   "why": "Produced vs consumed. When consumed drops to zero, the whole group has stopped."
   },
   {
    "id": "db_p99",
@@ -272,21 +274,24 @@
    "threshold": {
     "value": 600,
     "label": "per-record budget 600ms"
-   }
+   },
+   "why": "The slow dependency. Per-record time here decides how long a batch takes."
   },
   {
    "id": "rebalances",
    "title": "Group rebalances",
    "metrics": [
     "rebalances"
-   ]
+   ],
+   "why": "Each rebalance stops every worker. Several close together is the storm."
   },
   {
    "id": "dupes",
    "title": "Reprocessed records",
    "metrics": [
     "dupes"
-   ]
+   ],
+   "why": "Records processed again after an uncommitted batch was lost: extra load on the database."
   },
   {
    "id": "worker_cpu",
@@ -294,7 +299,8 @@
    "metrics": [
     "worker_cpu"
    ],
-   "max": 100
+   "max": 100,
+   "why": "Workers are waiting on the database, not working, so CPU falls instead of rising."
   },
   {
    "id": "db_cpu",
@@ -302,7 +308,8 @@
    "metrics": [
     "db_cpu"
    ],
-   "max": 100
+   "max": 100,
+   "why": "The real bottleneck. Replays and catch-up push it toward saturation."
   },
   {
    "id": "batch_s",
@@ -313,7 +320,8 @@
    "threshold": {
     "value": 300,
     "label": "max.poll.interval"
-   }
+   },
+   "why": "The number that triggers the failure: a batch longer than max.poll.interval gets the worker evicted."
   },
   {
    "id": "paused",
@@ -321,7 +329,8 @@
    "metrics": [
     "paused"
    ],
-   "max": 3
+   "max": 3,
+   "why": "How many workers are stopped by a rebalance at once. Eager rebalancing pauses all of them."
   }
  ],
  "alerts": [
