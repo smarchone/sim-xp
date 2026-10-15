@@ -214,49 +214,49 @@ kbd{font:500 var(--s) var(--mono);color:var(--muted);border:1px solid var(--line
 /* reading screens: intro and report. One calm column, serif prose. */
 .modal.report{width:min(720px,100%)}
 .modal.intro{width:min(max(60vw,760px),100%);max-height:calc(100dvh - 32px);padding:22px 28px 16px;gap:10px}
-.intro h2{font:500 35px/1.15 var(--serif);letter-spacing:-.01em}
-.intro .hook{font:400 21.2px/1.5 var(--serif);color:var(--fg);margin:0;text-wrap:pretty}
+.intro h2{font:500 26px/1.15 var(--serif);letter-spacing:-.01em}
+.intro .hook{font:400 17.5px/1.5 var(--serif);color:var(--fg);margin:0;text-wrap:pretty}
 .intro .icols{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:28px;margin-top:6px;overflow-y:auto;min-height:0}
 .intro .icols.one{grid-template-columns:minmax(0,1fr)}
 .intro .story,.intro .side{display:flex;flex-direction:column;gap:14px;min-width:0}
 .intro h4{margin:0 0 3px;font-size:var(--s);font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.intro .story p{font:400 18.8px/1.6 var(--serif);color:var(--fg)}
+.intro .story p{font:400 15px/1.6 var(--serif);color:var(--fg)}
 .intro ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px}
-.intro li{font-size:15.6px;line-height:1.45;color:var(--fg)}
+.intro li{font-size:14.4px;line-height:1.45;color:var(--fg)}
 .intro .cast li b{font-weight:600}
 .intro .cast li span{color:var(--muted)}
 .intro .watch li{display:flex;gap:8px;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--line);padding-bottom:4px}
-.intro .watch li em{font:normal 13.8px var(--mono);color:var(--green);white-space:nowrap}
+.intro .watch li em{font:normal 12.5px var(--mono);color:var(--green);white-space:nowrap}
 .intro .learn li{padding-left:16px;position:relative}
 .intro .learn li::before{content:"→";position:absolute;left:0;color:var(--accent)}
 .rp{display:flex;flex-direction:column;gap:20px;padding:4px 2px 6px}
 .rp h4{margin:0 0 6px;font-size:var(--s);font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.modal.report h2{font:500 32.5px/1.15 var(--serif);letter-spacing:-.01em}
-.rp-tldr{font:400 23.8px/1.5 var(--serif);margin:0;text-wrap:pretty}
-.rp-num{width:100%;border-collapse:collapse;font-size:15.6px}
+.modal.report h2{font:500 26px/1.15 var(--serif);letter-spacing:-.01em}
+.rp-tldr{font:400 17.5px/1.5 var(--serif);margin:0;text-wrap:pretty}
+.rp-num{width:100%;border-collapse:collapse;font-size:14.4px}
 .rp-num th{font-size:var(--s);font-weight:500;color:var(--muted);text-align:right;padding:0 0 4px}
 .rp-num th:first-child{text-align:left}
 .rp-num td{padding:5px 0;border-top:1px solid var(--line);font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
 .rp-num td:first-child{font-family:var(--sans);text-align:left;color:var(--fg)}
 .rp-num .bf{color:var(--red)} .rp-num .af{color:var(--green)}
 .rp-chain{list-style:none;margin:0;padding:0 0 0 14px;border-left:2px solid var(--line2);display:flex;flex-direction:column;gap:8px}
-.rp-chain li{display:flex;gap:10px;align-items:baseline;font:400 18.8px/1.45 var(--serif);position:relative}
+.rp-chain li{display:flex;gap:10px;align-items:baseline;font:400 15px/1.45 var(--serif);position:relative}
 .rp-chain li::before{content:"";position:absolute;left:-20px;top:.5em;width:8px;height:8px;border-radius:50%;background:var(--panel);border:2px solid var(--line2)}
-.rp-chain .tag{flex:none;width:86px;font:600 11.9px var(--sans);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.rp-chain .tag{flex:none;width:86px;font:600 10.5px var(--sans);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
 .rp-chain .k-cause .tag{color:var(--amber)} .rp-chain .k-amp .tag{color:var(--red)} .rp-chain .k-fix .tag{color:var(--green)}
 .rp-chain .k-cause::before{border-color:var(--amber)} .rp-chain .k-amp::before{border-color:var(--red)} .rp-chain .k-fix::before{border-color:var(--green)}
-.rp-loop{margin:12px 0 0;font:italic 400 17.5px/1.5 var(--serif);color:var(--muted)}
+.rp-loop{margin:12px 0 0;font:italic 400 15px/1.5 var(--serif);color:var(--muted)}
 .rp-loop b{font-style:normal;color:var(--red);font-weight:500}
-.rp-math{font:15px/1.7 var(--mono);background:var(--sunk);border-radius:8px;padding:10px 14px;margin:0;white-space:pre-wrap;max-height:none;overflow:visible}
+.rp-math{font:13px/1.7 var(--mono);background:var(--sunk);border-radius:8px;padding:10px 14px;margin:0;white-space:pre-wrap;max-height:none;overflow:visible}
 .rp-take{list-style:none;counter-reset:t;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
 .rp-take li{counter-increment:t;display:grid;grid-template-columns:22px minmax(0,1fr);gap:4px 8px}
-.rp-take li::before{content:counter(t);font:500 15px var(--mono);color:var(--accent);padding-top:3px}
-.rp-take b{font:600 17.5px/1.4 var(--sans)}
-.rp-take span{grid-column:2;font:400 18.8px/1.55 var(--serif);color:var(--fg)}
+.rp-take li::before{content:counter(t);font:500 12.5px var(--mono);color:var(--accent);padding-top:3px}
+.rp-take b{font:600 14.4px/1.4 var(--sans)}
+.rp-take span{grid-column:2;font:400 15px/1.55 var(--serif);color:var(--fg)}
 .rp-myth{border-left:2px solid var(--line2);padding:2px 0 2px 12px;margin:0 0 10px}
-.rp-myth q{font:italic 400 18.8px/1.5 var(--serif);color:var(--muted);quotes:"\201C" "\201D"}
-.rp-myth p{margin:3px 0 0;font:400 18.8px/1.55 var(--serif)}
-.rp-links{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:15.6px}
+.rp-myth q{font:italic 400 15px/1.5 var(--serif);color:var(--muted);quotes:"\201C" "\201D"}
+.rp-myth p{margin:3px 0 0;font:400 15px/1.55 var(--serif)}
+.rp-links{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:14.4px}
 .rp-links a{color:var(--accent)}
 
 /* reviewer-only section */
@@ -978,8 +978,8 @@ $("#schema").innerHTML = `<p>The agent writes one JSON file; the app only plays 
 
 
 /* ===================== Layout: fixed =====================
-   Components on the left (3 of 12 columns) and the feed on the right (3 columns), both full height and fixed.
-   The charts share the middle 6 columns, all the same size. The playbook may pick meta.layout { columns, rows };
+   Components on the left (3 of 12 columns, or 4 or 5 when meta.layout.components says so, taken from the charts only) and the feed
+   on the right (3 columns), both full height and fixed. The charts share the middle columns, all the same size. The playbook may pick meta.layout { components, columns, rows };
    otherwise 2 columns, with as many rows per screen as fit all charts (2 to 5). More charts than fit: the board scrolls. */
 const COLS = 12, GAP = 4, MIN_H = 110;
 const board = dashGrid, charts = panels.filter(P => P.kind === "chart");
@@ -988,18 +988,19 @@ const LAYOUT = PB.meta.layout || {};
 function renderLayout() {
   const all = [...tiles, ...charts.map(P => P.card)];
   if (!ONE_SCREEN.matches) { // stacked: no grid areas
-    board.style.gridTemplateRows = "";
+    board.style.gridTemplateRows = ""; board.style.gridTemplateColumns = "";
     all.forEach(e => { e.style.gridArea = ""; e.style.height = ""; e.classList.remove("stick"); });
     return;
   }
   const H = board.clientHeight, n = charts.length;
-  const cols = [1, 2, 3].includes(LAYOUT.columns) ? LAYOUT.columns : 2, span = 6 / cols, R = Math.max(1, Math.ceil(n / cols));
+  const cols = [1, 2, 3].includes(LAYOUT.columns) ? LAYOUT.columns : 2, CW = [3, 4, 5].includes(LAYOUT.components) ? LAYOUT.components : 3, M = 12 - CW - 3, R = Math.max(1, Math.ceil(n / cols));
   let per = Number.isInteger(LAYOUT.rows) && LAYOUT.rows >= 1 ? LAYOUT.rows : Math.max(2, Math.min(5, R));
   per = Math.max(1, Math.min(per, R, Math.floor((H + GAP) / (MIN_H + GAP))));
   const rh = (H - (per - 1) * GAP) / per, rows = R, tileH = Math.min(H, rows * rh + (rows - 1) * GAP);
   board.style.gridTemplateRows = `repeat(${rows}, ${rh}px)`;
-  [[tiles[0], 1], [tiles[1], 10]].forEach(([e, x]) => { e.style.gridArea = `1 / ${x} / ${rows + 1} / ${x + 3}`; e.style.height = `${tileH}px`; e.classList.add("stick"); });
-  charts.forEach((P, i) => { const r = Math.floor(i / cols) + 1, c = 4 + (i % cols) * span; P.card.style.gridArea = `${r} / ${c} / ${r + 1} / ${c + span}`; });
+  board.style.gridTemplateColumns = `minmax(0,${CW}fr) repeat(${cols}, minmax(0,${M / cols}fr)) minmax(0,3fr)`;
+  [[tiles[0], 1], [tiles[1], cols + 2]].forEach(([e, x]) => { e.style.gridArea = `1 / ${x} / ${rows + 1} / ${x + 1}`; e.style.height = `${tileH}px`; e.classList.add("stick"); });
+  charts.forEach((P, i) => { const r = Math.floor(i / cols) + 1, c = 2 + (i % cols); P.card.style.gridArea = `${r} / ${c} / ${r + 1} / ${c + 1}`; });
 }
 new ResizeObserver(() => renderLayout()).observe(board);
 ONE_SCREEN.addEventListener("change", () => renderLayout());
