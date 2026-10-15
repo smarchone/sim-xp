@@ -67,7 +67,11 @@
    "how a 43-second blip becomes a day of recovery",
    "why failing over is only safe if the apps can live with the new primary",
    "what you can and cannot do with writes that exist on only one side"
-  ]
+  ],
+  "layout": {
+   "columns": 2,
+   "rows": 5
+  }
  },
  "components": {
   "nodes": [
@@ -236,6 +240,27 @@
     0,
     20000
    ]
+  },
+  {
+   "id": "repl_lag",
+   "label": "East replicas behind West",
+   "unit": "min",
+   "start": 0,
+   "noise": 0.0
+  },
+  {
+   "id": "cross_dc",
+   "label": "Writes crossing the coast",
+   "unit": "%",
+   "start": 0,
+   "noise": 0.02
+  },
+  {
+   "id": "pages_q",
+   "label": "Pages builds queued",
+   "unit": "builds",
+   "start": 0,
+   "noise": 0.03
   }
  ],
  "dashboard": [
@@ -292,6 +317,28 @@
     "value": 1000000,
     "label": "1M jobs"
    }
+  },
+  {
+   "id": "repl_lag",
+   "title": "East replicas behind West",
+   "metrics": [
+    "repl_lag"
+   ]
+  },
+  {
+   "id": "cross_dc",
+   "title": "Writes crossing the coast",
+   "metrics": [
+    "cross_dc"
+   ],
+   "max": 100
+  },
+  {
+   "id": "pages_q",
+   "title": "Pages builds queued",
+   "metrics": [
+    "pages_q"
+   ]
   }
  ],
  "alerts": [
@@ -577,6 +624,13 @@
      "flow": 0.6,
      "color": "violet"
     }
+   ],
+   "metrics": [
+    {
+     "id": "cross_dc",
+     "to": 100,
+     "over_s": 10
+    }
    ]
   },
   {
@@ -821,6 +875,12 @@
      "id": "err",
      "to": 1.5,
      "over_s": 15
+    },
+    {
+     "id": "pages_q",
+     "to": 80000,
+     "over_s": 219,
+     "shape": "linear"
     }
    ]
   },
@@ -905,7 +965,14 @@
     "from": "Ana · #incident",
     "kind": "chat",
     "text": "biggest cluster restore is the long pole. decompress + load is hours, not minutes. eta rolling"
-   }
+   },
+   "metrics": [
+    {
+     "id": "repl_lag",
+     "to": 134,
+     "over_s": 35
+    }
+   ]
   },
   {
    "t": 240,
@@ -963,7 +1030,15 @@
     "from": "backup-restore",
     "kind": "log",
     "text": "mysql-c3, c4 us-east restored; replication lag 18m and dropping"
-   }
+   },
+   "metrics": [
+    {
+     "id": "repl_lag",
+     "to": 18,
+     "over_s": 60,
+     "shape": "linear"
+    }
+   ]
   },
   {
    "t": 330,
@@ -1063,6 +1138,16 @@
      "id": "err",
      "to": 0.3,
      "over_s": 12
+    },
+    {
+     "id": "repl_lag",
+     "to": 0,
+     "over_s": 20
+    },
+    {
+     "id": "cross_dc",
+     "to": 0,
+     "over_s": 10
     }
    ]
   },
@@ -1121,6 +1206,12 @@
      "id": "backlog",
      "to": 1500,
      "over_s": 90
+    },
+    {
+     "id": "pages_q",
+     "to": 6000,
+     "over_s": 67,
+     "shape": "linear"
     }
    ]
   },

@@ -96,7 +96,16 @@ export function validate(PB) {
   }
   const panels = PB.dashboard || [], panelIds = new Set();
   if (!panels.length) err("dashboard is empty");
-  if (panels.length > 8) warn(`${panels.length} panels: 4–6 is the sweet spot`);
+  if (panels.length > 14) warn(`${panels.length} panels; more than ~12 makes the board scroll a lot`);
+  if (panels.length < 4) warn(`only ${panels.length} panels; 6–10 gives the viewer enough to correlate`);
+  const lay = PB.meta && PB.meta.layout;
+  if (lay != null) {
+    if (typeof lay !== "object" || Array.isArray(lay)) err("meta.layout must be { columns?, rows? }");
+    else {
+      if (lay.columns != null && ![1, 2, 3].includes(lay.columns)) err("meta.layout.columns must be 1, 2 or 3");
+      if (lay.rows != null && !(Number.isInteger(lay.rows) && lay.rows >= 1 && lay.rows <= 8)) err("meta.layout.rows must be an integer 1..8");
+    }
+  }
   for (const p of panels) {
     if (panelIds.has(p.id)) err(`duplicate panel ${p.id}`); panelIds.add(p.id);
     if (!p.metrics?.length) err(`panel ${p.id} has no metrics`);

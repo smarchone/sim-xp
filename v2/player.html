@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap">
 <style>
-/* 12 x 6 board: components and feed are placed by hand, charts share one size and fill the rest, the board scrolls.
+/* Fixed board: components left, feed right, same-size charts between them; the playbook may pick the chart grid, the board scrolls.
    Type scale for the board: 10 / 11.5 / 14 px. Reading screens (intro, report) use the serif at a larger size.
    Colour only for state (red/amber/green), ownership (teal/violet/pink), and the one accent.
    Light is cream, dark is warm. */
@@ -42,21 +42,12 @@ button:hover,select:hover{border-color:var(--accent)}
 button:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 button.primary{background:var(--accent);border-color:var(--accent);color:var(--panel);font-weight:600}
 
-/* board: a 12-column grid, 6 rows per screen. Stacked on small windows. */
+/* board: components left, feed right, charts in the middle. Stacked on small windows. */
 .main{display:flex;flex-direction:column;gap:6px;min-width:0}
 .board{position:relative;display:flex;flex-direction:column;gap:4px;min-width:0}
 .pn{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:8px;min-width:0;min-height:0}
-.pn.moving{z-index:7;box-shadow:0 10px 28px rgba(0,0,0,.2);border-color:var(--accent)}
-.pn.target{outline:2px solid var(--accent);outline-offset:-2px}
 .pn.stick{position:sticky;top:0;align-self:start}
-.handle{cursor:grab;touch-action:none}
-.corner{position:absolute;right:0;bottom:0;width:16px;height:16px;cursor:nwse-resize;touch-action:none;z-index:6;color:var(--line2);
-  background:linear-gradient(135deg,transparent 52%,currentColor 52%,currentColor 62%,transparent 62%,transparent 74%,currentColor 74%,currentColor 84%,transparent 84%)}
-.corner:hover{color:var(--accent)}
-.cell{border:1px dashed var(--line2);border-radius:4px;opacity:0;pointer-events:none;transition:opacity .15s}
-.board.moving .cell{opacity:.7}
 .lanes{display:flex;flex-direction:column;gap:4px;flex:none}
-body.moving-panel,body.moving-panel *{cursor:grabbing!important;user-select:none!important}
 
 /* components stage */
 .stage{display:flex;flex-direction:column;overflow:hidden}
@@ -94,8 +85,6 @@ body.moving-panel,body.moving-panel *{cursor:grabbing!important;user-select:none
 .panel{display:flex;flex-direction:column;padding:6px 10px 4px;min-width:0;min-height:0}
 .panel-h{display:flex;align-items:baseline;gap:10px;min-height:18px;white-space:nowrap;min-width:0;font-size:var(--s)}
 .panel-h b{font-weight:600;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
-.panel.chart .panel-h b::before{content:"⠿";color:var(--faint);margin-right:5px;opacity:0;transition:opacity .15s}
-.panel.chart .panel-h:hover b::before{opacity:1}
 .panel .legend{display:flex;gap:10px;color:var(--faint);overflow:hidden}
 .panel .legend i{display:inline-block;width:10px;height:2px;margin-right:4px;vertical-align:middle}
 .panel .val{margin-left:auto;font:500 var(--m) var(--mono);font-variant-numeric:tabular-nums;text-align:right;color:var(--fg)}
@@ -155,7 +144,7 @@ body.moving-panel,body.moving-panel *{cursor:grabbing!important;user-select:none
 .playing .pulse{animation:pulse 2s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){.playing .pulse{animation:none}.feed li.fresh{animation:none}.feed ol{scroll-behavior:auto}}
 
-/* one screen: the board is a 12 x 6 grid (rows are sized from JS) and scrolls when there are more charts than fit */
+/* one screen: a 12-column grid (3 | 6 | 3), chart rows sized from JS, scrolls when there are more charts than fit */
 @media (min-width:1000px) and (min-height:600px){
   .app{height:calc(100dvh - 22px)}
   .main{flex:1;min-height:0}
@@ -166,8 +155,6 @@ body.moving-panel,body.moving-panel *{cursor:grabbing!important;user-select:none
   .stage{height:340px}
   .feed{height:220px}
   .panel.chart{height:190px}
-  .corner{display:none}
-  .handle{cursor:default}
 }
 
 /* popups: intro + report */
@@ -299,7 +286,6 @@ pre{font:var(--s)/1.5 var(--mono);background:var(--sunk);border-radius:8px;paddi
         <button class="mi" id="reportBtn" role="menuitem">Report <kbd>R</kbd></button>
         <div class="row"><span class="small" style="flex:1">Speed</span><div class="seg" id="speedSeg"><button data-speed="2">0.5×</button><button data-speed="4">1×</button><button data-speed="8">2×</button><button data-speed="16">4×</button></div></div>
         <div class="row"><span class="small" style="flex:1">Theme</span><div class="seg" id="themeSeg"><button data-theme-set="system">Auto</button><button data-theme-set="light">Light</button><button data-theme-set="dark">Dark</button></div></div>
-        <button class="mi" id="resetLayout" role="menuitem">Reset layout</button>
         <button class="mi" id="libraryBtn" role="menuitem">Open another playbook</button>
       </div>
     </div>
@@ -308,7 +294,7 @@ pre{font:var(--s)/1.5 var(--mono);background:var(--sunk);border-radius:8px;paddi
   <main class="main">
     <div class="board" id="dashgrid">
       <div class="pn stage dimmable" id="compCard" data-pn="comps">
-        <div class="ph handle" title="Drag to move · corner resizes">Components</div>
+        <div class="ph">Components</div>
         <div class="stagebox"><svg id="comp" role="img" aria-label="Components"></svg></div>
         <div class="sheet" id="caption" aria-live="polite">
           <div class="strip" id="sheetStrip"></div>
@@ -319,12 +305,10 @@ pre{font:var(--s)/1.5 var(--mono);background:var(--sunk);border-radius:8px;paddi
             <div class="foot"><span class="spacer"></span><kbd>Space</kbd><button class="primary" id="beatGo" tabindex="-1">Continue ▶</button></div>
           </div>
         </div>
-        <div class="corner" aria-hidden="true"></div>
       </div>
       <div class="pn feed dimmable" data-pn="feed" data-id="feed" id="feedCard">
-        <div class="fh handle" title="Drag to move · corner resizes"><b>Feed</b><span class="hint">hover a line to see that moment · click to jump</span></div>
+        <div class="fh"><b>Feed</b><span class="hint">hover a line to see that moment · click to jump</span></div>
         <div class="feedbox"><ol id="feed"></ol></div>
-        <div class="corner" aria-hidden="true"></div>
       </div>
     </div>
     <div class="lanes" id="dash" aria-label="Events"></div>
@@ -642,7 +626,7 @@ const panels = [...PB.dashboard.filter(p => !isEvent(p)), ...PB.dashboard.filter
   const card = document.createElement("div"); card.className = `pn panel ${kind} dimmable`; card.dataset.id = "panel:" + p.id;
   const unitTxt = units === "msg/s" ? "msg/s" : units === "msgs" ? "msgs" : "";
   const legend = p.metrics.length > 1 ? `<span class="legend">${p.metrics.map((m, i) => `<span><i style="background:${seriesColor({ p }, i)}"></i>${esc(metricById[m].label)}</span>`).join("")}</span>` : "";
-  card.innerHTML = `<div class="panel-h${kind === "chart" ? " handle" : ""}"><b>${esc(p.title)}</b>${legend}<span class="val"></span></div><div class="plot"></div>${kind === "chart" ? '<div class="corner" aria-hidden="true"></div>' : ""}`;
+  card.innerHTML = `<div class="panel-h"><b>${esc(p.title)}</b>${legend}<span class="val"></span></div><div class="plot"></div>`;
   (kind === "lane" ? dash : dashGrid).appendChild(card);
   const plot = card.querySelector(".plot"), svg = el("svg", {}, plot);
   const P = { p, kind, units, unitTxt, card, plot, svg, val: card.querySelector(".val"), W: 0, H: 0, xOf: xOfW(600), tOf: tOfW(600), yOf: () => 0, lines: [], dots: [], annoEls: [] };
@@ -903,7 +887,7 @@ document.addEventListener("keydown", e => {
 });
 function hoverable(svg, toTime) {
   const toT = ev => { const r = svg.getBoundingClientRect(); const vb = svg.viewBox.baseVal; return toTime(((ev.clientX - r.left) / r.width) * (vb && vb.width ? vb.width : r.width)); };
-  svg.addEventListener("pointermove", ev => { if (ev.pointerType === "mouse" && !document.body.classList.contains("moving-panel")) { hoverT = toT(ev); render(); } });
+  svg.addEventListener("pointermove", ev => { if (ev.pointerType === "mouse") { hoverT = toT(ev); render(); } });
   svg.addEventListener("pointerleave", () => { hoverT = null; render(); });
   svg.addEventListener("click", ev => { const t = toT(ev); if (t <= playT) seek(t); });
 }
@@ -952,150 +936,35 @@ $("#scrim").addEventListener("click", e => {
 $("#schema").innerHTML = `<p>The agent writes one JSON file; the app only plays it. Layout coordinates in this proposal come from the app, not from the playbook.</p><pre>${JSON.stringify(PB, null, 2).replace(/</g, "&lt;")}</pre>`;
 
 
-/* ===================== Layout: a 12 x 6 board =====================
-   Components and feed are placed by hand (drag the header, resize from the corner; both snap to cells).
-   Charts all share one size and fill every cell that is left, first free spot top-left; extra rows scroll.
-   Saved per playbook in this browser. */
-const COLS = 12, VIS = 6, GAP = 4, MIN_ROW = 44;
-const LKEY = "sim-xp.layout.v2." + PB.meta.id;
-const HOME = { comps: { x: 0, y: 0, w: 3, h: 6 }, feed: { x: 9, y: 0, w: 3, h: 6 } };
-const board = dashGrid, charts = panels.filter(P => P.kind === "chart"), chartIds = charts.map(P => P.p.id);
-const tiles = { comps: $("#compCard"), feed: $("#feedCard") };
-const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
-const inView = r => r.x >= 0 && r.y >= 0 && r.x + r.w <= COLS && r.y + r.h <= VIS;
-const isRect = r => r && [r.x, r.y, r.w, r.h].every(Number.isInteger);
-const MINS = { comps: [3, 3], feed: [2, 1] };
-let lay = { auto: true, cw: 3, ch: 2, comps: { ...HOME.comps }, feed: { ...HOME.feed }, order: null };
-try {
-  const v = JSON.parse(localStorage.getItem(LKEY));
-  if (v && typeof v === "object") {
-    const ok = (r, id) => isRect(r) && inView(r) && r.w >= MINS[id][0] && r.h >= MINS[id][1];
-    if (ok(v.comps, "comps") && ok(v.feed, "feed") && !hit(v.comps, v.feed)) { lay.comps = v.comps; lay.feed = v.feed; }
-    if (v.auto === false && Number.isInteger(v.cw) && Number.isInteger(v.ch) && v.cw >= 2 && v.cw <= COLS && v.ch >= 1 && v.ch <= VIS) Object.assign(lay, { auto: false, cw: v.cw, ch: v.ch });
-    if (Array.isArray(v.order)) lay.order = v.order.filter(id => chartIds.includes(id));
-  }
-} catch (e) { /* no saved layout */ }
-const orderNow = () => { const o = (lay.order || []).filter(id => chartIds.includes(id)); return [...o, ...chartIds.filter(id => !o.includes(id))]; };
-const isHome = () => lay.auto && JSON.stringify(lay.comps) === JSON.stringify(HOME.comps) && JSON.stringify(lay.feed) === JSON.stringify(HOME.feed) && orderNow().join() === chartIds.join();
-function saveLayout() {
-  $("#resetLayout").disabled = isHome();
-  try { if (isHome()) localStorage.removeItem(LKEY); else localStorage.setItem(LKEY, JSON.stringify({ ...lay, order: orderNow() })); } catch (e) { /* storage blocked: the layout still works for this visit */ }
-}
-function gridMetrics() {
-  const rh = Math.max(MIN_ROW, (board.clientHeight - (VIS - 1) * GAP) / VIS), cw = (board.clientWidth - (COLS - 1) * GAP) / COLS, b = board.getBoundingClientRect();
-  return { rh, cw, sx: cw + GAP, sy: rh + GAP, left: b.left, top: b.top - board.scrollTop };
-}
-function flowAt(cw, ch) {
-  const taken = new Set(), mark = r => { for (let j = r.y; j < r.y + r.h; j++) for (let i = r.x; i < r.x + r.w; i++) taken.add(i + "," + j); };
-  const free = r => { if (r.x + r.w > COLS) return false; for (let j = r.y; j < r.y + r.h; j++) for (let i = r.x; i < r.x + r.w; i++) if (taken.has(i + "," + j)) return false; return true; };
-  // a full-height tile is sticky and spans every row, so the whole column strip is taken, not just the first screen
-  const col = r => (r.y === 0 && r.h === VIS ? { ...r, h: 400 } : r);
-  mark(col(lay.comps)); mark(col(lay.feed));
-  const slots = [];
-  for (let y = 0; slots.length < charts.length; y++) for (let x = 0; x < COLS && slots.length < charts.length; x++) {
-    const r = { x, y, w: Math.min(cw, COLS), h: ch };
-    if (free(r)) { slots.push(r); mark(r); }
-  }
-  return { slots, rows: Math.max(VIS, ...slots.map(s => s.y + s.h)) };
-}
-// until a chart is resized by hand: the biggest shared size that fits every chart on the first screen and is still readable
-function flow(m) {
-  if (lay.auto) {
-    for (const [w, h] of [[4, 3], [4, 2], [3, 3], [3, 2], [2, 3], [2, 2]]) {
-      if (w * m.sx - GAP < 250 || h * m.sy - GAP < 140) continue;
-      const r = flowAt(w, h); if (r.rows === VIS) return r;
-    }
-    return flowAt(3, 2);
-  }
-  return flowAt(lay.cw, lay.ch);
-}
-let cells = [];
-function clearCells() { cells.forEach(c => c.remove()); cells = []; }
-function renderLayout(animate) {
-  const all = [tiles.comps, tiles.feed, ...charts.map(P => P.card)];
+/* ===================== Layout: fixed =====================
+   Components on the left (3 of 12 columns) and the feed on the right (3 columns), both full height and fixed.
+   The charts share the middle 6 columns, all the same size. The playbook may pick meta.layout { columns, rows };
+   otherwise 2 columns, with as many rows per screen as fit all charts (2 to 5). More charts than fit: the board scrolls. */
+const COLS = 12, GAP = 4, MIN_H = 110;
+const board = dashGrid, charts = panels.filter(P => P.kind === "chart");
+const tiles = [$("#compCard"), $("#feedCard")];
+const LAYOUT = PB.meta.layout || {};
+function renderLayout() {
+  const all = [...tiles, ...charts.map(P => P.card)];
   if (!ONE_SCREEN.matches) { // stacked: no grid areas
-    clearCells(); board.style.gridTemplateRows = "";
+    board.style.gridTemplateRows = "";
     all.forEach(e => { e.style.gridArea = ""; e.style.height = ""; e.classList.remove("stick"); });
     return;
   }
-  const m = gridMetrics(), { slots, rows } = flow(m);
-  const before = animate ? all.map(e => e.getBoundingClientRect()) : null;
-  board.style.gridTemplateRows = `repeat(${rows}, ${m.rh}px)`;
-  if (cells.length !== rows * COLS) {
-    clearCells();
-    for (let y = 0; y < rows; y++) for (let x = 0; x < COLS; x++) { const i = document.createElement("i"); i.className = "cell"; i.setAttribute("aria-hidden", "true"); i.style.gridArea = `${y + 1} / ${x + 1}`; board.prepend(i); cells.push(i); }
-  }
-  for (const id of ["comps", "feed"]) {
-    const r = lay[id], e = tiles[id], full = r.y === 0 && r.h === VIS;
-    // a full-height tile spans every row and sticks to the top while the charts scroll
-    e.style.gridArea = `${r.y + 1} / ${r.x + 1} / ${(full ? rows : r.y + r.h) + 1} / ${r.x + r.w + 1}`;
-    e.style.height = full ? `${VIS * m.rh + (VIS - 1) * GAP}px` : "";
-    e.classList.toggle("stick", full);
-  }
-  orderNow().forEach((id, k) => { const s = slots[k], P = charts.find(c => c.p.id === id); P.card.style.gridArea = `${s.y + 1} / ${s.x + 1} / ${s.y + s.h + 1} / ${s.x + s.w + 1}`; });
-  if (before) all.forEach((e, i) => {
-    const a = before[i], b = e.getBoundingClientRect();
-    if (!a.width || (a.left === b.left && a.top === b.top && a.width === b.width && a.height === b.height) || matchMedia("(prefers-reduced-motion:reduce)").matches) return;
-    e.animate([{ transform: `translate(${a.left - b.left}px,${a.top - b.top}px)` }, { transform: "none" }], { duration: 200, easing: "cubic-bezier(.2,.7,.2,1)" });
-  });
-  $("#resetLayout").disabled = isHome();
+  const H = board.clientHeight, n = charts.length;
+  const cols = [1, 2, 3].includes(LAYOUT.columns) ? LAYOUT.columns : 2, span = 6 / cols, R = Math.max(1, Math.ceil(n / cols));
+  let per = Number.isInteger(LAYOUT.rows) && LAYOUT.rows >= 1 ? LAYOUT.rows : Math.max(2, Math.min(5, R));
+  per = Math.max(1, Math.min(per, R, Math.floor((H + GAP) / (MIN_H + GAP))));
+  const rh = (H - (per - 1) * GAP) / per, rows = R, tileH = Math.min(H, rows * rh + (rows - 1) * GAP);
+  board.style.gridTemplateRows = `repeat(${rows}, ${rh}px)`;
+  [[tiles[0], 1], [tiles[1], 10]].forEach(([e, x]) => { e.style.gridArea = `1 / ${x} / ${rows + 1} / ${x + 3}`; e.style.height = `${tileH}px`; e.classList.add("stick"); });
+  charts.forEach((P, i) => { const r = Math.floor(i / cols) + 1, c = 4 + (i % cols) * span; P.card.style.gridArea = `${r} / ${c} / ${r + 1} / ${c + span}`; });
 }
-// the tile you move wins; the other one slides to the nearest free spot on the first screen
-function placeTile(id, r) {
-  const [mw, mh] = MINS[id];
-  if (r.w < mw || r.h < mh || !inView(r)) return;
-  const other = id === "comps" ? "feed" : "comps"; let o = lay[other];
-  if (hit(r, o)) {
-    let best = null;
-    for (let y = 0; y + o.h <= VIS; y++) for (let x = 0; x + o.w <= COLS; x++) {
-      const c = { x, y, w: o.w, h: o.h }; if (hit(c, r)) continue;
-      const d = Math.abs(x - o.x) + Math.abs(y - o.y); if (!best || d < best.d) best = { ...c, d };
-    }
-    if (!best) return; o = { x: best.x, y: best.y, w: best.w, h: best.h };
-  }
-  if (JSON.stringify(r) === JSON.stringify(lay[id]) && o === lay[other]) return;
-  lay[id] = r; lay[other] = o; renderLayout(true);
-}
-board.addEventListener("pointerdown", e => {
-  if (!ONE_SCREEN.matches || e.button !== 0) return;
-  const grip = e.target.closest(".corner"), handle = e.target.closest(".ph, .fh, .panel.chart > .panel-h");
-  if (!grip && !handle) return;
-  const box = e.target.closest(".pn"), chartP = charts.find(P => P.card === box), id = chartP ? null : box.dataset.pn, tgt = grip || handle;
-  e.preventDefault(); tgt.setPointerCapture(e.pointerId);
-  box.classList.add("moving"); board.classList.add("moving"); document.body.classList.add("moving-panel");
-  if (hoverT != null) { hoverT = null; scheduleRender(); }
-  const m = gridMetrics(), gx = Math.floor((e.clientX - m.left) / m.sx), gy = Math.floor((e.clientY - m.top) / m.sy), p0 = id ? { ...lay[id] } : null; let over = null;
-  const move = ev => {
-    const cx = Math.floor((ev.clientX - m.left) / m.sx), cy = Math.floor((ev.clientY - m.top) / m.sy);
-    if (chartP && grip) { // resizing one chart resizes every chart
-      const s = box.getBoundingClientRect(), w = Math.max(2, Math.min(COLS, Math.round((ev.clientX - s.left) / m.sx))), h = Math.max(1, Math.min(VIS, Math.round((ev.clientY - s.top) / m.sy)));
-      if (lay.auto || w !== lay.cw || h !== lay.ch) { lay.auto = false; lay.cw = w; lay.ch = h; renderLayout(true); }
-    } else if (chartP) { // drag a chart onto another to swap them
-      box.style.pointerEvents = "none"; const t = document.elementFromPoint(ev.clientX, ev.clientY); box.style.pointerEvents = "";
-      const tb = t && t.closest(".panel.chart");
-      if (over && over !== tb) over.classList.remove("target");
-      over = tb && tb !== box ? tb : null; if (over) over.classList.add("target");
-    } else if (grip) placeTile(id, { x: lay[id].x, y: lay[id].y, w: Math.round((ev.clientX - m.left) / m.sx) - lay[id].x, h: Math.round((ev.clientY - m.top) / m.sy) - lay[id].y });
-    else placeTile(id, { ...lay[id], x: Math.min(COLS - lay[id].w, Math.max(0, p0.x + cx - gx)), y: Math.min(VIS - lay[id].h, Math.max(0, p0.y + cy - gy)) });
-  };
-  const up = () => {
-    tgt.removeEventListener("pointermove", move);
-    box.classList.remove("moving"); board.classList.remove("moving"); document.body.classList.remove("moving-panel");
-    if (over) {
-      over.classList.remove("target");
-      const o = orderNow(), a = o.indexOf(chartP.p.id), b = o.indexOf(charts.find(P => P.card === over).p.id);
-      [o[a], o[b]] = [o[b], o[a]]; lay.order = o; renderLayout(true);
-    }
-    saveLayout(); if (activeBeat) revealFocusedPanels(activeBeat);
-  };
-  tgt.addEventListener("pointermove", move); tgt.addEventListener("pointerup", up, { once: true }); tgt.addEventListener("pointercancel", up, { once: true });
-});
-$("#resetLayout").onclick = () => { lay = { auto: true, cw: 3, ch: 2, comps: { ...HOME.comps }, feed: { ...HOME.feed }, order: null }; saveLayout(); renderLayout(true); flash("layout reset"); };
-new ResizeObserver(() => renderLayout(false)).observe(board);
-ONE_SCREEN.addEventListener("change", () => renderLayout(false));
+new ResizeObserver(() => renderLayout()).observe(board);
+ONE_SCREEN.addEventListener("change", () => renderLayout());
 document.querySelectorAll("#themeSeg [data-theme-set]").forEach(b => (b.onclick = () => applyTheme(b.dataset.themeSet, true)));
 applyTheme((() => { try { return localStorage.getItem(THEME_KEY); } catch (e) { return null; } })(), false);
-renderLayout(false); saveLayout();
+renderLayout();
 
 ready = true; setSpeed(speed);
 render();

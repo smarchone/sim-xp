@@ -61,7 +61,11 @@
    "how a read can come from the past",
    "what limits how fast a replica catches up",
    "how apps read their own writes safely"
-  ]
+  ],
+  "layout": {
+   "columns": 2,
+   "rows": 5
+  }
  },
  "components": {
   "nodes": [
@@ -177,6 +181,48 @@
    "unit": "qps",
    "start": 120,
    "noise": 0.05
+  },
+  {
+   "id": "bf_rows",
+   "label": "Backfill rows / s",
+   "unit": "rows/s",
+   "start": 0,
+   "noise": 0.04
+  },
+  {
+   "id": "replica_cpu",
+   "label": "Replica CPU (4 cores)",
+   "unit": "%",
+   "start": 12,
+   "noise": 0.05
+  },
+  {
+   "id": "primary_cpu",
+   "label": "Primary CPU",
+   "unit": "%",
+   "start": 18,
+   "noise": 0.05
+  },
+  {
+   "id": "api_p99",
+   "label": "profile-api p99",
+   "unit": "ms",
+   "start": 22,
+   "noise": 0.06
+  },
+  {
+   "id": "tickets",
+   "label": "Support tickets / 5 min",
+   "unit": "tickets",
+   "start": 0,
+   "noise": 0.0
+  },
+  {
+   "id": "wal_disk",
+   "label": "WAL on disk (replica-2)",
+   "unit": "GB",
+   "start": 0.05,
+   "noise": 0.01
   }
  ],
  "dashboard": [
@@ -215,6 +261,50 @@
    "title": "Reads served by primary",
    "metrics": [
     "primary_reads"
+   ]
+  },
+  {
+   "id": "bf_rows",
+   "title": "Backfill rows / s",
+   "metrics": [
+    "bf_rows"
+   ]
+  },
+  {
+   "id": "replica_cpu",
+   "title": "Replica CPU (4 cores)",
+   "metrics": [
+    "replica_cpu"
+   ],
+   "max": 100
+  },
+  {
+   "id": "primary_cpu",
+   "title": "Primary CPU",
+   "metrics": [
+    "primary_cpu"
+   ],
+   "max": 100
+  },
+  {
+   "id": "api_p99",
+   "title": "profile-api p99",
+   "metrics": [
+    "api_p99"
+   ]
+  },
+  {
+   "id": "tickets",
+   "title": "Support tickets / 5 min",
+   "metrics": [
+    "tickets"
+   ]
+  },
+  {
+   "id": "wal_disk",
+   "title": "WAL on disk (replica-2)",
+   "metrics": [
+    "wal_disk"
    ]
   }
  ],
@@ -389,6 +479,21 @@
      "id": "wal_replay",
      "to": 50,
      "over_s": 10
+    },
+    {
+     "id": "bf_rows",
+     "to": 48000,
+     "over_s": 6
+    },
+    {
+     "id": "replica_cpu",
+     "to": 31,
+     "over_s": 10
+    },
+    {
+     "id": "primary_cpu",
+     "to": 62,
+     "over_s": 10
     }
    ]
   },
@@ -405,6 +510,17 @@
      "id": "stale",
      "to": 65,
      "over_s": 45
+    },
+    {
+     "id": "api_p99",
+     "to": 24,
+     "over_s": 10
+    },
+    {
+     "id": "wal_disk",
+     "to": 2.4,
+     "over_s": 125,
+     "shape": "linear"
     }
    ]
   },
@@ -482,6 +598,16 @@
    ]
   },
   {
+   "t": 66,
+   "metrics": [
+    {
+     "id": "tickets",
+     "to": 5,
+     "over_s": 20
+    }
+   ]
+  },
+  {
    "t": 68,
    "feed": {
     "from": "support-bot",
@@ -532,6 +658,16 @@
     {
      "target": "backfill",
      "label": "batch 61/840"
+    }
+   ]
+  },
+  {
+   "t": 95,
+   "metrics": [
+    {
+     "id": "tickets",
+     "to": 8,
+     "over_s": 30
     }
    ]
   },
@@ -650,6 +786,16 @@
      "id": "primary_reads",
      "to": 1100,
      "over_s": 10
+    },
+    {
+     "id": "api_p99",
+     "to": 41,
+     "over_s": 10
+    },
+    {
+     "id": "tickets",
+     "to": 2,
+     "over_s": 40
     }
    ]
   },
@@ -723,6 +869,27 @@
      "to": 0.1,
      "over_s": 72,
      "shape": "linear"
+    },
+    {
+     "id": "bf_rows",
+     "to": 8000,
+     "over_s": 6
+    },
+    {
+     "id": "replica_cpu",
+     "to": 18,
+     "over_s": 10
+    },
+    {
+     "id": "primary_cpu",
+     "to": 30,
+     "over_s": 10
+    },
+    {
+     "id": "wal_disk",
+     "to": 0.05,
+     "over_s": 70,
+     "shape": "linear"
     }
    ]
   },
@@ -773,6 +940,13 @@
      "pulse": false,
      "label": "lag 18s"
     }
+   ],
+   "metrics": [
+    {
+     "id": "tickets",
+     "to": 0,
+     "over_s": 60
+    }
    ]
   },
   {
@@ -818,6 +992,21 @@
      "id": "primary_reads",
      "to": 180,
      "over_s": 12
+    },
+    {
+     "id": "api_p99",
+     "to": 26,
+     "over_s": 15
+    }
+   ]
+  },
+  {
+   "t": 240,
+   "metrics": [
+    {
+     "id": "replica_cpu",
+     "to": 12,
+     "over_s": 10
     }
    ]
   },
@@ -869,6 +1058,16 @@
      "id": "wal_replay",
      "to": 8,
      "over_s": 8
+    },
+    {
+     "id": "bf_rows",
+     "to": 0,
+     "over_s": 5
+    },
+    {
+     "id": "primary_cpu",
+     "to": 18,
+     "over_s": 10
     }
    ]
   },

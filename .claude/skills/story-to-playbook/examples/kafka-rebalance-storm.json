@@ -61,7 +61,11 @@
    "why a slow worker can look dead to Kafka",
    "why a rebalance makes the next one more likely",
    "how batch size, timeouts and rebalancing mode fit together"
-  ]
+  ],
+  "layout": {
+   "columns": 2,
+   "rows": 4
+  }
  },
  "components": {
   "nodes": [
@@ -209,6 +213,34 @@
     0,
     5
    ]
+  },
+  {
+   "id": "worker_cpu",
+   "label": "Worker CPU",
+   "unit": "%",
+   "start": 35,
+   "noise": 0.05
+  },
+  {
+   "id": "db_cpu",
+   "label": "DB CPU",
+   "unit": "%",
+   "start": 25,
+   "noise": 0.05
+  },
+  {
+   "id": "batch_s",
+   "label": "Batch duration",
+   "unit": "s",
+   "start": 4,
+   "noise": 0.05
+  },
+  {
+   "id": "paused",
+   "label": "Workers paused",
+   "unit": "workers",
+   "start": 0,
+   "noise": 0.0
   }
  ],
  "dashboard": [
@@ -255,6 +287,41 @@
    "metrics": [
     "dupes"
    ]
+  },
+  {
+   "id": "worker_cpu",
+   "title": "Worker CPU",
+   "metrics": [
+    "worker_cpu"
+   ],
+   "max": 100
+  },
+  {
+   "id": "db_cpu",
+   "title": "DB CPU",
+   "metrics": [
+    "db_cpu"
+   ],
+   "max": 100
+  },
+  {
+   "id": "batch_s",
+   "title": "Batch duration",
+   "metrics": [
+    "batch_s"
+   ],
+   "threshold": {
+    "value": 300,
+    "label": "max.poll.interval"
+   }
+  },
+  {
+   "id": "paused",
+   "title": "Workers paused",
+   "metrics": [
+    "paused"
+   ],
+   "max": 3
   }
  ],
  "alerts": [
@@ -416,6 +483,22 @@
      "to": 650,
      "over_s": 45,
      "shape": "ease"
+    },
+    {
+     "id": "worker_cpu",
+     "to": 22,
+     "over_s": 30
+    },
+    {
+     "id": "db_cpu",
+     "to": 78,
+     "over_s": 30
+    },
+    {
+     "id": "batch_s",
+     "to": 290,
+     "over_s": 55,
+     "shape": "linear"
     }
    ]
   },
@@ -579,6 +662,17 @@
      "id": "db_p99",
      "to": 300,
      "over_s": 15
+    },
+    {
+     "id": "db_cpu",
+     "to": 92,
+     "over_s": 40
+    },
+    {
+     "id": "paused",
+     "to": 3,
+     "over_s": 1,
+     "shape": "step"
     }
    ],
    "beat": {
@@ -727,6 +821,12 @@
      "to": 29000,
      "over_s": 70,
      "shape": "linear"
+    },
+    {
+     "id": "paused",
+     "to": 0,
+     "over_s": 1,
+     "shape": "step"
     }
    ]
   },
@@ -886,6 +986,12 @@
      "to": 52000,
      "over_s": 30,
      "shape": "linear"
+    },
+    {
+     "id": "paused",
+     "to": 3,
+     "over_s": 1,
+     "shape": "step"
     }
    ]
   },
@@ -1011,6 +1117,12 @@
      "to": 56000,
      "over_s": 25,
      "shape": "linear"
+    },
+    {
+     "id": "paused",
+     "to": 0,
+     "over_s": 1,
+     "shape": "step"
     }
    ]
   },
@@ -1129,6 +1241,12 @@
      "to": 80000,
      "over_s": 30,
      "shape": "linear"
+    },
+    {
+     "id": "paused",
+     "to": 3,
+     "over_s": 1,
+     "shape": "step"
     }
    ],
    "beat": {
@@ -1150,6 +1268,17 @@
     ],
     "hint": "This is a rebalance storm. Each rebalance creates more lag and more replayed work, which makes the next batch slower, which gets the next worker evicted. Scaling to 6 workers, as Ana suggested, would trigger yet another rebalance and add load to the database that is the real bottleneck."
    }
+  },
+  {
+   "t": 270,
+   "metrics": [
+    {
+     "id": "paused",
+     "to": 0,
+     "over_s": 1,
+     "shape": "step"
+    }
+   ]
   },
   {
    "t": 280,
@@ -1269,6 +1398,21 @@
      "id": "dupes",
      "to": 0,
      "over_s": 10
+    },
+    {
+     "id": "worker_cpu",
+     "to": 40,
+     "over_s": 15
+    },
+    {
+     "id": "db_cpu",
+     "to": 35,
+     "over_s": 20
+    },
+    {
+     "id": "batch_s",
+     "to": 33,
+     "over_s": 5
     }
    ]
   },
@@ -1355,6 +1499,11 @@
     {
      "id": "consumed",
      "to": 1200,
+     "over_s": 15
+    },
+    {
+     "id": "worker_cpu",
+     "to": 35,
      "over_s": 15
     }
    ]

@@ -71,7 +71,11 @@
    "why a deploy that never touches the database can take it down",
    "why queries that time out never refill the cache",
    "how to warm, coalesce and shed so a cold cache does not become an outage"
-  ]
+  ],
+  "layout": {
+   "columns": 2,
+   "rows": 5
+  }
  },
  "components": {
   "nodes": [
@@ -213,6 +217,34 @@
     0,
     1
    ]
+  },
+  {
+   "id": "db_conns",
+   "label": "pgbouncer connections in use",
+   "unit": "conns",
+   "start": 8,
+   "noise": 0.05
+  },
+  {
+   "id": "web_cpu",
+   "label": "Web CPU",
+   "unit": "%",
+   "start": 30,
+   "noise": 0.05
+  },
+  {
+   "id": "pods",
+   "label": "Web pods",
+   "unit": "pods",
+   "start": 6,
+   "noise": 0.0
+  },
+  {
+   "id": "web_p95",
+   "label": "Page latency p95",
+   "unit": "ms",
+   "start": 120,
+   "noise": 0.06
   }
  ],
  "dashboard": [
@@ -263,6 +295,36 @@
     "value": 5,
     "label": "SLO page 5%"
    }
+  },
+  {
+   "id": "db_conns",
+   "title": "pgbouncer connections in use",
+   "metrics": [
+    "db_conns"
+   ],
+   "max": 24
+  },
+  {
+   "id": "web_cpu",
+   "title": "Web CPU",
+   "metrics": [
+    "web_cpu"
+   ],
+   "max": 100
+  },
+  {
+   "id": "pods",
+   "title": "Web pods",
+   "metrics": [
+    "pods"
+   ]
+  },
+  {
+   "id": "web_p95",
+   "title": "Page latency p95",
+   "metrics": [
+    "web_p95"
+   ]
   }
  ],
  "alerts": [
@@ -489,7 +551,24 @@
     "from": "cache-redis",
     "kind": "log",
     "text": "INFO stats: keyspace_misses +41,880 in 10s (pdp:v42:* — 0 keys present)"
-   }
+   },
+   "metrics": [
+    {
+     "id": "db_conns",
+     "to": 20,
+     "over_s": 15
+    },
+    {
+     "id": "web_cpu",
+     "to": 55,
+     "over_s": 15
+    },
+    {
+     "id": "web_p95",
+     "to": 900,
+     "over_s": 20
+    }
+   ]
   },
   {
    "t": 54,
@@ -578,6 +657,16 @@
      "id": "dbqps",
      "to": 460,
      "over_s": 25
+    },
+    {
+     "id": "web_cpu",
+     "to": 95,
+     "over_s": 30
+    },
+    {
+     "id": "web_p95",
+     "to": 5000,
+     "over_s": 15
     }
    ],
    "effects": [
@@ -789,6 +878,17 @@
      "id": "miss",
      "to": 87,
      "over_s": 20
+    },
+    {
+     "id": "web_cpu",
+     "to": 70,
+     "over_s": 10
+    },
+    {
+     "id": "pods",
+     "to": 12,
+     "over_s": 1,
+     "shape": "step"
     }
    ]
   },
@@ -916,6 +1016,21 @@
      "id": "rps",
      "to": 2500,
      "over_s": 40
+    },
+    {
+     "id": "db_conns",
+     "to": 9,
+     "over_s": 15
+    },
+    {
+     "id": "web_cpu",
+     "to": 40,
+     "over_s": 20
+    },
+    {
+     "id": "web_p95",
+     "to": 150,
+     "over_s": 20
     }
    ]
   },
@@ -1027,6 +1142,14 @@
     {
      "target": "web",
      "badge": "6 pods"
+    }
+   ],
+   "metrics": [
+    {
+     "id": "pods",
+     "to": 6,
+     "over_s": 1,
+     "shape": "step"
     }
    ]
   },

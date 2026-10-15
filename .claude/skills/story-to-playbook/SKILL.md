@@ -59,6 +59,7 @@ Top level: `schema`, `meta`, `components`, `metrics`, `dashboard`, `alerts`, `in
 - `title`: short and evocative ("The rebalance storm: when slow looks dead").
 - `story`: the hook, 1–2 sentences, shown large at the top of the intro and as the subtitle in the gallery. Sets the scene, does not spoil the cause.
 - `duration_s`: 240–600 is typical (the viewer watches at 1×–4×).
+- `layout` (optional) `{ columns: 1|2|3, rows: 1–8 }`: how the charts are arranged. The components (left) and feed (right) are fixed and the viewer cannot move anything. `columns` is the number of chart columns between them (default 2); `rows` is how many chart rows fit on one screen before the board scrolls (default: fit all charts, between 2 and 5). Use 2 columns × 4–5 rows for ~8–10 charts; 3 columns for many small charts; 1 column × 3 rows for a few tall ones.
 - The rest is the **intro**: it is how a viewer who has never seen this system gets the context. Write for an engineer who knows software but not this stack.
   - `background`: 2–4 `{ title, body }` paragraphs, each ≤ ~400 chars, plain words. A good set is "The system" (what it is, rough scale, why it is built this way), "How it normally works" (the mechanism, in the normal state), "Today" (what is about to happen). Do not spoil the cause.
   - `cast`: `[{ name, role }]`, one per component the viewer will see (use the component labels), role in a few words.
@@ -77,12 +78,12 @@ Top level: `schema`, `meta`, `components`, `metrics`, `dashboard`, `alerts`, `in
 
 ### metrics
 `[{ id, label, unit, start, noise, normal?: [lo, hi] }]`
-- 4–8 metrics. `noise` is relative jitter (0.02–0.1; 0 for counters).
+- 8–12 metrics: the ones the story is about plus the supporting signals an engineer would open next (CPU, latency, queue depth, connections, error counts, user-visible symptoms such as support tickets). Each must move for a reason in the story, or hold steady on purpose. `noise` is relative jitter (0.02–0.1; 0 for counters).
 - Pick the signals an engineer would really watch for this system.
 
 ### dashboard
 `[{ id, title, metrics: [metricId...], threshold?: { value, label } }]`
-- 3–6 panels. Put two metrics on one panel when comparing them is the point (produced vs consumed),
+- 6–10 panels (the board scrolls past ~10). Put two metrics on one panel when comparing them is the point (produced vs consumed),
   and only when they have the same unit and similar size: the panel has one y-axis.
 - A threshold line on a panel makes "crossed the limit" visible.
 - Optional `max` fixes the y-axis top (otherwise: just above the peak; `%` panels stop at 100).
