@@ -1,5 +1,5 @@
 ---
-name: story-to-playbook
+name: simxp-playbook
 description: Turn a story (blog post, postmortem, concept or short prompt) into a sim-xp playbook that the player animates as a narrated, realistic simulation.
 ---
 

@@ -5,7 +5,7 @@ this page plays it: components light up, dashboards move, a feed scrolls, and pl
 moments that explain what happened. A one-screen report closes the run.
 
 ```
-story ──(Claude Code + story-to-playbook skill)──► playbook.json ──(WebMCP)──► this page plays it
+story ──(Claude Code + simxp-playbook skill)──► playbook.json ──(WebMCP)──► this page plays it
 ```
 
 v1 (the MVP in `../mvp`) let the learner operate the system. v2 drops that: nobody operates anything, the
@@ -28,11 +28,11 @@ Tests: `node --test v2/test/*.test.mjs`
 ## With Claude Code
 
 Add the [WebMCP bridge](https://github.com/smarchone/webmcp-apps) once, then ask for a story from a clone of
-this repo (it has the skill in `.claude/skills/story-to-playbook`):
+this repo (it has the skill in `.claude/skills/simxp-playbook`):
 
 ```sh
 claude mcp add webmcp -- npx -y @smarchone/webmcp-bridge
-claude "Use the story-to-playbook skill on: why Postgres replicas fall behind during a big backfill. Then open https://smarchone.github.io/sim-xp/v2/ with the webmcp tools and play it."
+claude "Use the simxp-playbook skill on: why Postgres replicas fall behind during a big backfill. Then open https://smarchone.github.io/sim-xp/v2/ with the webmcp tools and play it."
 ```
 
 The page's tools:
@@ -58,4 +58,4 @@ The page's tools:
 | `js/tools.js` | The WebMCP tools |
 | `tools/validate.mjs` | `node v2/tools/validate.mjs pb.json [--at 60,120]` |
 | `playbooks/` | Four playbooks and `index.json` |
-| `../.claude/skills/story-to-playbook/` | The skill: format, authoring rules, workflow |
+| `../.claude/skills/simxp-playbook/` | The skill: format, authoring rules, workflow |
