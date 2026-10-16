@@ -1,5 +1,20 @@
 [
  {
+  "id": "postgres-queue-load-test",
+  "file": "postgres-queue-load-test.json",
+  "title": "Postgres as a queue: the load test that found the wall",
+  "story": "A team runs its job queue on a Postgres table with SKIP LOCKED and ramps a load test to see where it breaks. The first two stages pass easily, then something quiet starts piling up. Compressed: 1 s ≈ 4 s.",
+  "duration_s": 330,
+  "tags": [
+   "postgres",
+   "queue",
+   "load-test",
+   "vacuum",
+   "dramatized"
+  ],
+  "key_moments": 6
+ },
+ {
   "id": "kafka-rebalance-storm",
   "file": "kafka-rebalance-storm.json",
   "title": "The rebalance storm: when slow looks dead",

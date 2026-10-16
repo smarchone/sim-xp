@@ -1,0 +1,80 @@
+/* sim-xp as one artifact page: the player fills the screen; a collapsible panel on the right holds the chat and the playbook box.
+   Same cream/dark tokens and fonts as the player so the panel reads as part of it. */
+:root{
+  --bg:#f3eee3; --panel:#fbf8f1; --sunk:#eee8da; --line:#e4dccb; --line2:#d5cab3; --fg:#28241d; --muted:#776d5c; --accent:#2c5a98; --on-accent:#fbf8f1;
+  --red:#b8432f; --amber:#a8740f; --green:#2f7a4c;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#131311;--panel:#1b1b18;--sunk:#22221e;--line:#2c2b27;--line2:#3a3933;--fg:#e8e3d8;--muted:#9c9585;--accent:#86aee6;--on-accent:#131311;--red:#e57a64;--amber:#d9a441;--green:#72c08e;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#131311;--panel:#1b1b18;--sunk:#22221e;--line:#2c2b27;--line2:#3a3933;--fg:#e8e3d8;--muted:#9c9585;--accent:#86aee6;--on-accent:#131311;--red:#e57a64;--amber:#d9a441;--green:#72c08e;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:13px/1.5 var(--sans);display:flex;flex-direction:row;overflow:hidden}
+[hidden]{display:none!important}
+button,.btn{font:inherit;font-size:12px;color:var(--fg);background:var(--panel);border:1px solid var(--line2);border-radius:6px;padding:4px 12px;cursor:pointer;white-space:nowrap}
+button:hover,.btn:hover{border-color:var(--accent)}
+button:focus-visible,.btn:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+button:disabled{opacity:.5;cursor:default;border-color:var(--line2)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:500}
+.spacer{flex:1}
+
+#stage{flex:1;min-width:0;height:100%;border:0;background:var(--bg)}
+
+/* Side panel: chat on top, playbook box below. Collapses to a thin rail; the player takes the width back. */
+.panel{flex:none;height:100%;display:flex;background:var(--panel);border-left:1px solid var(--line2);position:relative}
+.panel-in{width:var(--pw,400px);display:flex;flex-direction:column;min-width:0}
+.panel-in[hidden]{display:none}
+.grip{position:absolute;left:-4px;top:0;bottom:0;width:8px;cursor:col-resize;z-index:2}
+.grip:hover,.grip.drag{background:linear-gradient(to right,transparent 3px,var(--accent) 3px,var(--accent) 5px,transparent 5px)}
+body.resizing{cursor:col-resize;user-select:none}
+body.resizing #stage{pointer-events:none}
+.ph{flex:none;display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line)}
+.ph b{font-size:13px;font-weight:600}
+.muted{color:var(--muted);font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rail{width:34px;height:100%;border:0;border-radius:0;background:var(--panel);padding:12px 0;display:flex;flex-direction:column;align-items:center;gap:12px;color:var(--muted)}
+.rail:hover{color:var(--accent);background:var(--sunk)}
+.rail-text{writing-mode:vertical-rl;font-size:12px;font-weight:500;letter-spacing:.03em}
+.rail[hidden]{display:none}
+
+.chat{flex:1 1 42%;min-height:0;display:flex;flex-direction:column;background:var(--bg);border-bottom:1px solid var(--line)}
+.chat ol{list-style:none;margin:0;padding:10px 12px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:8px}
+.msg{max-width:92%;padding:6px 10px;border-radius:8px;font-size:12.5px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
+.msg.me{align-self:flex-end;background:var(--accent);color:var(--on-accent)}
+.msg.claude{align-self:flex-start;background:var(--panel);border:1px solid var(--line)}
+.msg.note{align-self:stretch;max-width:none;background:none;color:var(--muted);font-size:12px;padding:0 2px}
+.msg.err{align-self:stretch;max-width:none;background:color-mix(in srgb,var(--red) 8%,var(--panel));border:1px solid color-mix(in srgb,var(--red) 50%,transparent)}
+.msg button{margin-top:6px;display:block}
+.msg.hello{color:var(--muted)}
+.msg.hello b{color:var(--fg);font-weight:600}
+.bar{flex:none;display:flex;gap:8px;align-items:center;padding:8px 12px;border-top:1px solid var(--line);background:var(--panel)}
+.bar input{flex:1;min-width:0;font:inherit;font-size:13px;color:var(--fg);background:var(--bg);border:1px solid var(--line2);border-radius:8px;padding:7px 10px}
+.bar input::placeholder{color:var(--muted)}
+.bar input:disabled{opacity:.6}
+
+.pbbox{flex:1 1 58%;min-height:0;min-width:0;display:flex;flex-direction:column;padding:8px 12px 10px;gap:6px}
+.pbhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:26px}
+.pbhead b{font-size:13px;font-weight:600}
+.status{font:500 11px var(--mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1 1 120px}
+.status.ok{color:var(--green)} .status.warn{color:var(--amber)} .status.bad{color:var(--red)}
+.pbhead .spacer{display:none}
+#pb{flex:1;min-height:0;width:100%;resize:none;font:11.5px/1.45 var(--mono);color:var(--fg);background:var(--sunk);border:1px solid var(--line);border-radius:6px;padding:8px 10px;tab-size:2}
+.saved{flex:none;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+.saved summary{cursor:pointer;padding:4px 10px;font-size:12px;font-weight:500;color:var(--muted);user-select:none}
+.saved[open] summary{border-bottom:1px solid var(--line)}
+.saved ul{list-style:none;margin:0;padding:3px;max-height:128px;overflow-y:auto}
+.saved li{display:flex;align-items:center;gap:4px}
+.saved li.empty{padding:6px 8px;color:var(--muted);font-size:12px}
+.saved li.foot{justify-content:flex-end;padding:2px 4px}
+.saved li.foot button{border-color:transparent;background:none;color:var(--muted);font-size:11.5px;padding:2px 8px}
+.saved li.foot button:hover{color:var(--accent);background:var(--sunk)}
+.saved .pick{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:0;border-color:transparent;background:none;padding:3px 8px;text-align:left;white-space:normal}
+.saved .pick b{font-size:12.5px;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.saved .pick span{font:11px var(--mono);color:var(--muted)}
+.saved .pick:hover{background:var(--sunk)}
+.saved li>button:not(.pick){padding:2px 8px;border-color:transparent;background:none;color:var(--muted)}
+.saved li>button:not(.pick):hover{color:var(--accent);background:var(--sunk)}
+.problems{margin:0;padding:6px 10px 6px 26px;max-height:84px;overflow:auto;font-size:11.5px;background:color-mix(in srgb,var(--red) 8%,var(--panel));border:1px solid color-mix(in srgb,var(--red) 40%,transparent);border-radius:6px}
+
+.drop{position:fixed;inset:0;display:grid;place-items:center;background:color-mix(in srgb,var(--bg) 85%,transparent);border:2px dashed var(--accent);font-size:16px;font-weight:600;z-index:5}
+
+@media (prefers-reduced-motion:no-preference){.msg{animation:pop .12s ease-out}@keyframes pop{from{opacity:0;transform:translateY(3px)}}}
