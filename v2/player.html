@@ -1144,6 +1144,8 @@ $("#schema").innerHTML = `<p>The agent writes one JSON file; the app only plays 
    on the right (3 columns), both full height and fixed. The charts share the middle columns, all the same size. The playbook may pick meta.layout { columns, rows };
    otherwise 2 columns, with as many rows per screen as fit all charts (2 to 5). More charts than fit: the board scrolls. */
 const COLS = 12, GAP = 4, MIN_H = 110;
+// nothing is squeezed past what stays readable: side tiles keep a minimum width, a chart keeps a minimum width, and charts wrap onto more rows instead
+const MIN_SIDE = 200, MIN_CHART_W = 190;
 const board = dashGrid, allCharts = panels.filter(P => P.kind === "chart");
 const tiles = [$("#compCard"), $("#feedCard")];
 const LAYOUT = PB.meta.layout || {};
@@ -1155,18 +1157,21 @@ const FKEY = "sim-xp.feed-cols", FMIN = 2, FMAX = 5;
 let feedCols = 3;
 try { const v = +localStorage.getItem(FKEY); if (v >= FMIN && v <= FMAX) feedCols = v; } catch (e) { /* storage blocked */ }
 // chart row height: a preset in px, or Fill (rows share the screen, as the playbook's meta.layout says)
-const CHKEY = "sim-xp.chart-h", CH_PX = { xs: 96, s: 132, m: 180 };
-let chartH = "fill";
-try { const v = localStorage.getItem(CHKEY); if (v in CH_PX) chartH = v; } catch (e) { /* storage blocked */ }
+const CHKEY = "sim-xp.chart-h", CH_PX = { xs: 96, s: 132, m: 180 }, CH_DEFAULT = "m";
+let chartH = CH_DEFAULT;
+try { const v = localStorage.getItem(CHKEY); if (v in CH_PX || v === "fill") chartH = v; } catch (e) { /* storage blocked */ }
 const setChartH = v => {
   chartH = v in CH_PX ? v : "fill";
-  try { chartH === "fill" ? localStorage.removeItem(CHKEY) : localStorage.setItem(CHKEY, chartH); } catch (e) { /* storage blocked */ }
+  try { chartH === CH_DEFAULT ? localStorage.removeItem(CHKEY) : localStorage.setItem(CHKEY, chartH); } catch (e) { /* storage blocked */ }
   document.querySelectorAll("#chSeg [data-ch]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.ch === chartH)));
   renderLayout();
 };
 try { const v = +localStorage.getItem(WKEY); if (v >= CMIN && v <= CMAX) compCols = v; } catch (e) { /* storage blocked */ }
+const colPx = () => (board.clientWidth || 1200) / COLS;
+const sideMin = lo => Math.max(lo, MIN_SIDE / colPx());                       // columns a side tile needs
+const sideMax = (hi, other) => Math.max(0, Math.min(hi, COLS - other - MIN_CHART_W / colPx())); // leave one chart column
 const setComp = v => {
-  compCols = Math.max(CMIN, Math.min(CMAX, v));
+  compCols = Math.max(sideMin(CMIN), Math.min(sideMax(CMAX, feedCols), v));
   try { compCols === CMIN ? localStorage.removeItem(WKEY) : localStorage.setItem(WKEY, compCols.toFixed(2)); } catch (err) { /* storage blocked */ }
   renderLayout();
 };
@@ -1182,7 +1187,7 @@ split.onpointerdown = e => {
 };
 split.ondblclick = () => setComp(CMIN);
 const setFeed = v => {
-  feedCols = Math.max(FMIN, Math.min(FMAX, v));
+  feedCols = Math.max(sideMin(FMIN), Math.min(sideMax(FMAX, compCols), v));
   try { feedCols === 3 ? localStorage.removeItem(FKEY) : localStorage.setItem(FKEY, feedCols.toFixed(2)); } catch (err) { /* storage blocked */ }
   renderLayout();
 };
@@ -1218,7 +1223,11 @@ function renderLayout() {
     return;
   }
   const H = board.clientHeight, n = charts.length;
-  const cols = [1, 2, 3].includes(LAYOUT.columns) ? LAYOUT.columns : 2, CW = compCols, FC = feedCols, M = 12 - CW - FC, R = Math.max(1, Math.ceil(n / cols));
+  const CW = Math.max(sideMin(CMIN), Math.min(sideMax(CMAX, FMIN), compCols)), FC = Math.max(sideMin(FMIN), Math.min(sideMax(FMAX, CW), feedCols)), M = 12 - CW - FC;
+  // as many chart columns as the playbook asks for, fewer when they would get narrower than MIN_CHART_W: the rest wrap to new rows
+  const want = [1, 2, 3].includes(LAYOUT.columns) ? LAYOUT.columns : 2;
+  const cols = Math.max(1, Math.min(want, Math.floor((M * colPx() + GAP) / (MIN_CHART_W + GAP))));
+  const R = Math.max(1, Math.ceil(n / cols));
   let per = Number.isInteger(LAYOUT.rows) && LAYOUT.rows >= 1 ? LAYOUT.rows : Math.max(2, Math.min(5, R));
   per = Math.max(1, Math.min(per, R, Math.floor((H + GAP) / (MIN_H + GAP))));
   const preset = CH_PX[chartH]; // a fixed row height keeps the two side tiles full height; the charts just get shorter
