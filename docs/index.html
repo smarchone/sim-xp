@@ -41,6 +41,9 @@
     .flow { display:flex; flex-wrap:wrap; align-items:center; gap:8px 6px; margin:0 0 52px; font:13px/1 var(--mono); color:var(--faint); }
     .flow span { color:var(--dim); border:1px solid var(--line); border-radius:999px; padding:8px 12px; }
     .flow span.gold { color:var(--accent); border-color:rgba(222,138,104,.45); background:var(--accent-soft); }
+    .shot { margin:0 0 40px; }
+    .shot img { display:block; width:100%; height:auto; border:1px solid var(--line); border-radius:14px; }
+    .shot figcaption { color:var(--dim); font-size:13px; margin-top:10px; }
     .eyebrow { font:600 12px/1 var(--mono); color:var(--faint); text-transform:uppercase; letter-spacing:.12em; margin:0 0 14px; }
     .win { background:var(--win); border:1px solid var(--line); border-radius:14px; padding:6px 20px; margin:0 0 40px; }
     .win dl { margin:0; }
@@ -57,7 +60,7 @@
   <h1><span>~/</span>smarchone/sim-xp</h1>
   <p class="hero">Simulate any engineering blog, <em>incident or concept.</em></p>
   <p class="tldr">Simulated experiences, encoded as playbooks.</p>
-  <a class="cta" href="../">Play a simulation ↗</a>
+  <a class="cta" href="v2/">Play a simulation ↗</a>
 
   <section class="problem">
     <span class="lbl">The problem</span>
@@ -68,6 +71,9 @@
     </ul>
   </section>
 
+  <p class="eyebrow">An example</p>
+  <figure class="shot"><img src="example.png" alt="The player on a Kafka load test: components and key-moment caption on the left, dashboard charts on the right"><figcaption>Load test until it breaks: the three walls of a Kafka cluster. Components, a key moment and the dashboard, in the player.</figcaption></figure>
+
   <p class="flow"><span>story</span>→<span class="gold">playbook (JSON)</span>→<span>run</span>→<span>report</span></p>
 
   <p class="eyebrow">How it works</p>
@@ -77,7 +83,7 @@
     <dt>The skill</dt><dd><code>story-to-playbook</code> turns a blog post, postmortem, concept or short prompt into a validated playbook file. It writes that one file and nothing else.</dd>
   </dl></div>
 
-  <p class="foot"><a href="https://github.com/smarchone/sim-xp">GitHub</a> · <a href="../">Player</a></p>
+  <p class="foot"><a href="https://github.com/smarchone/sim-xp">GitHub</a> · <a href="v2/">Player</a></p>
 </main>
 </body>
 </html>

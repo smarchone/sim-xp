@@ -24,9 +24,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: node --test v2/test/*.test.mjs
-      # the site is the single-file build (player, side panel and bundled playbooks); it is served at the root and at /v2/. The MVP is deprecated and not deployed
+      # the site root is docs/ (purpose page); the single-file build (player, side panel and bundled playbooks) is served at /v2/. The MVP is deprecated and not deployed
       - run: node v2/build-single.mjs
-      - run: mkdir -p _site/v2 && cp v2/dist/sim-xp.html _site/index.html && cp v2/dist/sim-xp.html _site/v2/index.html && cp -r docs _site/docs
+      - run: mkdir -p _site/v2 && cp -r docs/. _site/ && cp v2/dist/sim-xp.html _site/v2/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

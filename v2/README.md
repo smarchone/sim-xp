@@ -16,7 +16,7 @@ playbook is played deterministically, and the experience is about how easy it is
 `node v2/build-single.mjs` writes `v2/dist/sim-xp.html`: the player, a collapsible side panel, and the bundled
 playbooks, with no other files. That one file is both:
 
-- **the GitHub Pages site**, at https://smarchone.github.io/sim-xp/ (also served at `/v2/`), and
+- **the GitHub Pages site**, at https://smarchone.github.io/sim-xp/v2/ (the site root is the docs page), and
 - **a Claude artifact**, where the panel's chat can ask Claude (on the viewer's own Claude usage) to write a playbook.
 
 The side panel (right, collapsible, resizable) has three parts:
