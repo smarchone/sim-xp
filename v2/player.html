@@ -14,8 +14,8 @@
    Colour only for state (red/amber/green), ownership (teal/violet/pink), and the one accent.
    Light is cream, dark is warm. */
 :root{
-  --bg:#f3eee3; --panel:#fbf8f1; --sunk:#eee8da; --line:#e4dccb; --line2:#d5cab3; --fg:#28241d; --muted:#776d5c; --faint:#9c917a; --node:#f6f1e4; --glass:rgba(251,248,241,.96);
-  --accent:#2c5a98; --track:#e0d7c4;
+  --bg:#f6ead3; --panel:#fdf5e3; --sunk:#f0e1c5; --line:#e8d6b4; --line2:#d9c294; --fg:#2c2316; --muted:#7b6a4d; --faint:#a2906f; --node:#f9eed6; --glass:rgba(253,245,227,.96);
+  --accent:#2c5a98; --track:#e8d6b4;
   --red:#b8432f; --amber:#a8740f; --green:#2f7a4c; --blue:#2c5a98; --teal:#2a7f78; --violet:#6a55c4; --pink:#b23f80; --grey:#8b8372;
   --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;
   --serif:"Newsreader",Georgia,"Times New Roman",serif;
@@ -61,7 +61,7 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--p
 .ph .hint,.fh .hint{font-weight:400;color:var(--faint)}
 .stagebox{position:relative;flex:1;min-height:0;padding:0}
 #comp{display:block;width:100%;height:100%;transform-origin:50% 0;transition:transform .38s cubic-bezier(.2,.8,.2,1)}
-#beatGo{white-space:nowrap}
+#beatGo,#start{white-space:nowrap}
 
 /* feed: one line per entry, tied to the shared cursor */
 .feed{display:flex;flex-direction:column;overflow:hidden}
@@ -254,10 +254,10 @@ kbd{font:500 var(--s) var(--mono);color:var(--muted);border:1px solid var(--line
 .chips span{font-size:var(--s);color:var(--muted);background:var(--sunk);border-radius:999px;padding:1px 8px}
 /* reading screens: intro and report. One calm column, serif prose. */
 .modal.report{width:min(720px,100%)}
-.modal.intro{width:min(max(60vw,760px),100%);max-height:calc(100dvh - 32px);padding:22px 28px 16px;gap:10px}
+.modal.intro{width:min(600px,100%);max-height:calc(100dvh - 32px);padding:22px 28px 16px;gap:10px}
 .intro h2{font:500 26px/1.15 var(--serif);letter-spacing:-.01em}
 .intro .hook{font:400 17.5px/1.5 var(--serif);color:var(--fg);margin:0;text-wrap:pretty}
-.intro .icols{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:28px;margin-top:6px;overflow-y:auto;min-height:0}
+.intro .icols{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;margin-top:6px;overflow-y:auto;min-height:0}
 .intro .icols.one{grid-template-columns:minmax(0,1fr)}
 .intro .story,.intro .side{display:flex;flex-direction:column;gap:14px;min-width:0}
 .intro h4{margin:0 0 3px;font-size:var(--s);font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
@@ -335,6 +335,7 @@ pre{font:var(--s)/1.5 var(--mono);background:var(--sunk);border-radius:8px;paddi
       <div class="pop menu" id="menu" hidden role="menu">
         <span class="eb">Playback</span>
         <button class="mi" id="reportBtn" role="menuitem">Report <kbd>R</kbd></button>
+        <button class="mi" id="introBtn" role="menuitem">Show intro <kbd>I</kbd></button>
         <div class="row"><span class="small" style="flex:1">Speed</span><div class="seg" id="speedSeg"><button data-speed="2">0.5×</button><button data-speed="4">1×</button><button data-speed="8">2×</button><button data-speed="16">4×</button></div></div>
         <div class="row"><span class="small" style="flex:1">Theme</span><div class="seg" id="themeSeg"><button data-theme-set="system">Auto</button><button data-theme-set="light">Light</button><button data-theme-set="dark">Dark</button></div></div>
         <div class="row" id="detailRow" hidden><span class="small" style="flex:1" title="Hardcore shows the deeper layer of the same run: more charts, raw logs and commands, and a deep dive in the report">Detail <kbd>H</kbd></span><div class="seg" id="detailSeg"><button data-detail="standard">Standard</button><button data-detail="hardcore">Hardcore</button></div></div>
@@ -1066,7 +1067,8 @@ document.addEventListener("pointerdown", e => { if (!e.target.closest(".hud")) c
 document.addEventListener("keydown", e => {
   if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.target.matches && e.target.matches("input,select,textarea")) return;
-  if (e.key === "Escape") { if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); if (closeMenus()) return; if (isOpen($("#scrim"))) closeReport(); return; }
+  if (e.key === "Escape") { if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); if (closeMenus()) return; if (isOpen($("#scrim"))) closeReport(); else if (introStarted && isOpen($("#intro"))) startRun(); return; }
+  if (e.key === "i" || e.key === "I") { if (!isOpen($("#scrim"))) showIntro(); return; }
   if (e.code === "Space") { e.preventDefault(); if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); primaryAction(); return; }
   if (e.key === "?") { toggleMenu("help"); return; }
   if (isOpen($("#intro"))) return;
@@ -1202,7 +1204,18 @@ $("#introT").textContent = M.title; $("#introStory").textContent = M.story;
   box.classList.toggle("one", !story || !side); box.hidden = !story && !side;
 }
 $("#introMeta").textContent = `${hasDeep ? "Hardcore detail available (H) · " : ""}Story · ${humanDur(TOTAL)}${TOTAL > D * 1.5 ? " (plays in ~" + Math.max(1, Math.round(D / 4 / 60)) + " min)" : ""} · ${beats.length} key moments${(M.tags || []).length ? " · " + M.tags.slice(0, 3).join(" · ") : ""}`;
-function startRun() { hideModal($("#intro"), () => renderHud(viewT())); seek(0); setPlaying(true); }
+let introStarted = false, introWasPlaying = false;
+function startRun() {
+  hideModal($("#intro"), () => renderHud(viewT()));
+  if (!introStarted) { introStarted = true; seek(0); setPlaying(true); } // first time: begin the run
+  else setPlaying(introWasPlaying); // reopened: carry on where it was
+}
+function showIntro() { // bring the intro back at any time; it pauses the run and Continue resumes it
+  if (isOpen($("#intro"))) return;
+  closeMenus(); introWasPlaying = playing; setPlaying(false);
+  $("#start").textContent = "Continue ▶"; showModal($("#intro")); renderHud(viewT());
+}
+$("#introBtn").onclick = showIntro;
 $("#start").onclick = startRun;
 $("#pbTitle").textContent = PB.meta.title; document.title = PB.meta.title;
 $("#libraryBtn").onclick = () => { closeMenus(); host && host.showLibrary && host.showLibrary(); };

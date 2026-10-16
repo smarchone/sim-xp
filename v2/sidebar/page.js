@@ -24,7 +24,7 @@ const panelIn = $("panelIn"), rail = $("rail");
 function setOpen(open) { panelIn.hidden = !open; rail.hidden = open; }
 $("collapse").onclick = () => setOpen(false);
 rail.onclick = () => { setOpen(true); askEl.focus(); };
-setOpen(false); // starts collapsed so the player has the room; the rail (or the player's menu) opens it
+// starts open; Collapse gives the player the room back
 const panel = $("panel"), WIDTH = "sim-xp.panelWidth";
 const setWidth = (w) => panel.style.setProperty("--pw", Math.max(300, Math.min(760, Math.round(w))) + "px");
 try { const w = Number(localStorage.getItem(WIDTH)); if (w) setWidth(w); } catch (e) { /* storage blocked */ }
