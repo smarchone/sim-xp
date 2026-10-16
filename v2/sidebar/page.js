@@ -295,8 +295,22 @@ askEl.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey 
 stopBtn.onclick = () => ctl && ctl.abort();
 
 // ---------- start: put the default playbook in the box and play it ----------
-// the box starts with the last playbook played here (the saved copy, else the bundled one, else what was stored), or the default on a first visit
+// The box starts with the playbook named by the address (#<id>: the saved copy, else the bundled one). With no usable id it is the last playbook played here (the saved copy, else the bundled one, else what was stored), or the default on a first visit.
+function playbookFromHash() {
+  let id = ""; try { id = decodeURIComponent(location.hash.slice(1)); } catch (e) { return null; }
+  if (!id) return null;
+  let pb = null;
+  const saved = library.get(docId({ meta: { id } }));
+  try { pb = saved ? JSON.parse(saved.json) : null; } catch (e) { /* unreadable saved copy */ }
+  pb = pb || SEEDS.find((s) => s.meta.id === id) || null;
+  return pb && !validate(pb).errors.length ? pb : null;
+}
+window.addEventListener("hashchange", () => {   // the person edited the address or used Back
+  const pb = playbookFromHash();
+  if (pb && (!simxp.current || simxp.current.meta.id !== pb.meta.id)) { setBox(JSON.stringify(pb, null, 2)); play(last.pb); }
+});
 function startingPlaybook() {
+  const fromHash = playbookFromHash(); if (fromHash) return fromHash;
   try {
     const x = JSON.parse(localStorage.getItem(LAST) || "null");
     if (x && x.meta && x.meta.id) {
