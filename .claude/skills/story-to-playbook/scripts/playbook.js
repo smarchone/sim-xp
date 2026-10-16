@@ -157,14 +157,6 @@ export function validate(PB) {
   if (stdPanels.length > 12) warn(`${stdPanels.length} standard panels; keep ~10 or fewer (put the rest at level "deep")`);
   if (panels.length - stdPanels.length > 10) warn(`${panels.length - stdPanels.length} deep panels; more than ~8 is noise even in Hardcore`);
   if (panels.length < 4) warn(`only ${panels.length} panels; 6–10 gives the viewer enough to correlate`);
-  const lay = PB.meta && PB.meta.layout;
-  if (lay != null) {
-    if (typeof lay !== "object" || Array.isArray(lay)) err("meta.layout must be { columns?, rows? }");
-    else {
-      if (lay.columns != null && ![1, 2, 3].includes(lay.columns)) err("meta.layout.columns must be 1, 2 or 3");
-      if (lay.rows != null && !(Number.isInteger(lay.rows) && lay.rows >= 1 && lay.rows <= 8)) err("meta.layout.rows must be an integer 1..8");
-    }
-  }
   for (const p of panels) {
     if (!p.why) warn(`panel ${p.id}: add "why", one sentence on why this metric matters (shown behind the ⓘ)`);
     else if (typeof p.why !== "string" || p.why.length > 160) warn(`panel ${p.id}: "why" should be a string under ~140 chars`);
