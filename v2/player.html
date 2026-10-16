@@ -341,6 +341,7 @@ pre{font:var(--s)/1.5 var(--mono);background:var(--sunk);border-radius:8px;paddi
         <div class="row"><span class="small" style="flex:1">Theme</span><div class="seg" id="themeSeg"><button data-theme-set="system">Auto</button><button data-theme-set="light">Light</button><button data-theme-set="dark">Dark</button></div></div>
         <div class="row" id="detailRow" hidden><span class="small" style="flex:1" title="Hardcore shows the deeper layer of the same run: more charts, raw logs and commands, and a deep dive in the report">Detail <kbd>H</kbd></span><div class="seg" id="detailSeg"><button data-detail="standard">Standard</button><button data-detail="hardcore">Hardcore</button></div></div>
         <div class="row"><span class="small" style="flex:1">Chart height</span><div class="seg" id="chSeg"><button data-ch="xs">XS</button><button data-ch="s">S</button><button data-ch="m">M</button><button data-ch="fill">Fill</button></div></div>
+        <button class="mi" id="resetLayout" role="menuitem">Restore layout</button>
         <button class="mi" id="libraryBtn" role="menuitem">Open another playbook</button>
       </div>
     </div>
@@ -1150,11 +1151,11 @@ const board = dashGrid, allCharts = panels.filter(P => P.kind === "chart");
 const tiles = [$("#compCard"), $("#feedCard")];
 const LAYOUT = PB.meta.layout || {};
 // the viewer drags the vertical divider on the components tile's right edge: width 3 (default, narrow) to 6 of 12 columns, taken from the charts only
-const WKEY = "sim-xp.comp-cols", CMIN = 3, CMAX = 6;
-let compCols = CMIN;
+const WKEY = "sim-xp.comp-cols", CMIN = 3, CMAX = 6, CDEF = 4; // default: components, charts and feed a third each
+let compCols = CDEF;
 // the viewer drags the divider on the feed's left edge: 2 to 5 of 12 columns, taken from the charts only
-const FKEY = "sim-xp.feed-cols", FMIN = 2, FMAX = 5;
-let feedCols = 3;
+const FKEY = "sim-xp.feed-cols", FMIN = 2, FMAX = 5, FDEF = 4;
+let feedCols = FDEF;
 try { const v = +localStorage.getItem(FKEY); if (v >= FMIN && v <= FMAX) feedCols = v; } catch (e) { /* storage blocked */ }
 // chart row height: a preset in px, or Fill (rows share the screen, as the playbook's meta.layout says)
 const CHKEY = "sim-xp.chart-h", CH_PX = { xs: 96, s: 132, m: 180 }, CH_DEFAULT = "m";
@@ -1172,7 +1173,7 @@ const sideMin = lo => Math.max(lo, MIN_SIDE / colPx());                       //
 const sideMax = (hi, other) => Math.max(0, Math.min(hi, COLS - other - MIN_CHART_W / colPx())); // leave one chart column
 const setComp = v => {
   compCols = Math.max(sideMin(CMIN), Math.min(sideMax(CMAX, feedCols), v));
-  try { compCols === CMIN ? localStorage.removeItem(WKEY) : localStorage.setItem(WKEY, compCols.toFixed(2)); } catch (err) { /* storage blocked */ }
+  try { compCols === CDEF ? localStorage.removeItem(WKEY) : localStorage.setItem(WKEY, compCols.toFixed(2)); } catch (err) { /* storage blocked */ }
   renderLayout();
 };
 const split = document.createElement("div");
@@ -1185,10 +1186,10 @@ split.onpointerdown = e => {
   split.onpointermove = m => setComp(c0 + (m.clientX - x0) / colW);
   split.onpointerup = split.onpointercancel = () => { split.classList.remove("drag"); split.onpointermove = split.onpointerup = split.onpointercancel = null; };
 };
-split.ondblclick = () => setComp(CMIN);
+split.ondblclick = () => setComp(CDEF);
 const setFeed = v => {
   feedCols = Math.max(sideMin(FMIN), Math.min(sideMax(FMAX, compCols), v));
-  try { feedCols === 3 ? localStorage.removeItem(FKEY) : localStorage.setItem(FKEY, feedCols.toFixed(2)); } catch (err) { /* storage blocked */ }
+  try { feedCols === FDEF ? localStorage.removeItem(FKEY) : localStorage.setItem(FKEY, feedCols.toFixed(2)); } catch (err) { /* storage blocked */ }
   renderLayout();
 };
 const fsplit = document.createElement("div");
@@ -1201,7 +1202,7 @@ fsplit.onpointerdown = e => {
   fsplit.onpointermove = m => setFeed(f0 - (m.clientX - x0) / colW);
   fsplit.onpointerup = fsplit.onpointercancel = () => { fsplit.classList.remove("drag"); fsplit.onpointermove = fsplit.onpointerup = fsplit.onpointercancel = null; };
 };
-fsplit.ondblclick = () => setFeed(3);
+fsplit.ondblclick = () => setFeed(FDEF);
 fsplit.onkeydown = e => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); e.stopPropagation(); setFeed(feedCols + (e.key === "ArrowLeft" ? 0.25 : -0.25)); } };
 split.onkeydown = e => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); e.stopPropagation(); setComp(compCols + (e.key === "ArrowRight" ? 0.25 : -0.25)); } };
 function renderLayout() {
@@ -1251,6 +1252,12 @@ document.querySelectorAll("#detailSeg [data-detail]").forEach(b => (b.onclick = 
 document.querySelectorAll("#detailSeg [data-detail]").forEach(b => b.setAttribute("aria-pressed", String((b.dataset.detail === "hardcore") === HC)));
 new ResizeObserver(() => renderLayout()).observe(board);
 ONE_SCREEN.addEventListener("change", () => renderLayout());
+$("#resetLayout").onclick = () => { // back to thirds and Medium charts; also re-fits the components view
+  compCols = CDEF; feedCols = FDEF;
+  try { [WKEY, FKEY].forEach(k => localStorage.removeItem(k)); } catch (e) { /* storage blocked */ }
+  setChartH(CH_DEFAULT); if (typeof resetView === "function") resetView();
+  if (ready) flash("Layout restored");
+};
 document.querySelectorAll("#chSeg [data-ch]").forEach(b => (b.onclick = () => setChartH(b.dataset.ch)));
 document.querySelectorAll("#chSeg [data-ch]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.ch === chartH)));
 document.querySelectorAll("#themeSeg [data-theme-set]").forEach(b => (b.onclick = () => applyTheme(b.dataset.themeSet, true)));
