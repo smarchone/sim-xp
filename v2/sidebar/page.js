@@ -19,6 +19,13 @@ function play(pb) {
   simxp.current = pb; simxp.source = "box";
   try { localStorage.setItem(LAST, JSON.stringify(pb)); } catch (e) { /* storage blocked: it starts on the default next time */ }
   stage.srcdoc = PLAYER_HTML + "<!-- " + Date.now() + " -->";
+  track(pb);
+}
+// Mark the run in the address (#<playbook id>) and send a Google Analytics event. Both are best effort: the artifact has no gtag and may not allow history changes.
+function track(pb) {
+  const id = String(pb.meta.id);
+  try { history.replaceState(null, "", "#" + encodeURIComponent(id)); } catch (e) { /* not allowed here (artifact frame) */ }
+  try { if (typeof window.gtag === "function") window.gtag("event", "playbook_run", { playbook_id: id, playbook_title: pb.meta.title }); } catch (e) { /* analytics blocked */ }
 }
 
 // ---------- the side panel: open while writing, a thin rail while watching ----------
