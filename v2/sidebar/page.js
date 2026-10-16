@@ -24,6 +24,7 @@ const panelIn = $("panelIn"), rail = $("rail");
 function setOpen(open) { panelIn.hidden = !open; rail.hidden = open; }
 $("collapse").onclick = () => setOpen(false);
 rail.onclick = () => { setOpen(true); askEl.focus(); };
+setOpen(false); // starts collapsed so the player has the room; the rail (or the player's menu) opens it
 const panel = $("panel"), WIDTH = "sim-xp.panelWidth";
 const setWidth = (w) => panel.style.setProperty("--pw", Math.max(300, Math.min(760, Math.round(w))) + "px");
 try { const w = Number(localStorage.getItem(WIDTH)); if (w) setWidth(w); } catch (e) { /* storage blocked */ }
@@ -289,6 +290,6 @@ setBox(JSON.stringify(DEFAULT, null, 2));
 if (!last.errors.length) play(last.pb);
 (async () => {
   try { sample = await window.claude?.use?.("sample"); } catch (e) { sample = null; }
-  if (!sample) { askEl.disabled = true; sendBtn.disabled = true; askEl.placeholder = "Chat needs Claude. Paste or open a playbook instead."; say("note", "Chat with Claude only works in the sim-xp Claude artifact. Here you can paste or open a playbook, run it, and keep up to 20 in the Saved list."); setOpen(true); }
+  if (!sample) { askEl.disabled = true; sendBtn.disabled = true; askEl.placeholder = "Chat needs Claude. Paste or open a playbook instead."; say("note", "Chat with Claude only works in the sim-xp Claude artifact. Here you can paste or open a playbook, run it, and keep up to 20 in the Saved list."); }
   else askEl.disabled = busy;
 })();
