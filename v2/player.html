@@ -51,16 +51,12 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--p
 
 /* components stage */
 .stage{display:flex;flex-direction:column;overflow:hidden}
-.zoombar{position:absolute;top:10px;right:16px;z-index:2;display:flex;align-items:center;background:var(--glass);border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+.zoombar{position:absolute;bottom:8px;right:8px;z-index:2;opacity:0;transition:opacity .2s;display:flex;align-items:center;background:var(--glass);border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+.stage:hover .zoombar,.zoombar:focus-within{opacity:1}
 .zoombar button{border:0;border-radius:0;background:transparent;color:var(--muted);padding:2px 8px;font:500 var(--s) var(--mono);line-height:18px;min-width:26px}
 .zoombar button:hover{color:var(--fg);background:var(--sunk);border-color:transparent}
 .zoombar #zoomPct{min-width:46px;border-left:1px solid var(--line);border-right:1px solid var(--line);font-variant-numeric:tabular-nums}
 #comp{cursor:grab;touch-action:none}#comp.panning{cursor:grabbing}
-.split{position:absolute;top:0;bottom:0;right:0;width:8px;cursor:col-resize;z-index:5;touch-action:none;outline:none}
-.split.l{right:auto;left:0}
-.split::after{content:"";position:absolute;top:0;bottom:0;left:5px;width:2px;border-radius:1px;background:var(--accent);opacity:0;transition:opacity .15s}
-.split.l::after{left:1px}
-.split:hover::after,.split:focus-visible::after,.split.drag::after{opacity:.7}
 .ph{display:flex;align-items:baseline;gap:8px;padding:6px 10px 2px;font-size:var(--s);font-weight:600;color:var(--muted);flex:none}
 .ph .hint,.fh .hint{font-weight:400;color:var(--faint)}
 .stagebox{position:relative;flex:1;min-height:0;padding:0}
@@ -340,8 +336,6 @@ pre{font:var(--s)/1.5 var(--mono);background:var(--sunk);border-radius:8px;paddi
         <div class="row"><span class="small" style="flex:1">Speed</span><div class="seg" id="speedSeg"><button data-speed="2">0.5×</button><button data-speed="4">1×</button><button data-speed="8">2×</button><button data-speed="16">4×</button></div></div>
         <div class="row"><span class="small" style="flex:1">Theme</span><div class="seg" id="themeSeg"><button data-theme-set="system">Auto</button><button data-theme-set="light">Light</button><button data-theme-set="dark">Dark</button></div></div>
         <div class="row" id="detailRow" hidden><span class="small" style="flex:1" title="Hardcore shows the deeper layer of the same run: more charts, raw logs and commands, and a deep dive in the report">Detail <kbd>H</kbd></span><div class="seg" id="detailSeg"><button data-detail="standard">Standard</button><button data-detail="hardcore">Hardcore</button></div></div>
-        <div class="row"><span class="small" style="flex:1">Chart height</span><div class="seg" id="chSeg"><button data-ch="xs">XS</button><button data-ch="s">S</button><button data-ch="m">M</button><button data-ch="fill">Fill</button></div></div>
-        <button class="mi" id="resetLayout" role="menuitem">Restore layout</button>
         <button class="mi" id="libraryBtn" role="menuitem">Open another playbook</button>
       </div>
     </div>
@@ -545,16 +539,8 @@ $("#zoomPct").onclick = () => resetView();
 // resize observers fire many times while a splitter is dragged; draw at most once per frame
 let renderQueued = false;
 const scheduleRender = () => { if (renderQueued) return; renderQueued = true; requestAnimationFrame(() => { renderQueued = false; render(); }); };
-const layoutScale = (key, w, h) => Math.min(w / LAYOUTS[key].vb[0], h / LAYOUTS[key].vb[1]);
 const pickLayout = () => {
-  if (ONE_SCREEN.matches) {
-    // pick whichever layout draws the graph larger; switch only when the other is clearly (8%) better, so dragging doesn't flicker
-    const w = stageEl.clientWidth, h = stageEl.clientHeight; if (!w || !h) return layoutKey || "tall";
-    const st = layoutScale("tall", w, h), sw = layoutScale("wide", w, h);
-    if (!layoutKey) return st >= sw ? "tall" : "wide";
-    const cur = layoutKey === "tall" ? st : sw, other = layoutKey === "tall" ? sw : st;
-    return other > cur * 1.08 ? (layoutKey === "tall" ? "wide" : "tall") : layoutKey;
-  }
+  if (ONE_SCREEN.matches) return "wide"; // the components tile is wide and short: always draw the flow left to right
   return innerWidth <= 640 ? "tall" : "wide";
 };
 // Excalidraw-style canvas: drag to pan, Ctrl+scroll or pinch to zoom at the cursor, plain scroll pans, double-click or the % button fits.
@@ -1140,71 +1126,12 @@ $("#scrim").addEventListener("click", e => {
 $("#schema").innerHTML = `<p>The agent writes one JSON file; the app only plays it. Layout coordinates in this proposal come from the app, not from the playbook.</p><pre>${JSON.stringify(PB, null, 2).replace(/</g, "&lt;")}</pre>`;
 
 
-/* ===================== Layout: fixed =====================
-   Components on the left (3 of 12 columns; a slider in its header widens it to 4 or 5, taking only from the charts) and the feed
-   on the right (3 columns), both full height and fixed. The charts share the middle columns, all the same size. The playbook may pick meta.layout { columns, rows };
-   otherwise 2 columns, with as many rows per screen as fit all charts (2 to 5). More charts than fit: the board scrolls. */
-const COLS = 12, GAP = 4, MIN_H = 110;
-// nothing is squeezed past what stays readable: side tiles keep a minimum width, a chart keeps a minimum width, and charts wrap onto more rows instead
-const MIN_SIDE = 200, MIN_CHART_W = 190;
+/* ===================== Layout: computed, nothing to adjust =====================
+   Two columns. Left (about 40%): components on top, the feed below, both fixed while the charts scroll. Right: the charts, same size,
+   3 columns when there is room and 2 otherwise, rows sized to the screen (150 to 220px); more charts than fit: the board scrolls. */
+const GAP = 4, LEFT = 0.4, CH_MIN = 150, CH_MAX = 220, MIN_CHART_W = 260, COMP_SHARE = 0.5;
 const board = dashGrid, allCharts = panels.filter(P => P.kind === "chart");
 const tiles = [$("#compCard"), $("#feedCard")];
-const LAYOUT = PB.meta.layout || {};
-// the viewer drags the vertical divider on the components tile's right edge: width 3 (default, narrow) to 6 of 12 columns, taken from the charts only
-const WKEY = "sim-xp.comp-cols", CMIN = 3, CMAX = 6, CDEF = 4; // default: components, charts and feed a third each
-let compCols = CDEF;
-// the viewer drags the divider on the feed's left edge: 2 to 5 of 12 columns, taken from the charts only
-const FKEY = "sim-xp.feed-cols", FMIN = 2, FMAX = 5, FDEF = 4;
-let feedCols = FDEF;
-try { const v = +localStorage.getItem(FKEY); if (v >= FMIN && v <= FMAX) feedCols = v; } catch (e) { /* storage blocked */ }
-// chart row height: a preset in px, or Fill (rows share the screen, as the playbook's meta.layout says)
-const CHKEY = "sim-xp.chart-h", CH_PX = { xs: 96, s: 132, m: 180 }, CH_DEFAULT = "m";
-let chartH = CH_DEFAULT;
-try { const v = localStorage.getItem(CHKEY); if (v in CH_PX || v === "fill") chartH = v; } catch (e) { /* storage blocked */ }
-const setChartH = v => {
-  chartH = v in CH_PX ? v : "fill";
-  try { chartH === CH_DEFAULT ? localStorage.removeItem(CHKEY) : localStorage.setItem(CHKEY, chartH); } catch (e) { /* storage blocked */ }
-  document.querySelectorAll("#chSeg [data-ch]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.ch === chartH)));
-  renderLayout();
-};
-try { const v = +localStorage.getItem(WKEY); if (v >= CMIN && v <= CMAX) compCols = v; } catch (e) { /* storage blocked */ }
-const colPx = () => (board.clientWidth || 1200) / COLS;
-const sideMin = lo => Math.max(lo, MIN_SIDE / colPx());                       // columns a side tile needs
-const sideMax = (hi, other) => Math.max(0, Math.min(hi, COLS - other - MIN_CHART_W / colPx())); // leave one chart column
-const setComp = v => {
-  compCols = Math.max(sideMin(CMIN), Math.min(sideMax(CMAX, feedCols), v));
-  try { compCols === CDEF ? localStorage.removeItem(WKEY) : localStorage.setItem(WKEY, compCols.toFixed(2)); } catch (err) { /* storage blocked */ }
-  renderLayout();
-};
-const split = document.createElement("div");
-split.className = "split"; split.tabIndex = 0; split.setAttribute("role", "separator"); split.setAttribute("aria-orientation", "vertical");
-split.setAttribute("aria-label", "Components width (drag, or arrow keys; double-click resets)");
-tiles[0].appendChild(split);
-split.onpointerdown = e => {
-  e.preventDefault(); split.setPointerCapture(e.pointerId); split.classList.add("drag");
-  const x0 = e.clientX, c0 = compCols, colW = board.clientWidth / COLS;
-  split.onpointermove = m => setComp(c0 + (m.clientX - x0) / colW);
-  split.onpointerup = split.onpointercancel = () => { split.classList.remove("drag"); split.onpointermove = split.onpointerup = split.onpointercancel = null; };
-};
-split.ondblclick = () => setComp(CDEF);
-const setFeed = v => {
-  feedCols = Math.max(sideMin(FMIN), Math.min(sideMax(FMAX, compCols), v));
-  try { feedCols === FDEF ? localStorage.removeItem(FKEY) : localStorage.setItem(FKEY, feedCols.toFixed(2)); } catch (err) { /* storage blocked */ }
-  renderLayout();
-};
-const fsplit = document.createElement("div");
-fsplit.className = "split l"; fsplit.tabIndex = 0; fsplit.setAttribute("role", "separator"); fsplit.setAttribute("aria-orientation", "vertical");
-fsplit.setAttribute("aria-label", "Feed width (drag, or arrow keys; double-click resets)");
-tiles[1].appendChild(fsplit);
-fsplit.onpointerdown = e => {
-  e.preventDefault(); fsplit.setPointerCapture(e.pointerId); fsplit.classList.add("drag");
-  const x0 = e.clientX, f0 = feedCols, colW = board.clientWidth / COLS;
-  fsplit.onpointermove = m => setFeed(f0 - (m.clientX - x0) / colW);
-  fsplit.onpointerup = fsplit.onpointercancel = () => { fsplit.classList.remove("drag"); fsplit.onpointermove = fsplit.onpointerup = fsplit.onpointercancel = null; };
-};
-fsplit.ondblclick = () => setFeed(FDEF);
-fsplit.onkeydown = e => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); e.stopPropagation(); setFeed(feedCols + (e.key === "ArrowLeft" ? 0.25 : -0.25)); } };
-split.onkeydown = e => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); e.stopPropagation(); setComp(compCols + (e.key === "ArrowRight" ? 0.25 : -0.25)); } };
 function renderLayout() {
   // a surfaced deep chart sits right after the standard charts of the same component, so related signals stay together
   const charts = allCharts.filter(P => !P.deep);
@@ -1220,24 +1147,24 @@ function renderLayout() {
   const all = [...tiles, ...charts.map(P => P.card), quietEl];
   if (!ONE_SCREEN.matches) { // stacked: no grid areas
     board.style.gridTemplateRows = ""; board.style.gridTemplateColumns = "";
-    all.forEach(e => { e.style.gridArea = ""; e.style.height = ""; e.classList.remove("stick"); });
+    all.forEach(e => { e.style.gridArea = ""; e.style.height = ""; e.style.marginTop = ""; e.style.top = ""; e.classList.remove("stick"); });
     return;
   }
-  const H = board.clientHeight, n = charts.length;
-  const CW = Math.max(sideMin(CMIN), Math.min(sideMax(CMAX, FMIN), compCols)), FC = Math.max(sideMin(FMIN), Math.min(sideMax(FMAX, CW), feedCols)), M = 12 - CW - FC;
-  // as many chart columns as the playbook asks for, fewer when they would get narrower than MIN_CHART_W: the rest wrap to new rows
-  const want = [1, 2, 3].includes(LAYOUT.columns) ? LAYOUT.columns : 2;
-  const cols = Math.max(1, Math.min(want, Math.floor((M * colPx() + GAP) / (MIN_CHART_W + GAP))));
+  const H = board.clientHeight, W = board.clientWidth, n = charts.length;
+  const chartW = W * (1 - LEFT) - GAP * 2;
+  const cols = Math.max(1, Math.min(3, Math.floor((chartW + GAP) / (MIN_CHART_W + GAP))));
   const R = Math.max(1, Math.ceil(n / cols));
-  let per = Number.isInteger(LAYOUT.rows) && LAYOUT.rows >= 1 ? LAYOUT.rows : Math.max(2, Math.min(5, R));
-  per = Math.max(1, Math.min(per, R, Math.floor((H + GAP) / (MIN_H + GAP))));
-  const preset = CH_PX[chartH]; // a fixed row height keeps the two side tiles full height; the charts just get shorter
-  const rh = preset || (H - (per - 1) * GAP) / per, rows = R, tileH = preset ? H : Math.min(H, rows * rh + (rows - 1) * GAP);
-  board.style.gridTemplateRows = `repeat(${rows}, ${rh}px)` + (quiet.length ? " max-content" : "");
-  board.style.gridTemplateColumns = `minmax(0,${CW}fr) repeat(${cols}, minmax(0,${M / cols}fr)) minmax(0,${FC}fr)`;
-  [[tiles[0], 1], [tiles[1], cols + 2]].forEach(([e, x]) => { e.style.gridArea = `1 / ${x} / ${rows + 1} / ${x + 1}`; e.style.height = `${tileH}px`; e.classList.add("stick"); });
+  const fit = (H - (R - 1) * GAP) / R, rh = Math.max(CH_MIN, Math.min(CH_MAX, fit));
+  board.style.gridTemplateRows = `repeat(${R}, ${rh}px)` + (quiet.length ? " max-content" : "");
+  board.style.gridTemplateColumns = `minmax(0,${LEFT}fr) repeat(${cols}, minmax(0,${(1 - LEFT) / cols}fr))`;
+  const compH = Math.round((H - GAP) * COMP_SHARE), feedH = H - GAP - compH;
+  tiles[0].style.gridArea = tiles[1].style.gridArea = `1 / 1 / ${R + 1} / 2`;
+  tiles[0].style.height = compH + "px"; tiles[1].style.height = feedH + "px";
+  tiles[0].style.marginTop = "0"; tiles[1].style.marginTop = (compH + GAP) + "px";
+  tiles[0].style.top = "0"; tiles[1].style.top = (compH + GAP) + "px";
+  tiles.forEach(e => e.classList.add("stick"));
   charts.forEach((P, i) => { const r = Math.floor(i / cols) + 1, c = 2 + (i % cols); P.card.style.gridArea = `${r} / ${c} / ${r + 1} / ${c + 1}`; });
-  quietEl.style.gridArea = `${rows + 1} / 2 / ${rows + 2} / ${cols + 2}`;
+  quietEl.style.gridArea = `${R + 1} / 2 / ${R + 2} / ${cols + 2}`;
 }
 // Standard / Hardcore: the same run, with or without the deep layer
 function setDetail(on) {
@@ -1252,14 +1179,6 @@ document.querySelectorAll("#detailSeg [data-detail]").forEach(b => (b.onclick = 
 document.querySelectorAll("#detailSeg [data-detail]").forEach(b => b.setAttribute("aria-pressed", String((b.dataset.detail === "hardcore") === HC)));
 new ResizeObserver(() => renderLayout()).observe(board);
 ONE_SCREEN.addEventListener("change", () => renderLayout());
-$("#resetLayout").onclick = () => { // back to thirds and Medium charts; also re-fits the components view
-  compCols = CDEF; feedCols = FDEF;
-  try { [WKEY, FKEY].forEach(k => localStorage.removeItem(k)); } catch (e) { /* storage blocked */ }
-  setChartH(CH_DEFAULT); if (typeof resetView === "function") resetView();
-  if (ready) flash("Layout restored");
-};
-document.querySelectorAll("#chSeg [data-ch]").forEach(b => (b.onclick = () => setChartH(b.dataset.ch)));
-document.querySelectorAll("#chSeg [data-ch]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.ch === chartH)));
 document.querySelectorAll("#themeSeg [data-theme-set]").forEach(b => (b.onclick = () => applyTheme(b.dataset.themeSet, true)));
 applyTheme((() => { try { return localStorage.getItem(THEME_KEY); } catch (e) { return null; } })(), false);
 renderLayout();
