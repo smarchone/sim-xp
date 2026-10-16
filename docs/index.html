@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>sim-xp: Simulate any engineering blog, incident or concept</title>
+  <title>sim-xp: Simulate a blog, an incident or a load test</title>
   <meta name="description" content="Simulated experiences, encoded as playbooks.">
   <style>
     :root {
@@ -44,6 +44,16 @@
     .shot { margin:0 0 40px; }
     .shot img { display:block; width:100%; height:auto; border:1px solid var(--line); border-radius:14px; }
     .shot figcaption { color:var(--dim); font-size:13px; margin-top:10px; }
+    .bigflow { display:flex; flex-wrap:wrap; align-items:center; gap:10px 0; margin:0 0 28px; font:15px/1 var(--mono); }
+    .bigflow span { color:var(--white); border:1px solid var(--line); border-radius:999px; padding:12px 18px; }
+    .bigflow span.gold { color:var(--accent); border-color:rgba(222,138,104,.55); background:var(--accent-soft); }
+    .bigflow i { font-style:normal; font-size:12px; color:var(--dim); display:inline-flex; align-items:center; gap:8px; padding:0 10px; }
+    .bigflow i::before, .bigflow i::after { content:""; width:22px; height:1px; background:var(--faint); }
+    .bigflow i::after { width:18px; }
+    .bigflow i b { width:0; height:0; margin-left:-9px; border-left:7px solid var(--faint); border-top:5px solid transparent; border-bottom:5px solid transparent; order:3; }
+    .win .step { color:var(--fg); font-size:14px; margin:14px 0 8px; }
+    .win pre { font:12.5px/1.6 var(--mono); color:var(--fg); background:var(--code); border-radius:8px; padding:10px 12px; margin:0 0 6px; overflow-x:auto; }
+    .kin { color:var(--dim); font-size:14px; text-align:center; margin:0 0 14px; }
     .eyebrow { font:600 12px/1 var(--mono); color:var(--faint); text-transform:uppercase; letter-spacing:.12em; margin:0 0 14px; }
     .win { background:var(--win); border:1px solid var(--line); border-radius:14px; padding:6px 20px; margin:0 0 40px; }
     .win dl { margin:0; }
@@ -58,31 +68,36 @@
 <body>
 <main>
   <h1><span>~/</span>smarchone/sim-xp</h1>
-  <p class="hero">Simulate any engineering blog, <em>incident or concept.</em></p>
-  <p class="tldr">Simulated experiences, encoded as playbooks.</p>
-  <a class="cta" href="v2/">Play a simulation ↗</a>
+  <p class="hero">Simulate<br><em>a blog, an incident or a load test.</em></p>
+  <p class="tldr">A new way for engineers to share and build experience. Agents turn any blog, incident or concept into a simulation that brings you closer to reality, and saves you the reading.</p>
+  <p class="bigflow"><span>experience</span><i>encode<b></b></i><span class="gold">playbook.json</span><i>run<b></b></i><span>simulation</span></p>
+  <a class="cta" href="v2/">Start playing ↗</a>
 
   <section class="problem">
     <span class="lbl">The problem</span>
     <ul>
-      <li>There is a gap between reading a blog and experiencing a system running live.</li>
-      <li>Simulations fill the gap. Not exact, but still better.</li>
-      <li>You see the system in action.</li>
+      <li>There's a gap between reading about a system and experiencing it live.</li>
+      <li>Simulations close that gap. Not exact, but much closer.</li>
+      <li>Agents make it fast: one story in, one simulation out.</li>
     </ul>
   </section>
 
   <p class="eyebrow">An example</p>
-  <figure class="shot"><img src="example.png" alt="The player on a Kafka load test: components and key-moment caption on the left, dashboard charts on the right"><figcaption>Load test until it breaks: the three walls of a Kafka cluster. Components, a key moment and the dashboard, in the player.</figcaption></figure>
+  <figure class="shot"><img src="example.png" alt="The player on a Kafka load test: components and key-moment caption on the left, dashboard charts on the right"><figcaption>Load test until it breaks: the three walls of a Kafka cluster.</figcaption></figure>
 
-  <p class="flow"><span>story</span>→<span class="gold">playbook (JSON)</span>→<span>run</span>→<span>report</span></p>
 
-  <p class="eyebrow">How it works</p>
-  <div class="win"><dl>
-    <dt>The playbook</dt><dd>The initial state (components, dashboards, metrics, alerts), a timeline of events, and a report. A small required core, free-form text everywhere else.</dd>
-    <dt>The player</dt><dd>One generic page. Nobody operates anything: the engine plays the playbook deterministically. Space plays and pauses, ←/→ jump between key moments, R opens the report, H switches to Hardcore for the deeper layer.</dd>
-    <dt>The skill</dt><dd><code>story-to-playbook</code> turns a blog post, postmortem, concept or short prompt into a validated playbook file. It writes that one file and nothing else.</dd>
-  </dl></div>
+  <p class="eyebrow">How to create playbooks</p>
+  <div class="win">
+    <p class="step">The <code>story-to-playbook</code> skill turns a blog post, postmortem, concept or short prompt into a validated <code>playbook.json</code>. Install it once:</p>
+    <pre>npx skills add smarchone/sim-xp --skill story-to-playbook -g</pre>
+    <p class="step">Then give it a story in Claude Code:</p>
+    <pre>/story-to-playbook https://github.blog/news-insights/company-news/oct21-post-incident-analysis/
+/story-to-playbook "Postgres as a job queue, load tested until it breaks"
+/story-to-playbook "How a Kafka consumer rebalance storm starts and ends"</pre>
+    <p class="step">Open the file in the <a href="v2/">player</a> (drop it on the page, or <em>Open file…</em> in the side panel) and press Space.</p>
+  </div>
 
+  <p class="kin">Part of <a href="https://smarchone.github.io/agentic-experiences">agentic experiences</a>: accelerate learning with agents ↗</p>
   <p class="foot"><a href="https://github.com/smarchone/sim-xp">GitHub</a> · <a href="v2/">Player</a></p>
 </main>
 </body>
