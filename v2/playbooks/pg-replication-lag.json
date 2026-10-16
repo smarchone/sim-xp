@@ -136,7 +136,21 @@
     "from": "primary",
     "to": "r2"
    }
-  ]
+  ],
+  "layout": {
+   "rows": [
+    [
+     "browser",
+     "api",
+     "r1"
+    ],
+    [
+     "backfill",
+     "primary",
+     "r2"
+    ]
+   ]
+  }
  },
  "metrics": [
   {

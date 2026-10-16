@@ -302,7 +302,26 @@
         "from": "w3",
         "to": "db"
       }
-    ]
+    ],
+    "layout": {
+      "rows": [
+        [
+          "checkout",
+          "topic",
+          "w1"
+        ],
+        [
+          null,
+          "db",
+          "w2"
+        ],
+        [
+          null,
+          null,
+          "w3"
+        ]
+      ]
+    }
   },
   "metrics": [
     {

@@ -87,7 +87,8 @@ export function validate(PB) {
   // components
   const nodes = PB.components?.nodes || [], edges = PB.components?.edges || [];
   if (!nodes.length) err("components.nodes is empty");
-  if (nodes.length > 14) warn(`${nodes.length} nodes: more than ~12 gets hard to read`);
+  if (nodes.length > 8) warn(`${nodes.length} nodes: the components tile reads best with 4–8; more gets small and crowded`);
+  if (nodes.length > 12) warn(`${nodes.length} nodes: more than 12 will not be readable`);
   const nodeIds = new Set(), partIds = new Set(), edgeIds = new Set();
   for (const n of nodes) {
     if (!n.id || !n.label) err(`node needs id and label: ${JSON.stringify(n)}`);
@@ -114,6 +115,33 @@ export function validate(PB) {
     if (edgeIds.has(e.id) || nodeIds.has(e.id)) err(`duplicate id ${e.id}`); edgeIds.add(e.id);
     if (!nodeIds.has(e.from)) err(`edge ${e.id}: unknown from "${e.from}"`);
     if (!nodeIds.has(e.to)) err(`edge ${e.id}: unknown to "${e.to}"`);
+  }
+
+  // components.layout.rows: the grid the playbook draws (optional). Rows of node ids, null = empty cell; the tile is about 580 x 390 px
+  const grid = PB.components?.layout;
+  if (grid != null) {
+    if (!grid || !Array.isArray(grid.rows) || !grid.rows.every(r => Array.isArray(r))) err("components.layout.rows must be a list of rows, each a list of node ids (null for an empty cell)");
+    else {
+      const pos = {}, rows = grid.rows, cols = Math.max(0, ...rows.map(r => r.length));
+      rows.forEach((r, ri) => r.forEach((id, ci) => {
+        if (id == null) return;
+        if (!nodeIds.has(id)) err(`components.layout: unknown node "${id}"`);
+        else if (pos[id]) err(`components.layout: node "${id}" appears twice`);
+        else pos[id] = [ri, ci];
+      }));
+      for (const id of nodeIds) if (!pos[id]) err(`components.layout: node "${id}" is not placed`);
+      if (rows.length > 3) warn(`components.layout has ${rows.length} rows: more than 3 shrinks the nodes (the tile is wider than tall)`);
+      if (cols > 3) warn(`components.layout has ${cols} columns: more than 3 shrinks the nodes; use rows to hold more`);
+      if (rows.length > 1 && cols === 1) warn("components.layout is one column: the tile is wider than tall, use 2-3 columns");
+      const at = (r, c) => (rows[r] || [])[c];
+      const range = (x, y) => { const lo = Math.min(x, y) + 1, hi = Math.max(x, y); return Array.from({ length: Math.max(0, hi - lo) }, (_, i) => lo + i); }; // cells strictly between
+      for (const e of edges) {
+        const a = pos[e.from], b = pos[e.to]; if (!a || !b) continue;
+        const between = (a[0] === b[0] && Math.abs(a[1] - b[1]) > 1 && range(a[1], b[1]).some(c => at(a[0], c) != null))
+          || (a[1] === b[1] && Math.abs(a[0] - b[0]) > 1 && range(a[0], b[0]).some(r => at(r, a[1]) != null));
+        if (between) warn(`edge ${e.id} (${e.from} to ${e.to}) passes behind another node; move one of them so linked nodes sit in neighbouring cells`);
+      }
+    }
   }
 
   // metrics, dashboard, alerts

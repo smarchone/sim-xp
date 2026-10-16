@@ -59,7 +59,7 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--p
 #comp{cursor:grab;touch-action:none}#comp.panning{cursor:grabbing}
 .ph{display:flex;align-items:baseline;gap:8px;padding:6px 10px 2px;font-size:var(--s);font-weight:600;color:var(--muted);flex:none}
 .ph .hint,.fh .hint{font-weight:400;color:var(--faint)}
-.stagebox{position:relative;flex:1;min-height:0;padding:0}
+.stagebox{position:relative;flex:1;min-height:0;padding:0 0 26px} /* the key-moment strip rests on the bottom 25px */
 #comp{display:block;width:100%;height:100%;transform-origin:50% 0;transition:transform .38s cubic-bezier(.2,.8,.2,1)}
 #beatGo,#start{white-space:nowrap}
 
@@ -514,11 +514,21 @@ function autoLayout(dir) {
   layers.forEach(l => { l.forEach((id, k) => (pos[id] = k)); });
   for (let li = 1; li < nl; li++) { const bc = id => { const ps = preds[id].filter(p => layer[p] < li); return ps.length ? ps.reduce((a, p) => a + pos[p], 0) / ps.length : pos[id]; }; layers[li].sort((a, b) => bc(a) - bc(b)); layers[li].forEach((id, k) => (pos[id] = k)); }
   const byId = Object.fromEntries(ns.map(n => [n.id, n]));
+  const sdir = dir === "GRID" ? "LR" : dir; // a hand-drawn grid uses the wide node sizes
   const size = id => { const n = byId[id], np = (n.parts || []).length;
-    if (np) { const rows = dir === "LR" ? Math.ceil(Math.sqrt(np)) : Math.min(2, Math.ceil(np / Math.ceil(Math.sqrt(np)))) || 1, cols = Math.ceil(np / rows), cw = 52, ch = 34, gap = 8;
-      return { w: Math.max(dir === "LR" ? 180 : 170, 20 + cols * cw + (cols - 1) * gap), h: 39 + rows * ch + (rows - 1) * gap + 10, cols }; }
-    return dir === "LR" ? { w: 160, h: 70 } : { w: 140, h: 76 }; };
+    if (np) { const rows = sdir === "LR" ? Math.ceil(Math.sqrt(np)) : Math.min(2, Math.ceil(np / Math.ceil(Math.sqrt(np)))) || 1, cols = Math.ceil(np / rows), cw = 52, ch = 34, gap = 8;
+      return { w: Math.max(sdir === "LR" ? 180 : 170, 20 + cols * cw + (cols - 1) * gap), h: 39 + rows * ch + (rows - 1) * gap + 10, cols }; }
+    return sdir === "LR" ? { w: 160, h: 70 } : { w: 140, h: 76 }; };
   const sz = Object.fromEntries(ids.map(i => [i, size(i)])), out = {}, M = 6;
+  if (dir === "GRID") { // the playbook draws the grid: rows of node ids (null = empty cell); columns line up, so edges stay short and straight
+    const gapX = 50, gapY = 34, rowsIn = PB.components.layout.rows.map(r => r.map(id => (byId[id] ? id : null)));
+    const seen = new Set(rowsIn.flat()), rest = ids.filter(i => !seen.has(i)); if (rest.length) rowsIn.push(rest); // a node the grid forgot still shows
+    const nc = Math.max(...rowsIn.map(r => r.length)), colW = Array.from({ length: nc }, (_, c) => Math.max(0, ...rowsIn.map(r => (r[c] ? sz[r[c]].w : 0))));
+    const rowH = rowsIn.map(r => Math.max(0, ...r.map(i => (i ? sz[i].h : 0))));
+    const colX = colW.map((_, c) => M + colW.slice(0, c).reduce((a, w) => a + w + gapX, 0));
+    let y = M; rowsIn.forEach((r, ri) => { r.forEach((i, c) => { if (i) out[i] = { x: colX[c] + (colW[c] - sz[i].w) / 2, y: y + (rowH[ri] - sz[i].h) / 2, ...sz[i] }; }); y += rowH[ri] + gapY; });
+    return { vb: [colX[nc - 1] + colW[nc - 1] + M, y - gapY + M], dir, n: out };
+  }
   if (dir === "LR") {
     const gapX = 60, gapY = 16, colW = layers.map(l => Math.max(...l.map(i => sz[i].w))), colH = layers.map(l => l.reduce((a, i) => a + sz[i].h, 0) + gapY * (l.length - 1));
     const H = Math.max(...colH); let x = M;
@@ -530,7 +540,9 @@ function autoLayout(dir) {
   layers.forEach((l, li) => { let x = M + (W - rowW[li]) / 2; l.forEach(i => { out[i] = { x, y: y + (rowH[li] - sz[i].h) / 2, ...sz[i] }; x += sz[i].w + gapX; }); y += rowH[li] + gapY; });
   return { vb: [W + 2 * M, y - gapY + M], dir, n: out };
 }
-const LAYOUTS = { wide: autoLayout("LR"), tall: autoLayout("TB") };
+// the playbook may draw the component grid itself (components.layout.rows); the phone-width stack always uses the auto top-to-bottom layout
+const GRID = Array.isArray(PB.components.layout && PB.components.layout.rows) && PB.components.layout.rows.every(Array.isArray);
+const LAYOUTS = { wide: autoLayout(GRID ? "GRID" : "LR"), tall: autoLayout("TB") };
 const nodeStatus = {};
 const comp = $("#comp"); let nodeEls = {}, partEls = {}, edgeEls = {}, nodes = {}, layoutKey = null;
 const ONE_SCREEN = matchMedia("(min-width:1000px) and (min-height:600px)");
@@ -594,7 +606,14 @@ function buildComponents() {
   const gEdges = el("g", {}, comp), gNodes = el("g", {}, comp);
   PB.components.edges.forEach(e => {
     const a = nodes[e.from], b = nodes[e.to]; let d;
-    if (L.dir === "LR") { const x1 = a.x + a.w, y1 = a.y + a.h / 2, x2 = b.x, y2 = b.y + b.h / 2, mx = (x1 + x2) / 2; d = `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`; }
+    if (L.dir === "GRID") { // leave from the side that faces the target: right/left when it is a column over, bottom/top when it is a row over
+      const H = (x1, y1, x2, y2) => { const mx = (x1 + x2) / 2; return `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`; }, V = (x1, y1, x2, y2) => { const my = (y1 + y2) / 2; return `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`; };
+      const ay = a.y + a.h / 2, by = b.y + b.h / 2, ax = a.x + a.w / 2, bx = b.x + b.w / 2;
+      if (b.x >= a.x + a.w + 8) d = H(a.x + a.w, ay, b.x, by);
+      else if (b.x + b.w <= a.x - 8) d = H(a.x, ay, b.x + b.w, by);
+      else if (b.y >= a.y + a.h + 8) d = V(ax, a.y + a.h, bx, b.y);
+      else d = V(ax, a.y, bx, b.y + b.h);
+    } else if (L.dir === "LR") { const x1 = a.x + a.w, y1 = a.y + a.h / 2, x2 = b.x, y2 = b.y + b.h / 2, mx = (x1 + x2) / 2; d = `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`; }
     else { const x1 = a.x + a.w / 2, y1 = a.y + a.h, x2 = b.x + b.w / 2, y2 = b.y, my = (y1 + y2) / 2; d = `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`; }
     const g = el("g", { class: "dimmable", "data-id": e.id }, gEdges);
     const path = el("path", { d, fill: "none", stroke: "var(--line)", "stroke-width": 2 }, g);

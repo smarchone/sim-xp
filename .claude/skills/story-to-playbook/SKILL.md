@@ -68,14 +68,29 @@ Top level: `schema`, `meta`, `components`, `metrics`, `dashboard`, `alerts`, `in
   - `learn`: 2–4 short "you'll come away knowing…" lines. No spoilers; name the question, not the answer.
 
 ### components
-`{ nodes: [{ id, label, kind, parts?: [{id}], part_cols? }], edges: [{ id, from, to }] }`
-- 4–10 nodes; only what the story needs. Labels are real-looking names (`payments-db`, `orders topic`).
+`{ nodes: [{ id, label, kind, parts?: [{id}], part_cols? }], edges: [{ id, from, to }], layout: { rows } }`
+- 4–8 nodes (12 at most); only what the story needs. Labels are real-looking names (`payments-db`, `orders topic`).
 - `kind` is free text shown under the label (`postgres`, `kafka-topic`, `redis`, `lb`).
 - `parts` are sub-cells you can colour on their own (partitions, shards, replicas, pods).
-- Edges point in the direction of the request/data flow. The app lays out the graph itself
-  (left→right or top→bottom, whichever fits the screen): do not add positions.
+- Edges point in the direction of the request/data flow.
+- `layout.rows` draws the graph on a small grid so it is easy to take in (see below). Always write it; without it the player
+  lays the nodes out in one long row, which shrinks them.
 - Nodes appear at the start and stay. To show scaling out or a failover target, declare the
   spare nodes/parts up front, start them `grey` with `label: "idle"` (or `down: true`), and bring them up later.
+
+#### Drawing the components (`layout.rows`)
+`layout: { rows: [["users","lb","web"], [null,"redis","bouncer"], [null,null,"db"]] }`: rows of node ids, top to bottom;
+`null` is an empty cell. Columns line up, and the app routes each edge from the side facing its target. The tile is about
+580 × 390 px (430 when the side panel is open), wider than tall, so:
+- **At most 3 columns × 3 rows** (a node with `parts` is wider; keep it to 3 columns anyway). More nodes: go down, not wider.
+  If the story needs more than 8 nodes, merge the boring ones (`cdn + lb` becomes `edge`).
+- **Read like a page**: the entry point (users, load test, producer) top-left, the data store bottom-right, so flow runs
+  left to right and then down. Put the thing the story is about near the middle.
+- **Linked nodes in neighbouring cells**, so an edge never passes behind another node (the validator warns). A fan-out
+  (one node feeding three) stacks the three in one column next to the source.
+- **Side players go on the edges of the grid**: background jobs, cron, vacuum, a report running against the database sit
+  above or below the node they act on, in its column.
+- Every node appears exactly once; a node you forget is added on an extra row.
 
 ### metrics
 `[{ id, label, unit, start, noise, normal?: [lo, hi] }]`

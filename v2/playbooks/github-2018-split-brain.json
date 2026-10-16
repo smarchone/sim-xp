@@ -198,7 +198,26 @@
     "from": "apps",
     "to": "jobs"
    }
-  ]
+  ],
+  "layout": {
+   "rows": [
+    [
+     "hub",
+     "apps",
+     "jobs"
+    ],
+    [
+     null,
+     "east",
+     "west"
+    ],
+    [
+     null,
+     "orch",
+     null
+    ]
+   ]
+  }
  },
  "metrics": [
   {

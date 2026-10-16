@@ -157,7 +157,26 @@
     "from": "bouncer",
     "to": "db"
    }
-  ]
+  ],
+  "layout": {
+   "rows": [
+    [
+     "users",
+     "lb",
+     "web"
+    ],
+    [
+     null,
+     "redis",
+     "bouncer"
+    ],
+    [
+     null,
+     null,
+     "db"
+    ]
+   ]
+  }
  },
  "metrics": [
   {
