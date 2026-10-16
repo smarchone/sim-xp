@@ -136,7 +136,21 @@
     "from": "primary",
     "to": "r2"
    }
-  ]
+  ],
+  "layout": {
+   "rows": [
+    [
+     "browser",
+     "api",
+     "r1"
+    ],
+    [
+     "backfill",
+     "primary",
+     "r2"
+    ]
+   ]
+  }
  },
  "metrics": [
   {
@@ -236,7 +250,8 @@
     "value": 5,
     "label": "alert 5s"
    },
-   "why": "How far a replica is behind the primary. Anything a user reads from a lagging replica can be stale."
+   "why": "How far a replica is behind the primary. Anything a user reads from a lagging replica can be stale.",
+   "component": "r1"
   },
   {
    "id": "wal",
@@ -245,7 +260,8 @@
     "wal_gen",
     "wal_replay"
    ],
-   "why": "The primary writes WAL; each replica must replay it. When generated outruns replayed, a backlog builds."
+   "why": "The primary writes WAL; each replica must replay it. When generated outruns replayed, a backlog builds.",
+   "component": "primary"
   },
   {
    "id": "stale",
@@ -257,7 +273,8 @@
     "value": 5,
     "label": "alert 5%"
    },
-   "why": "The user-visible symptom: a read right after your own write returns the old value."
+   "why": "The user-visible symptom: a read right after your own write returns the old value.",
+   "component": "api"
   },
   {
    "id": "primary_reads",
@@ -265,7 +282,8 @@
    "metrics": [
     "primary_reads"
    ],
-   "why": "The cost of the fix: reads pinned to the primary add load to the one server that takes all writes."
+   "why": "The cost of the fix: reads pinned to the primary add load to the one server that takes all writes.",
+   "component": "primary"
   },
   {
    "id": "bf_rows",
@@ -273,7 +291,8 @@
    "metrics": [
     "bf_rows"
    ],
-   "why": "The trigger. The backfill's speed sets how much WAL the primary produces."
+   "why": "The trigger. The backfill's speed sets how much WAL the primary produces.",
+   "component": "backfill"
   },
   {
    "id": "replica_cpu",
@@ -282,7 +301,8 @@
     "replica_cpu"
    ],
    "max": 100,
-   "why": "Rules out the obvious wrong fix: replicas are not busy, so more hardware would not help."
+   "why": "Rules out the obvious wrong fix: replicas are not busy, so more hardware would not help.",
+   "component": "r1"
   },
   {
    "id": "primary_cpu",
@@ -291,7 +311,8 @@
     "primary_cpu"
    ],
    "max": 100,
-   "why": "Shows what the backfill and the pinned reads cost the primary."
+   "why": "Shows what the backfill and the pinned reads cost the primary.",
+   "component": "primary"
   },
   {
    "id": "api_p99",
@@ -299,7 +320,8 @@
    "metrics": [
     "api_p99"
    ],
-   "why": "What users feel on the API. Reads moved to the primary get a bit slower."
+   "why": "What users feel on the API. Reads moved to the primary get a bit slower.",
+   "component": "api"
   },
   {
    "id": "tickets",
@@ -307,7 +329,8 @@
    "metrics": [
     "tickets"
    ],
-   "why": "The business signal. Support tickets are often the first alarm for stale reads."
+   "why": "The business signal. Support tickets are often the first alarm for stale reads.",
+   "component": "browser"
   },
   {
    "id": "wal_disk",
@@ -315,7 +338,8 @@
    "metrics": [
     "wal_disk"
    ],
-   "why": "The backlog itself: WAL the replica has received but not yet replayed."
+   "why": "The backlog itself: WAL the replica has received but not yet replayed.",
+   "component": "r2"
   }
  ],
  "alerts": [

@@ -198,7 +198,26 @@
         "from": "report",
         "to": "db"
       }
-    ]
+    ],
+    "layout": {
+      "rows": [
+        [
+          "loadgen",
+          "vacuum",
+          null
+        ],
+        [
+          "api",
+          "db",
+          "workers"
+        ],
+        [
+          null,
+          "report",
+          null
+        ]
+      ]
+    }
   },
   "metrics": [
     {

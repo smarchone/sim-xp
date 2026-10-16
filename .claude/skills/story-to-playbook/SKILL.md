@@ -60,7 +60,7 @@ Top level: `schema`, `meta`, `components`, `metrics`, `dashboard`, `alerts`, `in
 - `story`: the hook, 1–2 sentences, shown large at the top of the intro and as the subtitle in the Saved list. Sets the scene, does not spoil the cause.
 - `duration_s`: 240–600 is typical (the viewer watches at 1×–4×).
 - `clock` (optional) `{ start?, scale?, changes? }`: real story time. By default one playbook second is one story second. For a long story set `scale` = story seconds per playbook second (a 2-month story in 420 s: 12,500; one hour per second: 3,600) and the clock, feed times, chart axes and key moments show story time ("Day 23", "Oct 21 22:52"), so nothing is shown as "8 seconds". `start` is an ISO date ("2018-10-21T22:51:18Z", shown in UTC) if the real dates matter, otherwise the clock counts "Day N". `changes` `[{ t, scale }]` switches the scale at playbook second `t` (real time through the trigger, then fast-forward through a long recovery). Keep event times (`t`) in playbook seconds and make sure feed text, durations and curves agree with the clock.
-- `layout` (optional) `{ columns: 1|2|3, rows: 1–8 }`: how the charts are arranged. The components (left) and feed (right) are fixed; the viewer can only widen the components by dragging the vertical divider (3 to 6 of 12 columns), which is not a playbook setting. `columns` is the number of chart columns between them (default 2); `rows` is how many chart rows fit on one screen before the board scrolls (default: fit all charts, between 2 and 5). Use 2 columns × 4–5 rows for ~8–10 charts; 3 columns for many small charts; 1 column × 3 rows for a few tall ones.
+- `layout` (optional, now ignored by the player): the player arranges charts itself (components over the feed on the left, charts on the right in 2–3 columns, scrolling when there are many). Leave it out.
 - The rest is the **intro**: it is how a viewer who has never seen this system gets the context. Write for an engineer who knows software but not this stack.
   - `background`: 2–4 `{ title, body }` paragraphs, each ≤ ~400 chars, plain words. A good set is "The system" (what it is, rough scale, why it is built this way), "How it normally works" (the mechanism, in the normal state), "Today" (what is about to happen). Do not spoil the cause.
   - `cast`: `[{ name, role }]`, one per component the viewer will see (use the component labels), role in a few words.
@@ -68,14 +68,29 @@ Top level: `schema`, `meta`, `components`, `metrics`, `dashboard`, `alerts`, `in
   - `learn`: 2–4 short "you'll come away knowing…" lines. No spoilers; name the question, not the answer.
 
 ### components
-`{ nodes: [{ id, label, kind, parts?: [{id}], part_cols? }], edges: [{ id, from, to }] }`
-- 4–10 nodes; only what the story needs. Labels are real-looking names (`payments-db`, `orders topic`).
+`{ nodes: [{ id, label, kind, parts?: [{id}], part_cols? }], edges: [{ id, from, to }], layout: { rows } }`
+- 4–8 nodes (12 at most); only what the story needs. Labels are real-looking names (`payments-db`, `orders topic`).
 - `kind` is free text shown under the label (`postgres`, `kafka-topic`, `redis`, `lb`).
 - `parts` are sub-cells you can colour on their own (partitions, shards, replicas, pods).
-- Edges point in the direction of the request/data flow. The app lays out the graph itself
-  (left→right or top→bottom, whichever fits the screen): do not add positions.
+- Edges point in the direction of the request/data flow.
+- `layout.rows` draws the graph on a small grid so it is easy to take in (see below). Always write it; without it the player
+  lays the nodes out in one long row, which shrinks them.
 - Nodes appear at the start and stay. To show scaling out or a failover target, declare the
   spare nodes/parts up front, start them `grey` with `label: "idle"` (or `down: true`), and bring them up later.
+
+#### Drawing the components (`layout.rows`)
+`layout: { rows: [["users","lb","web"], [null,"redis","bouncer"], [null,null,"db"]] }`: rows of node ids, top to bottom;
+`null` is an empty cell. Columns line up, and the app routes each edge from the side facing its target. The tile is about
+580 × 390 px (430 when the side panel is open), wider than tall, so:
+- **At most 3 columns × 3 rows** (a node with `parts` is wider; keep it to 3 columns anyway). More nodes: go down, not wider.
+  If the story needs more than 8 nodes, merge the boring ones (`cdn + lb` becomes `edge`).
+- **Read like a page**: the entry point (users, load test, producer) top-left, the data store bottom-right, so flow runs
+  left to right and then down. Put the thing the story is about near the middle.
+- **Linked nodes in neighbouring cells**, so an edge never passes behind another node (the validator warns). A fan-out
+  (one node feeding three) stacks the three in one column next to the source.
+- **Side players go on the edges of the grid**: background jobs, cron, vacuum, a report running against the database sit
+  above or below the node they act on, in its column.
+- Every node appears exactly once; a node you forget is added on an extra row.
 
 ### metrics
 `[{ id, label, unit, start, noise, normal?: [lo, hi] }]`
@@ -151,7 +166,7 @@ and reveals extra items you tag `"level": "deep"`. Standard must tell the whole 
 for an engineer who wants the next level down. The toggle only appears when the playbook has a deep layer.
 
 - `dashboard[].component` (any level): the node id this chart belongs to. The chart shows a small tag with that
-  node's name, coloured by its live status (calm, degrading, failing). Tag every chart that clearly belongs to one node.
+  node's name, coloured by its live status (calm, degrading, failing). Tag every chart that clearly belongs to one node: charts of the same component are shown together, in the order the components first appear in `dashboard`, so the viewer can find a component's signals in one place. A chart with no `component` stays where you put it.
 - `dashboard[]` with `"level": "deep"`: 3–6 second-order signals (pool usage, GC, join/sync time, commit failures,
   rows scanned). In Hardcore a deep chart is drawn full size only while it matters (a key-moment note sits on it, or an
   alert on its metric is pending or firing) and is otherwise a one-line row under "Quiet signals". So put a note on a

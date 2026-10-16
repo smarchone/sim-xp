@@ -157,7 +157,26 @@
     "from": "bouncer",
     "to": "db"
    }
-  ]
+  ],
+  "layout": {
+   "rows": [
+    [
+     "users",
+     "lb",
+     "web"
+    ],
+    [
+     null,
+     "redis",
+     "bouncer"
+    ],
+    [
+     null,
+     null,
+     "db"
+    ]
+   ]
+  }
  },
  "metrics": [
   {
@@ -258,7 +277,8 @@
     "value": 20,
     "label": "alert > 20%"
    },
-   "why": "Share of requests the cache could not answer. A jump means the database suddenly takes the traffic."
+   "why": "Share of requests the cache could not answer. A jump means the database suddenly takes the traffic.",
+   "component": "redis"
   },
   {
    "id": "load",
@@ -267,7 +287,8 @@
     "rps",
     "dbqps"
    ],
-   "why": "Requests in vs queries out. Normally the cache keeps queries far below requests."
+   "why": "Requests in vs queries out. Normally the cache keeps queries far below requests.",
+   "component": "web"
   },
   {
    "id": "dbp99",
@@ -279,7 +300,8 @@
     "value": 4000,
     "label": "statement_timeout 4s"
    },
-   "why": "How long queries take. Past the statement timeout they are cancelled and never cached."
+   "why": "How long queries take. Past the statement timeout they are cancelled and never cached.",
+   "component": "db"
   },
   {
    "id": "waiting",
@@ -287,7 +309,8 @@
    "metrics": [
     "waiting"
    ],
-   "why": "Clients queued for one of 20 database connections. This is the real bottleneck."
+   "why": "Clients queued for one of 20 database connections. This is the real bottleneck.",
+   "component": "bouncer"
   },
   {
    "id": "err",
@@ -299,7 +322,8 @@
     "value": 5,
     "label": "SLO page 5%"
    },
-   "why": "What shoppers see: pages failing with 5xx."
+   "why": "What shoppers see: pages failing with 5xx.",
+   "component": "lb"
   },
   {
    "id": "db_conns",
@@ -308,7 +332,8 @@
     "db_conns"
    ],
    "max": 24,
-   "why": "Pool usage. At 20 of 20 every extra query has to wait."
+   "why": "Pool usage. At 20 of 20 every extra query has to wait.",
+   "component": "bouncer"
   },
   {
    "id": "web_cpu",
@@ -317,7 +342,8 @@
     "web_cpu"
    ],
    "max": 100,
-   "why": "Busy threads waiting on the database look like load, which tempts you to scale out."
+   "why": "Busy threads waiting on the database look like load, which tempts you to scale out.",
+   "component": "web"
   },
   {
    "id": "pods",
@@ -325,7 +351,8 @@
    "metrics": [
     "pods"
    ],
-   "why": "The tempting wrong fix: more pods send more misses to the same 20 connections."
+   "why": "The tempting wrong fix: more pods send more misses to the same 20 connections.",
+   "component": "web"
   },
   {
    "id": "web_p95",
@@ -333,7 +360,8 @@
    "metrics": [
     "web_p95"
    ],
-   "why": "Slow pages, even before errors. Users leave at this point."
+   "why": "Slow pages, even before errors. Users leave at this point.",
+   "component": "web"
   }
  ],
  "alerts": [
