@@ -75,9 +75,11 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--p
 .feed li:hover{background:var(--sunk)}
 .feed li{transition:background .3s ease,box-shadow .3s ease,color .3s ease}
 .feed li.near{background:color-mix(in srgb,var(--accent) 12%,transparent);box-shadow:inset 3px 0 0 var(--accent)}
-.feed li.key{background:color-mix(in srgb,var(--amber) 9%,transparent);box-shadow:inset 2px 0 0 color-mix(in srgb,var(--amber) 70%,transparent)}
+/* key-moment tone: good (green), neutral (grey), bad (red); a key moment with no tone keeps the amber */
+.tone-good{--tone:var(--green)} .tone-bad{--tone:var(--red)} .tone-neutral{--tone:var(--muted)}
+.feed li.key{background:color-mix(in srgb,var(--tone,var(--amber)) 9%,transparent);box-shadow:inset 2px 0 0 color-mix(in srgb,var(--tone,var(--amber)) 75%,transparent)}
 /* current line on a key moment: keep the blue bar and ring, over the amber tint */
-.feed li.near.key{background:color-mix(in srgb,var(--accent) 12%,color-mix(in srgb,var(--amber) 9%,transparent));box-shadow:inset 3px 0 0 var(--accent),inset 0 0 0 1px color-mix(in srgb,var(--accent) 45%,transparent)}
+.feed li.near.key{background:color-mix(in srgb,var(--accent) 12%,color-mix(in srgb,var(--tone,var(--amber)) 9%,transparent));box-shadow:inset 3px 0 0 var(--accent),inset 0 0 0 1px color-mix(in srgb,var(--accent) 45%,transparent)}
 .feed li.key .txt{color:var(--fg)}
 .feed li.key .who{color:var(--fg);font-weight:500}
 .feed li.near .txt,.feed li.near .who{color:var(--fg)}
@@ -227,12 +229,15 @@ kbd{font:500 var(--s) var(--mono);color:var(--muted);border:1px solid var(--line
 .modal.wide{width:min(680px,100%)}
 /* key moment: a compact sheet that rises from the bottom of the components view (overlay, never pushes layout) */
 .sheet{position:absolute;left:0;right:0;bottom:0;z-index:3;max-height:calc(100% - 12px);display:flex;flex-direction:column;background:var(--glass);border-top:1px solid var(--line2);border-radius:8px 8px 0 0;transform:translateY(calc(100% - 25px));transition:transform .38s cubic-bezier(.2,.8,.2,1),box-shadow .38s,border-color .38s}
-.sheet.open{transform:none;border-top-color:color-mix(in srgb,var(--accent) 60%,transparent);box-shadow:0 -8px 22px rgba(0,0,0,.12)}
+.sheet.open{transform:none;border-top-color:color-mix(in srgb,var(--tone,var(--accent)) 70%,transparent);box-shadow:0 -8px 22px rgba(0,0,0,.12)}
 .sheet .strip{flex:none;height:25px;line-height:25px;padding:0 10px;font-size:var(--s);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sheet.open .strip{display:none}
 .sheet .sb{display:flex;flex-direction:column;gap:2px;padding:6px 10px 7px;min-height:0;overflow-y:auto}
 .sheet .top{display:flex;align-items:baseline;gap:8px}
 .sheet .eb{font-size:var(--s);color:var(--muted)}
+.sheet .tn{display:inline-flex;align-items:center;gap:5px;font-size:var(--s);font-weight:600;color:var(--tone,var(--muted))}
+.sheet .tn i{width:8px;height:8px;border-radius:50%;background:var(--tone,var(--muted))}
+.sheet .tn[hidden]{display:none}
 .sheet .top .spacer{flex:1}
 .sheet .more{border:0;background:none;color:var(--muted);font-size:var(--s);padding:0 2px}
 .sheet .more:hover{color:var(--accent)}
@@ -254,7 +259,7 @@ kbd{font:500 var(--s) var(--mono);color:var(--muted);border:1px solid var(--line
 .chips span{font-size:var(--s);color:var(--muted);background:var(--sunk);border-radius:999px;padding:1px 8px}
 /* reading screens: intro and report. One calm column, serif prose. */
 .modal.report{width:min(720px,100%)}
-.modal.intro{width:min(600px,100%);max-height:calc(100dvh - 32px);padding:22px 28px 16px;gap:10px}
+.modal.intro{width:min(720px,100%)} /* same dimensions as the report */
 .intro h2{font:500 26px/1.15 var(--serif);letter-spacing:-.01em}
 .intro .hook{font:400 17.5px/1.5 var(--serif);color:var(--fg);margin:0;text-wrap:pretty}
 .intro .icols{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;margin-top:6px;overflow-y:auto;min-height:0}
@@ -352,7 +357,7 @@ pre{font:var(--s)/1.5 var(--mono);background:var(--sunk);border-radius:8px;paddi
         <div class="sheet" id="caption" aria-live="polite">
           <div class="strip" id="sheetStrip"></div>
           <div class="sb">
-            <div class="top"><span class="eb" id="capK"></span><span class="spacer"></span><button class="more" id="capMore" aria-expanded="false">more</button></div>
+            <div class="top"><span class="tn" id="capTone" hidden><i></i><b></b></span><span class="eb" id="capK"></span><span class="spacer"></span><button class="more" id="capMore" aria-expanded="false">more</button></div>
             <h2 id="capT"></h2>
             <p id="capH"></p>
             <div class="foot"><span class="spacer"></span><kbd>Space</kbd><button class="primary" id="beatGo" tabindex="-1">Continue ▶</button></div>
@@ -478,6 +483,11 @@ function stateAt(T) {
 const beatTimes = new Set(PB.timeline.filter(e => e.beat).map(e => e.t));
 const feedItems = PB.timeline.filter(e => e.feed).map(e => ({ t: e.t, ...e.feed })).concat(alertFeed).sort((a, b) => a.t - b.t);
 feedItems.forEach(f => (f.key = f.key === true || beatTimes.has(f.t) || f.kind === "alert" || f.kind === "resolved"));
+// tone of a key moment: good, neutral or bad (the feed line at its time, the caption sheet and the status chip carry it); alerts firing are bad, resolved are good
+const TONES = ["good", "neutral", "bad"], TONE_LABEL = { good: "Good", neutral: "Neutral", bad: "Bad" };
+const beatTone = e => (TONES.includes(e.beat.tone) ? e.beat.tone : null);
+const toneAt = new Map(PB.timeline.filter(e => e.beat && beatTone(e)).map(e => [e.t, beatTone(e)]));
+feedItems.forEach(f => { f.tone = toneAt.get(f.t) || (f.kind === "alert" ? "bad" : f.kind === "resolved" ? "good" : null); });
 $("#feedCard").style.setProperty("--tcol", (Math.max(...feedItems.map(f => fmtT(f.t).length), 5) * 0.62 + 1.4).toFixed(1) + "em");
 const beats = PB.timeline.filter(e => e.beat);
 // Detail: Standard or Hardcore. Hardcore reveals items the playbook tags level "deep"; the run itself never changes.
@@ -916,7 +926,7 @@ function renderQuiet(playT, viewT) {
 
 /* ===================== Feed: always visible, one line per entry, linked to the shared cursor ===================== */
 const feedEl = $("#feed"); let feedShown = -1, feedNear = null, feedHoverLi = null;
-const liHTML = (f, fresh) => `<li class="k-${f.kind}${f.key ? " key" : ""}${f.level === "deep" ? " lv-deep" : ""}${fresh ? " fresh" : ""}" data-i="${feedItems.indexOf(f)}" data-t="${f.t}"><time>${fmtT(f.t)}</time><span class="msg"><span class="who">${esc(f.from)}</span><span class="txt">${esc(f.text)}</span></span></li>`;
+const liHTML = (f, fresh) => `<li class="k-${f.kind}${f.key ? " key" : ""}${f.tone ? " tone-" + f.tone : ""}${f.level === "deep" ? " lv-deep" : ""}${fresh ? " fresh" : ""}" data-i="${feedItems.indexOf(f)}" data-t="${f.t}"><time>${fmtT(f.t)}</time><span class="msg"><span class="who">${esc(f.from)}</span><span class="txt">${esc(f.text)}</span></span></li>`;
 function feedScrollTo(top, smooth) { if (!smooth) feedEl.style.scrollBehavior = "auto"; feedEl.scrollTop = top; if (!smooth) feedEl.style.scrollBehavior = ""; }
 function renderFeed(playT, viewT) {
   const vis = feedItems.filter(f => f.t <= playT && shownFeed(f));
@@ -990,7 +1000,7 @@ function renderHud(v) {
   if (hudFlash && hudFlash.until > performance.now()) html = `<span class="ic">•</span>${hudFlash.text}`;
   else if (isOpen($("#intro"))) html = `<span class="ic">▶</span><kbd>Space</kbd> to start`;
   else if (hoverT != null && hoverT < playT - 0.5) html = `<span class="ic">◷</span>viewing <b>${fmtT(v)}</b><span class="ch">${ch}</span>`;
-  else if (activeBeat) html = `<span class="ic">◆</span>key moment ${beats.indexOf(activeBeat) + 1}/${beats.length} · <kbd>Space</kbd> continue`;
+  else if (activeBeat) html = `<span class="ic" style="color:${{ good: "var(--green)", bad: "var(--red)", neutral: "var(--muted)" }[beatTone(activeBeat)] || "var(--accent)"}">◆</span>key moment ${beats.indexOf(activeBeat) + 1}/${beats.length}${beatTone(activeBeat) ? " · " + TONE_LABEL[beatTone(activeBeat)].toLowerCase() : ""} · <kbd>Space</kbd> continue`;
   else if (playT >= D) html = `<span class="ic">↺</span><b>${fmtT(D)}</b> · <kbd>Space</kbd> replay`;
   else html = `<span class="ic">${playing ? "❚❚" : "▶"}</span><b>${fmtT(v)} / ${fmtT(D)}</b><span class="ch">${ch}</span>${speed !== 4 ? `<span>${speedLabel(speed)}</span>` : ""}<kbd>Space</kbd>${playing ? "pause" : "play"}`;
   if (st._h !== html) { st._h = html; st.innerHTML = html; }
@@ -1015,7 +1025,8 @@ function applyFocus(e) {
 const emit = (type, data) => { try { host && host.onPlayerEvent && host.onPlayerEvent(type, data); } catch (err) { /* host gone */ } };
 function showBeat(e) {
   activeBeat = e; setPlaying(false); emit("key_moment", { n: beats.indexOf(e) + 1, t: e.t });
-  $("#capK").textContent = `Key moment ${beats.indexOf(e) + 1} of ${beats.length} · ${fmtT(e.t)}`; $("#capT").textContent = e.title || ""; setCapHint(e);
+  $("#capK").textContent = `Key moment ${beats.indexOf(e) + 1} of ${beats.length} · ${fmtT(e.t)}`;
+  { const tn = beatTone(e), cap = $("#caption"), chip = $("#capTone"); TONES.forEach(t => cap.classList.toggle("tone-" + t, t === tn)); chip.hidden = !tn; if (tn) chip.querySelector("b").textContent = TONE_LABEL[tn]; } $("#capT").textContent = e.title || ""; setCapHint(e);
   setExpanded(false); $("#caption").classList.add("open"); $("#beatGo").tabIndex = 0; fitAboveSheet(true);
   $("#app").classList.add("focus-mode");
   applyFocus(e);

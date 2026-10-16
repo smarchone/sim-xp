@@ -534,6 +534,7 @@
    "t": 3,
    "title": "Meet the system",
    "beat": {
+    "tone": "neutral",
     "hint": "Users reach GitHub through the US East hub. Apps write to MySQL primaries in the East DC, which replicate asynchronously to West. Orchestrator runs as a 3-node Raft group (East, West, cloud) and fails over any primary it decides is dead.",
     "focus": [
      "hub",
@@ -635,6 +636,7 @@
    "t": 50,
    "title": "Partition: 43 seconds",
    "beat": {
+    "tone": "bad",
     "hint": "The link swap cut the East DC off from the hub, from West and from the rest of Raft. Requests already inside the East DC keep writing to the East primaries, but none of those writes can replicate West.",
     "focus": [
      "hub",
@@ -755,6 +757,7 @@
    "t": 66,
    "title": "Raft quorum without the East",
    "beat": {
+    "tone": "neutral",
     "hint": "West and the cloud node form a majority, so Orchestrator acts: it sees four dead primaries and promotes the West replicas. That's exactly what it's built for. But the East primaries never died; they were just unreachable, and they've accepted writes the West never saw.",
     "focus": [
      "orch",
@@ -847,6 +850,7 @@
    "t": 108,
    "title": "Two histories",
    "beat": {
+    "tone": "bad",
     "hint": "Connectivity is back but the damage is done. East holds a few seconds of writes that never reached West; West has taken new writes since the failover. Each side has data the other lacks, and East apps now pay a cross-country round trip on every write.",
     "focus": [
      "east",
@@ -939,6 +943,7 @@
    "t": 150,
    "title": "Why not fail back?",
    "beat": {
+    "tone": "neutral",
     "hint": "Failing back now would discard everything written to West since the failover, on top of the 954 already stranded East. GitHub chose to stay slow and pause webhooks and Pages instead of risking lost or inconsistent data. The cost: hours of degraded service.",
     "focus": [
      "jobs",
@@ -1206,6 +1211,7 @@
    "t": 342,
    "title": "Why failback is safe now",
    "beat": {
+    "tone": "good",
     "hint": "The restored East replicas caught up from the West primaries, so they hold every write the West took. Promoting them loses nothing, and writes are local again. The 954 stranded writes still need reconciling by hand from the old East binlogs.",
     "focus": [
      "east",
@@ -1323,6 +1329,7 @@
    "t": 460,
    "title": "Recovered",
    "beat": {
+    "tone": "good",
     "hint": "43 seconds of partition cost 24 hours of degraded service. Failover worked as designed; the design allowed a cross-region promotion that East apps couldn't live with and that left two histories. The report has the takeaways.",
     "focus": [
      "east",
