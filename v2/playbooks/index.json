@@ -29,48 +29,34 @@
   "key_moments": 6
  },
  {
-  "id": "pg-replication-lag",
-  "file": "pg-replication-lag.json",
-  "title": "Saved, refreshed, reverted: replica lag",
-  "story": "A profile service writes to a Postgres primary and serves reads from two streaming replicas. It has worked for years. This afternoon a user renames herself, gets a green 'Saved', hits refresh, and her old name is back.",
-  "duration_s": 300,
+  "id": "zerodha-seven-million-tables",
+  "file": "zerodha-seven-million-tables.json",
+  "title": "7 million tables a day: Zerodha's report cache",
+  "story": "Every report a Zerodha user pulls becomes its own Postgres table, about 7 million by midnight, all thrown away at 02:00. Follow tax-deadline day, compressed (≈6 min per second by day, 1 min per second in the evening rush).",
+  "duration_s": 450,
   "tags": [
    "postgres",
-   "replication",
-   "read-replicas",
-   "consistency"
+   "zerodha",
+   "dungbeetle",
+   "async-jobs",
+   "reporting",
+   "dramatized"
   ],
-  "key_moments": 6
+  "key_moments": 7
  },
  {
-  "id": "cache-stampede-after-deploy",
-  "file": "cache-stampede-after-deploy.json",
-  "title": "The cold cache: a deploy that forgot everything",
-  "story": "A shop's product pages are served from Redis 96% of the time, and Postgres only sees the misses. A routine Thursday deploy rolls out across six web pods. Nothing in it touches the database, yet within a minute the site is returning 504s.",
-  "duration_s": 420,
-  "tags": [
-   "redis",
-   "caching",
-   "cache-stampede",
-   "thundering-herd",
-   "postgres",
-   "pgbouncer"
-  ],
-  "key_moments": 6
- },
- {
-  "id": "github-2018-split-brain",
-  "file": "github-2018-split-brain.json",
-  "title": "43 seconds, 24 hours: GitHub's split brain",
-  "story": "October 21, 2018, 22:52 UTC. Engineers replace a failing 100G optic at GitHub's US East Coast network hub, a routine job. Orchestrator watches over the MySQL clusters from three sites. Real time is compressed here: the first two minutes play close to real time, then each second stands for several minutes of a 24-hour recovery.",
+  "id": "kafka-load-test-until-it-breaks",
+  "file": "kafka-load-test-until-it-breaks.json",
+  "title": "Load test until it breaks: the three walls of a Kafka cluster",
+  "story": "A team ramps a healthy 3-broker Kafka cluster from 20 to 270 MB/s with the abort guard switched off, to learn exactly how it fails. Compressed: 1 s of playback ≈ 10 s of test time.",
   "duration_s": 480,
   "tags": [
-   "mysql",
-   "orchestrator",
-   "raft",
-   "failover",
-   "split-brain",
-   "network-partition"
+   "kafka",
+   "load-test",
+   "capacity",
+   "isr",
+   "replication",
+   "dramatized"
   ],
   "key_moments": 7
  }

@@ -1,0 +1,2529 @@
+{
+  "schema": "sim-xp/playbook@2",
+  "meta": {
+    "id": "kafka-load-test-until-it-breaks",
+    "title": "Load test until it breaks: the three walls of a Kafka cluster",
+    "story": "A team ramps a healthy 3-broker Kafka cluster from 20 to 270 MB/s with the abort guard switched off, to learn exactly how it fails. Compressed: 1 s of playback ≈ 10 s of test time.",
+    "duration_s": 480,
+    "tags": [
+      "kafka",
+      "load-test",
+      "capacity",
+      "isr",
+      "replication",
+      "dramatized"
+    ],
+    "clock": {
+      "start": "2026-10-14T10:00:00Z",
+      "scale": 10
+    },
+    "background": [
+      {
+        "title": "The system",
+        "body": "A 3-broker Kafka cluster (b1, b2, b3), each with a 250 MB/s gp3 volume. The events topic has 48 partitions, replication factor 3, min.insync.replicas=2. Six load generators write 1 KB records with acks=all; a consumer group reads them live."
+      },
+      {
+        "title": "How it normally works",
+        "body": "A produce request goes to the partition leader, which appends it; followers fetch from the leader. With acks=all the producer is acked once every in-sync replica (ISR) has the data. A follower that is behind for replica.lag.time.max.ms (30 s) is dropped from the ISR. If the ISR shrinks below min.insync.replicas, writes are rejected."
+      },
+      {
+        "title": "Today",
+        "body": "Marta's team raises the load in 7-minute steps: 20, 60, 100, 150, 190, 230, 270 MB/s. The abort guard is off on purpose. They want to know which signal moves first, where it starts to hurt, and what 'broken' actually looks like."
+      }
+    ],
+    "cast": [
+      {
+        "name": "loadgen",
+        "role": "6 producers, the ramp, acks=all"
+      },
+      {
+        "name": "broker-1, -2, -3",
+        "role": "the cluster under test"
+      },
+      {
+        "name": "consumers",
+        "role": "live consumer group, 6 members"
+      }
+    ],
+    "watch": [
+      {
+        "label": "Produce p99 latency",
+        "normal": "normal < 50 ms"
+      },
+      {
+        "label": "Request handler idle (b1)",
+        "normal": "normal > 40%"
+      },
+      {
+        "label": "Partitions below min ISR",
+        "normal": "normal: 0"
+      }
+    ],
+    "learn": [
+      "which signal moves first as load grows, and which moves last",
+      "why a cluster at 92% disk can lose its replicas",
+      "what 'broken' looks like to a producer using acks=all",
+      "where a safe steady-state ceiling really sits"
+    ]
+  },
+  "components": {
+    "nodes": [
+      {
+        "id": "loadgen",
+        "label": "loadgen",
+        "kind": "perf-test x6",
+        "details": [
+          {
+            "label": "Offered",
+            "metric": "offered"
+          },
+          {
+            "label": "Acked",
+            "metric": "acked"
+          },
+          {
+            "label": "Buffer used",
+            "metric": "buf_pct",
+            "level": "deep"
+          },
+          {
+            "label": "Producer",
+            "text": "acks=all, linger 5 ms",
+            "level": "deep"
+          },
+          {
+            "label": "buffer.memory",
+            "text": "32 MB per producer",
+            "level": "deep"
+          }
+        ]
+      },
+      {
+        "id": "b1",
+        "label": "broker-1",
+        "kind": "kafka",
+        "details": [
+          {
+            "label": "Handlers idle",
+            "metric": "req_idle"
+          },
+          {
+            "label": "CPU",
+            "metric": "cpu"
+          },
+          {
+            "label": "Disk MB/s",
+            "metric": "disk_mbs"
+          },
+          {
+            "label": "Leads",
+            "text": "28 of 48 partitions"
+          },
+          {
+            "label": "Request queue p99",
+            "metric": "queue_ms",
+            "level": "deep"
+          },
+          {
+            "label": "Dirty pages",
+            "metric": "dirty_gb",
+            "level": "deep"
+          }
+        ]
+      },
+      {
+        "id": "b2",
+        "label": "broker-2",
+        "kind": "kafka",
+        "details": [
+          {
+            "label": "Disk MB/s",
+            "metric": "disk_mbs"
+          },
+          {
+            "label": "Follower lag",
+            "metric": "rep_lag"
+          },
+          {
+            "label": "Leads",
+            "text": "12 of 48 partitions"
+          },
+          {
+            "label": "Disk await",
+            "metric": "disk_await",
+            "level": "deep"
+          },
+          {
+            "label": "replica.lag.time.max.ms",
+            "text": "30000",
+            "level": "deep"
+          }
+        ]
+      },
+      {
+        "id": "b3",
+        "label": "broker-3",
+        "kind": "kafka",
+        "details": [
+          {
+            "label": "Disk MB/s",
+            "metric": "disk_mbs"
+          },
+          {
+            "label": "Follower lag",
+            "metric": "rep_lag"
+          },
+          {
+            "label": "Leads",
+            "text": "8 of 48 partitions"
+          },
+          {
+            "label": "GC pause p99",
+            "metric": "gc_ms",
+            "level": "deep"
+          },
+          {
+            "label": "num.replica.fetchers",
+            "text": "1",
+            "level": "deep"
+          }
+        ]
+      },
+      {
+        "id": "consumers",
+        "label": "consumers",
+        "kind": "consumer-group",
+        "details": [
+          {
+            "label": "Consumed",
+            "metric": "consumed"
+          },
+          {
+            "label": "Lag",
+            "metric": "lag"
+          },
+          {
+            "label": "Reads from",
+            "text": "page cache (live tail)"
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-l1",
+        "from": "loadgen",
+        "to": "b1"
+      },
+      {
+        "id": "e-l2",
+        "from": "loadgen",
+        "to": "b2"
+      },
+      {
+        "id": "e-l3",
+        "from": "loadgen",
+        "to": "b3"
+      },
+      {
+        "id": "e-r12",
+        "from": "b1",
+        "to": "b2"
+      },
+      {
+        "id": "e-r23",
+        "from": "b2",
+        "to": "b3"
+      },
+      {
+        "id": "e-c1",
+        "from": "b1",
+        "to": "consumers"
+      },
+      {
+        "id": "e-c2",
+        "from": "b2",
+        "to": "consumers"
+      },
+      {
+        "id": "e-c3",
+        "from": "b3",
+        "to": "consumers"
+      }
+    ],
+    "layout": {
+      "rows": [
+        [
+          null,
+          "b1",
+          null
+        ],
+        [
+          "loadgen",
+          "b2",
+          "consumers"
+        ],
+        [
+          null,
+          "b3",
+          null
+        ]
+      ]
+    }
+  },
+  "metrics": [
+    {
+      "id": "offered",
+      "label": "Offered load",
+      "unit": "MB/s",
+      "start": 20,
+      "noise": 0.01
+    },
+    {
+      "id": "acked",
+      "label": "Acked by cluster",
+      "unit": "MB/s",
+      "start": 20,
+      "noise": 0.03
+    },
+    {
+      "id": "consumed",
+      "label": "Consumed",
+      "unit": "MB/s",
+      "start": 20,
+      "noise": 0.03
+    },
+    {
+      "id": "produce_p99",
+      "label": "Produce p99 latency",
+      "unit": "ms",
+      "start": 9,
+      "noise": 0.08,
+      "normal": [
+        3,
+        50
+      ]
+    },
+    {
+      "id": "req_idle",
+      "label": "Request handler idle (b1)",
+      "unit": "%",
+      "start": 92,
+      "noise": 0.03,
+      "normal": [
+        40,
+        100
+      ]
+    },
+    {
+      "id": "cpu",
+      "label": "Broker CPU (b1)",
+      "unit": "%",
+      "start": 12,
+      "noise": 0.04
+    },
+    {
+      "id": "disk_mbs",
+      "label": "Disk throughput per broker",
+      "unit": "MB/s",
+      "start": 20,
+      "noise": 0.03
+    },
+    {
+      "id": "rep_lag",
+      "label": "Follower fetch lag",
+      "unit": "s",
+      "start": 0.2,
+      "noise": 0.08,
+      "normal": [
+        0,
+        5
+      ]
+    },
+    {
+      "id": "urp",
+      "label": "Under-replicated partitions",
+      "unit": "partitions",
+      "start": 0,
+      "noise": 0,
+      "normal": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "under_min",
+      "label": "Below min.insync.replicas",
+      "unit": "partitions",
+      "start": 0,
+      "noise": 0,
+      "normal": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "errs",
+      "label": "Producer send errors",
+      "unit": "k rec/s",
+      "start": 0,
+      "noise": 0.05
+    },
+    {
+      "id": "lag",
+      "label": "Consumer lag",
+      "unit": "k msgs",
+      "start": 4,
+      "noise": 0.05,
+      "normal": [
+        0,
+        50
+      ]
+    },
+    {
+      "id": "queue_ms",
+      "label": "Request queue time p99 (b1)",
+      "unit": "ms",
+      "start": 0.5,
+      "noise": 0.1
+    },
+    {
+      "id": "dirty_gb",
+      "label": "Dirty page cache",
+      "unit": "GB",
+      "start": 0.1,
+      "noise": 0.05
+    },
+    {
+      "id": "disk_await",
+      "label": "Disk await",
+      "unit": "ms",
+      "start": 0.8,
+      "noise": 0.08
+    },
+    {
+      "id": "buf_pct",
+      "label": "Producer buffer used",
+      "unit": "%",
+      "start": 3,
+      "noise": 0.05
+    },
+    {
+      "id": "gc_ms",
+      "label": "Broker GC pause p99",
+      "unit": "ms",
+      "start": 22,
+      "noise": 0.08
+    }
+  ],
+  "dashboard": [
+    {
+      "id": "flow",
+      "title": "Throughput",
+      "metrics": [
+        "offered",
+        "acked"
+      ],
+      "why": "Offered is what we push, acked is what the cluster accepted. The gap between them is the break.",
+      "component": "loadgen"
+    },
+    {
+      "id": "produce_p99",
+      "title": "Produce p99 latency",
+      "metrics": [
+        "produce_p99"
+      ],
+      "why": "What a producer feels. It rises long before anything fails, so it is the early warning.",
+      "component": "loadgen",
+      "threshold": {
+        "value": 100,
+        "label": "SLO 100 ms"
+      }
+    },
+    {
+      "id": "errs",
+      "title": "Producer send errors",
+      "metrics": [
+        "errs"
+      ],
+      "why": "Rejected or timed-out sends. Zero for most of the test, then the cliff.",
+      "component": "loadgen"
+    },
+    {
+      "id": "req_idle",
+      "title": "Request handler idle (b1)",
+      "metrics": [
+        "req_idle"
+      ],
+      "why": "How much spare capacity b1's request threads have. Under 30% means requests queue.",
+      "component": "b1",
+      "threshold": {
+        "value": 30,
+        "label": "alert < 30%"
+      },
+      "max": 100
+    },
+    {
+      "id": "cpu",
+      "title": "Broker CPU (b1)",
+      "metrics": [
+        "cpu"
+      ],
+      "why": "Shows b1 working harder than its share. Rules out 'the whole cluster is CPU bound'.",
+      "component": "b1",
+      "max": 100
+    },
+    {
+      "id": "disk_mbs",
+      "title": "Disk throughput per broker",
+      "metrics": [
+        "disk_mbs"
+      ],
+      "why": "With RF 3 on 3 brokers this equals the produce rate. The volume cap is the physical ceiling.",
+      "component": "b1",
+      "threshold": {
+        "value": 250,
+        "label": "volume cap 250 MB/s"
+      }
+    },
+    {
+      "id": "rep_lag",
+      "title": "Follower fetch lag",
+      "metrics": [
+        "rep_lag"
+      ],
+      "why": "How far followers trail their leaders. Past 30 s a follower is dropped from the ISR.",
+      "component": "b3",
+      "threshold": {
+        "value": 30,
+        "label": "replica.lag.time.max.ms"
+      }
+    },
+    {
+      "id": "repl",
+      "title": "Replication health",
+      "metrics": [
+        "urp",
+        "under_min"
+      ],
+      "why": "Under-replicated is a warning; below min.insync.replicas means producers are being rejected.",
+      "component": "b3"
+    },
+    {
+      "id": "lag",
+      "title": "Consumer lag",
+      "metrics": [
+        "lag"
+      ],
+      "why": "Stayed small the whole test, so lag would never have warned us about the failure.",
+      "component": "consumers"
+    },
+    {
+      "id": "queue_ms",
+      "title": "Request queue time p99 (b1)",
+      "metrics": [
+        "queue_ms"
+      ],
+      "why": "Time requests wait for a free handler. The first place saturation shows up.",
+      "component": "b1",
+      "level": "deep"
+    },
+    {
+      "id": "dirty_gb",
+      "title": "Dirty page cache",
+      "metrics": [
+        "dirty_gb"
+      ],
+      "why": "Data accepted but not yet on disk. At vm.dirty_ratio the kernel blocks writers.",
+      "component": "b1",
+      "threshold": {
+        "value": 6.4,
+        "label": "vm.dirty_ratio 20%"
+      },
+      "max": 8,
+      "level": "deep"
+    },
+    {
+      "id": "disk_await",
+      "title": "Disk await",
+      "metrics": [
+        "disk_await"
+      ],
+      "why": "Per-I/O wait. Near saturation it grows far faster than throughput does.",
+      "component": "b2",
+      "level": "deep"
+    },
+    {
+      "id": "buf_pct",
+      "title": "Producer buffer used",
+      "metrics": [
+        "buf_pct"
+      ],
+      "why": "buffer.memory is shared by all partitions, so a few sick partitions can starve the rest.",
+      "component": "loadgen",
+      "max": 100,
+      "level": "deep"
+    },
+    {
+      "id": "gc_ms",
+      "title": "Broker GC pause p99",
+      "metrics": [
+        "gc_ms"
+      ],
+      "why": "Rules out the usual suspect: pauses stay in tens of ms, so GC is not why followers stalled.",
+      "component": "b3",
+      "level": "deep"
+    }
+  ],
+  "alerts": [
+    {
+      "id": "p99-slo",
+      "metric": "produce_p99",
+      "op": ">",
+      "value": 100,
+      "for_s": 8,
+      "severity": "warning",
+      "component": "loadgen",
+      "summary": "produce p99 > 100 ms"
+    },
+    {
+      "id": "req-idle",
+      "metric": "req_idle",
+      "op": "<",
+      "value": 30,
+      "for_s": 8,
+      "severity": "warning",
+      "component": "b1",
+      "summary": "b1 request handler idle < 30%"
+    },
+    {
+      "id": "disk-hot",
+      "metric": "disk_mbs",
+      "op": ">",
+      "value": 225,
+      "for_s": 6,
+      "severity": "warning",
+      "component": "b2",
+      "summary": "broker disks > 90% of volume cap"
+    },
+    {
+      "id": "urp",
+      "metric": "urp",
+      "op": ">",
+      "value": 0,
+      "for_s": 4,
+      "severity": "critical",
+      "component": "b3",
+      "summary": "under-replicated partitions > 0"
+    },
+    {
+      "id": "under-min",
+      "metric": "under_min",
+      "op": ">",
+      "value": 0,
+      "for_s": 3,
+      "severity": "critical",
+      "component": "b1",
+      "summary": "partitions below min.insync.replicas: producers rejected"
+    }
+  ],
+  "initial": {
+    "effects": [
+      {
+        "target": "loadgen",
+        "color": "violet",
+        "intensity": 0.2,
+        "label": "6 producers"
+      },
+      {
+        "target": "b1",
+        "color": "teal",
+        "intensity": 0.15,
+        "label": "leads 28/48"
+      },
+      {
+        "target": "b2",
+        "color": "teal",
+        "intensity": 0.15,
+        "label": "leads 12/48"
+      },
+      {
+        "target": "b3",
+        "color": "teal",
+        "intensity": 0.15,
+        "label": "leads 8/48"
+      },
+      {
+        "target": "consumers",
+        "color": "pink",
+        "intensity": 0.15,
+        "label": "6 members"
+      },
+      {
+        "target": "e-l1",
+        "flow": 0.15
+      },
+      {
+        "target": "e-l2",
+        "flow": 0.08
+      },
+      {
+        "target": "e-l3",
+        "flow": 0.06
+      },
+      {
+        "target": "e-r12",
+        "flow": 0.09
+      },
+      {
+        "target": "e-r23",
+        "flow": 0.07
+      },
+      {
+        "target": "e-c1",
+        "flow": 0.12
+      },
+      {
+        "target": "e-c2",
+        "flow": 0.07
+      },
+      {
+        "target": "e-c3",
+        "flow": 0.04
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "t": 3,
+      "title": "Meet the cluster",
+      "beat": {
+        "tone": "neutral",
+        "hint": "Three brokers, one topic of 48 partitions, each stored three times. Six load generators send 20 MB/s of 1 KB records with acks=all. Everything is boring: p99 about 9 ms, brokers mostly idle. The plan is to raise the load in steps until something gives.",
+        "deep": "events: 48 partitions, RF 3, min.insync.replicas=2. Producers: acks=all, linger.ms=5, batch.size=128 KB, buffer.memory=32 MB each. Brokers: num.replica.fetchers=1, replica.lag.time.max.ms=30000, auto.leader.rebalance.enable=false.",
+        "focus": [
+          "loadgen",
+          "b1",
+          "b2",
+          "b3",
+          "panel:flow"
+        ],
+        "notes": [
+          {
+            "panel": "flow",
+            "text": "Offered = acked = consumed: the cluster keeps up"
+          },
+          {
+            "panel": "produce_p99",
+            "text": "Baseline p99 about 9 ms at 20 MB/s"
+          },
+          {
+            "panel": "req_idle",
+            "text": "Handlers 92% idle: plenty of headroom"
+          }
+        ]
+      }
+    },
+    {
+      "t": 8,
+      "feed": {
+        "from": "Marta · #kafka-perf",
+        "kind": "chat",
+        "text": "ramp plan: 20 > 60 > 100 > 150 > 190 > 230 > 270 MB/s, 7 min holds, 1 KB records, acks=all. abort guard is OFF on purpose. I want to see how it breaks, not where we stop.",
+        "key": true
+      }
+    },
+    {
+      "t": 14,
+      "feed": {
+        "from": "Kofi · terminal",
+        "kind": "chat",
+        "text": "$ kafka-topics.sh --describe --topic events | head -1  > PartitionCount: 48  ReplicationFactor: 3  Configs: min.insync.replicas=2,retention.ms=86400000,segment.bytes=1073741824",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 22,
+      "feed": {
+        "from": "Marta · terminal",
+        "kind": "chat",
+        "text": "$ kafka-producer-perf-test.sh --topic events --record-size 1000 --throughput 20000 --producer-props acks=all linger.ms=5 batch.size=131072 buffer.memory=33554432  (x6 hosts)",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 30,
+      "title": "Ramp: 60 MB/s",
+      "feed": {
+        "from": "loadgen",
+        "kind": "deploy",
+        "text": "ramp step 2/7: 60 MB/s (60k rec/s), hold 7 min"
+      },
+      "effects": [
+        {
+          "target": "e-l1",
+          "flow": 0.3
+        },
+        {
+          "target": "e-l2",
+          "flow": 0.17
+        },
+        {
+          "target": "e-l3",
+          "flow": 0.12
+        },
+        {
+          "target": "e-r12",
+          "flow": 0.18
+        },
+        {
+          "target": "e-r23",
+          "flow": 0.14
+        },
+        {
+          "target": "e-c1",
+          "flow": 0.24
+        },
+        {
+          "target": "e-c2",
+          "flow": 0.14
+        },
+        {
+          "target": "e-c3",
+          "flow": 0.09
+        }
+      ],
+      "metrics": [
+        {
+          "id": "offered",
+          "to": 60,
+          "over_s": 4,
+          "shape": "linear"
+        },
+        {
+          "id": "acked",
+          "to": 60,
+          "over_s": 6
+        },
+        {
+          "id": "consumed",
+          "to": 60,
+          "over_s": 6
+        },
+        {
+          "id": "produce_p99",
+          "to": 10,
+          "over_s": 6
+        },
+        {
+          "id": "req_idle",
+          "to": 82,
+          "over_s": 8
+        },
+        {
+          "id": "cpu",
+          "to": 28,
+          "over_s": 8
+        },
+        {
+          "id": "disk_mbs",
+          "to": 60,
+          "over_s": 6
+        },
+        {
+          "id": "rep_lag",
+          "to": 0.3,
+          "over_s": 6
+        },
+        {
+          "id": "queue_ms",
+          "to": 0.6,
+          "over_s": 6
+        },
+        {
+          "id": "disk_await",
+          "to": 0.9,
+          "over_s": 6
+        },
+        {
+          "id": "dirty_gb",
+          "to": 0.2,
+          "over_s": 6
+        }
+      ]
+    },
+    {
+      "t": 48,
+      "feed": {
+        "from": "kafka b2",
+        "kind": "log",
+        "text": "INFO [Log partition=events-12, dir=/data/kafka] Rolled new log segment at offset 4411203 in 3 ms"
+      }
+    },
+    {
+      "t": 70,
+      "title": "Ramp: 100 MB/s",
+      "feed": {
+        "from": "loadgen",
+        "kind": "deploy",
+        "text": "ramp step 3/7: 100 MB/s (100k rec/s), hold 7 min"
+      },
+      "effects": [
+        {
+          "target": "e-l1",
+          "flow": 0.45
+        },
+        {
+          "target": "e-l2",
+          "flow": 0.25
+        },
+        {
+          "target": "e-l3",
+          "flow": 0.18
+        },
+        {
+          "target": "e-r12",
+          "flow": 0.27
+        },
+        {
+          "target": "e-r23",
+          "flow": 0.2
+        },
+        {
+          "target": "e-c1",
+          "flow": 0.36
+        },
+        {
+          "target": "e-c2",
+          "flow": 0.2
+        },
+        {
+          "target": "e-c3",
+          "flow": 0.14
+        }
+      ],
+      "metrics": [
+        {
+          "id": "offered",
+          "to": 100,
+          "over_s": 4,
+          "shape": "linear"
+        },
+        {
+          "id": "acked",
+          "to": 100,
+          "over_s": 6
+        },
+        {
+          "id": "consumed",
+          "to": 100,
+          "over_s": 6
+        },
+        {
+          "id": "produce_p99",
+          "to": 12,
+          "over_s": 6
+        },
+        {
+          "id": "req_idle",
+          "to": 65,
+          "over_s": 8
+        },
+        {
+          "id": "cpu",
+          "to": 40,
+          "over_s": 8
+        },
+        {
+          "id": "disk_mbs",
+          "to": 100,
+          "over_s": 6
+        },
+        {
+          "id": "rep_lag",
+          "to": 0.4,
+          "over_s": 6
+        },
+        {
+          "id": "queue_ms",
+          "to": 1.0,
+          "over_s": 6
+        },
+        {
+          "id": "disk_await",
+          "to": 1.0,
+          "over_s": 6
+        },
+        {
+          "id": "dirty_gb",
+          "to": 0.3,
+          "over_s": 6
+        },
+        {
+          "id": "lag",
+          "to": 5,
+          "over_s": 6
+        }
+      ]
+    },
+    {
+      "t": 90,
+      "feed": {
+        "from": "kafka b1",
+        "kind": "log",
+        "text": "JMX kafka.network:type=RequestMetrics,name=TotalTimeMs,request=Produce  99thPercentile=12.0  Mean=4.1",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 96,
+      "feed": {
+        "from": "Kofi · #kafka-perf",
+        "kind": "chat",
+        "text": "100 MB/s: p99 12 ms, busiest broker at 40% CPU. boring graphs, my favourite kind."
+      }
+    },
+    {
+      "t": 110,
+      "title": "Ramp: 150 MB/s",
+      "feed": {
+        "from": "loadgen",
+        "kind": "deploy",
+        "text": "ramp step 4/7: 150 MB/s (150k rec/s), hold 7 min"
+      },
+      "effects": [
+        {
+          "target": "e-l1",
+          "flow": 0.65
+        },
+        {
+          "target": "e-l2",
+          "flow": 0.36
+        },
+        {
+          "target": "e-l3",
+          "flow": 0.26
+        },
+        {
+          "target": "e-r12",
+          "flow": 0.39
+        },
+        {
+          "target": "e-r23",
+          "flow": 0.29
+        },
+        {
+          "target": "e-c1",
+          "flow": 0.52
+        },
+        {
+          "target": "e-c2",
+          "flow": 0.29
+        },
+        {
+          "target": "e-c3",
+          "flow": 0.2
+        }
+      ],
+      "metrics": [
+        {
+          "id": "offered",
+          "to": 150,
+          "over_s": 4,
+          "shape": "linear"
+        },
+        {
+          "id": "acked",
+          "to": 150,
+          "over_s": 6
+        },
+        {
+          "id": "consumed",
+          "to": 150,
+          "over_s": 6
+        },
+        {
+          "id": "produce_p99",
+          "to": 19,
+          "over_s": 8
+        },
+        {
+          "id": "req_idle",
+          "to": 42,
+          "over_s": 10
+        },
+        {
+          "id": "cpu",
+          "to": 58,
+          "over_s": 10
+        },
+        {
+          "id": "disk_mbs",
+          "to": 150,
+          "over_s": 6
+        },
+        {
+          "id": "rep_lag",
+          "to": 0.7,
+          "over_s": 6
+        },
+        {
+          "id": "queue_ms",
+          "to": 4,
+          "over_s": 8
+        },
+        {
+          "id": "disk_await",
+          "to": 1.4,
+          "over_s": 8
+        },
+        {
+          "id": "dirty_gb",
+          "to": 0.5,
+          "over_s": 8
+        },
+        {
+          "id": "lag",
+          "to": 6,
+          "over_s": 6
+        },
+        {
+          "id": "gc_ms",
+          "to": 24,
+          "over_s": 20
+        }
+      ]
+    },
+    {
+      "t": 116,
+      "title": "Linear zone: up to 150 MB/s",
+      "beat": {
+        "tone": "neutral",
+        "hint": "From 20 to 150 MB/s the cluster scales linearly: acked tracks offered, p99 stays under 20 ms. With RF 3 on 3 brokers each disk writes one full copy of the stream, so disk MB/s equals produce MB/s. But b1's handlers went from 92% to 42% idle: a quiet early warning.",
+        "deep": "b1 leads 28 of 48 partitions (28/12/8). Leadership drifted during the last rolling restart and auto.leader.rebalance.enable=false keeps it that way, so b1 does 58% of the produce work and serves the follower fetches for those partitions.",
+        "focus": [
+          "b1",
+          "panel:req_idle",
+          "panel:disk_mbs",
+          "panel:flow"
+        ],
+        "notes": [
+          {
+            "panel": "flow",
+            "text": "Acked tracks offered 1:1 up to 150 MB/s"
+          },
+          {
+            "panel": "disk_mbs",
+            "text": "Disk MB/s = produce MB/s (RF 3 on 3 brokers)"
+          },
+          {
+            "panel": "req_idle",
+            "text": "b1 handlers 92% to 42% idle: the quiet warning"
+          },
+          {
+            "panel": "produce_p99",
+            "text": "p99 9 to 19 ms: still well inside budget"
+          }
+        ]
+      }
+    },
+    {
+      "t": 122,
+      "feed": {
+        "from": "Kofi · terminal",
+        "kind": "chat",
+        "text": "$ kafka-topics.sh --describe --topic events | awk '{print $6}' | sort | uniq -c  >  28 Leader: 1   12 Leader: 2   8 Leader: 3",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 132,
+      "feed": {
+        "from": "Kofi · #kafka-perf",
+        "kind": "chat",
+        "text": "150 is clean: p99 19 ms. b1 handler idle is dropping though, 42%. going to 190."
+      }
+    },
+    {
+      "t": 150,
+      "title": "Ramp: 190 MB/s",
+      "feed": {
+        "from": "loadgen",
+        "kind": "deploy",
+        "text": "ramp step 5/7: 190 MB/s (190k rec/s), hold 7 min"
+      },
+      "effects": [
+        {
+          "target": "e-l1",
+          "flow": 0.8
+        },
+        {
+          "target": "e-l2",
+          "flow": 0.44
+        },
+        {
+          "target": "e-l3",
+          "flow": 0.32
+        },
+        {
+          "target": "e-r12",
+          "flow": 0.48
+        },
+        {
+          "target": "e-r23",
+          "flow": 0.36
+        },
+        {
+          "target": "e-c1",
+          "flow": 0.64
+        },
+        {
+          "target": "e-c2",
+          "flow": 0.36
+        },
+        {
+          "target": "e-c3",
+          "flow": 0.24
+        },
+        {
+          "target": "b1",
+          "color": "amber",
+          "intensity": 0.35,
+          "label": "hot leader"
+        }
+      ],
+      "metrics": [
+        {
+          "id": "offered",
+          "to": 190,
+          "over_s": 4,
+          "shape": "linear"
+        },
+        {
+          "id": "acked",
+          "to": 190,
+          "over_s": 6
+        },
+        {
+          "id": "consumed",
+          "to": 190,
+          "over_s": 6
+        },
+        {
+          "id": "produce_p99",
+          "to": 48,
+          "over_s": 15
+        },
+        {
+          "id": "req_idle",
+          "to": 24,
+          "over_s": 18
+        },
+        {
+          "id": "cpu",
+          "to": 78,
+          "over_s": 15
+        },
+        {
+          "id": "disk_mbs",
+          "to": 190,
+          "over_s": 6
+        },
+        {
+          "id": "rep_lag",
+          "to": 2.5,
+          "over_s": 20
+        },
+        {
+          "id": "queue_ms",
+          "to": 45,
+          "over_s": 15
+        },
+        {
+          "id": "disk_await",
+          "to": 3,
+          "over_s": 15
+        },
+        {
+          "id": "dirty_gb",
+          "to": 1.1,
+          "over_s": 15
+        },
+        {
+          "id": "lag",
+          "to": 9,
+          "over_s": 15
+        }
+      ]
+    },
+    {
+      "t": 162,
+      "feed": {
+        "from": "kafka b1",
+        "kind": "log",
+        "text": "JMX RequestHandlerAvgIdlePercent=0.27  NetworkProcessorAvgIdlePercent=0.51  (num.io.threads=8, num.network.threads=3)",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 178,
+      "title": "Wall 1: the hot leader",
+      "beat": {
+        "tone": "bad",
+        "hint": "At 190 MB/s b1's request handlers are mostly busy. The disks are fine (76% of cap); the cluster is lopsided: b1 leads 58% of the partitions, so it takes most produce and replica-fetch traffic. Requests queue and p99 more than doubles. Nothing has failed yet.",
+        "deep": "Rule of thumb: alert when RequestHandlerAvgIdlePercent < 30%, saturated near 20%. Queue time p99 on b1 is 45 ms; produce p99 = queue + local append + wait for followers + response.",
+        "focus": [
+          "b1",
+          "panel:req_idle",
+          "panel:produce_p99",
+          "panel:cpu"
+        ],
+        "notes": [
+          {
+            "panel": "req_idle",
+            "text": "b1 handlers under 30% idle: requests wait in a queue"
+          },
+          {
+            "panel": "produce_p99",
+            "text": "p99 19 to 48 ms: queueing, not slow disks"
+          },
+          {
+            "panel": "cpu",
+            "text": "b1 CPU 78%: it carries 58% of the leader work"
+          },
+          {
+            "panel": "queue_ms",
+            "text": "Queue time 4 to 45 ms"
+          }
+        ]
+      }
+    },
+    {
+      "t": 190,
+      "title": "Ramp: 230 MB/s",
+      "feed": {
+        "from": "loadgen",
+        "kind": "deploy",
+        "text": "ramp step 6/7: 230 MB/s (230k rec/s), hold 7 min"
+      },
+      "effects": [
+        {
+          "target": "e-l1",
+          "flow": 0.95
+        },
+        {
+          "target": "e-l2",
+          "flow": 0.52
+        },
+        {
+          "target": "e-l3",
+          "flow": 0.38
+        },
+        {
+          "target": "e-r12",
+          "flow": 0.57
+        },
+        {
+          "target": "e-r23",
+          "flow": 0.43
+        },
+        {
+          "target": "e-c1",
+          "flow": 0.76
+        },
+        {
+          "target": "e-c2",
+          "flow": 0.43
+        },
+        {
+          "target": "e-c3",
+          "flow": 0.28
+        },
+        {
+          "target": "b1",
+          "color": "amber",
+          "intensity": 0.4,
+          "label": "disks near cap"
+        },
+        {
+          "target": "b2",
+          "color": "amber",
+          "intensity": 0.4,
+          "label": "disks near cap"
+        },
+        {
+          "target": "b3",
+          "color": "amber",
+          "intensity": 0.4,
+          "label": "disks near cap"
+        }
+      ],
+      "metrics": [
+        {
+          "id": "offered",
+          "to": 230,
+          "over_s": 5,
+          "shape": "linear"
+        },
+        {
+          "id": "acked",
+          "to": 228,
+          "over_s": 6
+        },
+        {
+          "id": "consumed",
+          "to": 226,
+          "over_s": 6
+        },
+        {
+          "id": "produce_p99",
+          "to": 380,
+          "over_s": 20
+        },
+        {
+          "id": "req_idle",
+          "to": 14,
+          "over_s": 15
+        },
+        {
+          "id": "cpu",
+          "to": 86,
+          "over_s": 15
+        },
+        {
+          "id": "disk_mbs",
+          "to": 228,
+          "over_s": 6
+        },
+        {
+          "id": "rep_lag",
+          "to": 9,
+          "over_s": 25
+        },
+        {
+          "id": "queue_ms",
+          "to": 190,
+          "over_s": 15
+        },
+        {
+          "id": "disk_await",
+          "to": 18,
+          "over_s": 15
+        },
+        {
+          "id": "dirty_gb",
+          "to": 2.4,
+          "over_s": 20,
+          "shape": "linear"
+        },
+        {
+          "id": "lag",
+          "to": 22,
+          "over_s": 20
+        },
+        {
+          "id": "gc_ms",
+          "to": 27,
+          "over_s": 20
+        }
+      ]
+    },
+    {
+      "t": 200,
+      "feed": {
+        "from": "kafka b2",
+        "kind": "log",
+        "text": "$ iostat -x 1 nvme1n1  >  w/s 228k-iops-eq  wMB/s 228.4  w_await 18.2  %util 92.1",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 212,
+      "feed": {
+        "from": "Kofi · #kafka-perf",
+        "kind": "chat",
+        "text": "p99 is 400 ms and the disks are 92% busy. let's bump num.io.threads and num.network.threads and redo the step."
+      }
+    },
+    {
+      "t": 215,
+      "title": "Wall 2: the disks saturate",
+      "beat": {
+        "tone": "bad",
+        "hint": "At 230 MB/s each disk is 92% busy against its 250 MB/s cap. Writes wait behind writeback, p99 jumps to about 400 ms and followers start to trail. More I/O or network threads is the tempting fix, but they would only wait on the same disk.",
+        "deep": "Dirty pages climb to 2.4 GB (background writeback starts at 3.2 GB, writers block at vm.dirty_ratio = 6.4 GB). Disk await 3 to 18 ms: near saturation, queueing delay grows steeply.",
+        "focus": [
+          "b1",
+          "b2",
+          "b3",
+          "panel:disk_mbs",
+          "panel:produce_p99"
+        ],
+        "notes": [
+          {
+            "panel": "disk_mbs",
+            "text": "230 of 250 MB/s: 92% of the volume cap"
+          },
+          {
+            "panel": "produce_p99",
+            "text": "p99 about 400 ms: writes queue behind the disk"
+          },
+          {
+            "panel": "rep_lag",
+            "text": "Followers trail 9 s: stalls while the disk is busy"
+          },
+          {
+            "panel": "dirty_gb",
+            "text": "Dirty pages 1.1 to 2.4 GB: writeback is behind"
+          }
+        ]
+      }
+    },
+    {
+      "t": 225,
+      "feed": {
+        "from": "kafka b3",
+        "kind": "log",
+        "text": "INFO [Log partition=events-7, dir=/data/kafka] Rolled new log segment at offset 88197320 in 1480 ms",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 232,
+      "title": "Ramp: 270 MB/s, above the disk cap",
+      "feed": {
+        "from": "loadgen",
+        "kind": "deploy",
+        "text": "ramp step 7/7: 270 MB/s (270k rec/s). volume cap is 250 MB/s."
+      },
+      "effects": [
+        {
+          "target": "e-l1",
+          "flow": 1
+        },
+        {
+          "target": "e-l2",
+          "flow": 0.55
+        },
+        {
+          "target": "e-l3",
+          "flow": 0.4
+        },
+        {
+          "target": "e-r12",
+          "flow": 0.6
+        },
+        {
+          "target": "e-r23",
+          "flow": 0.45
+        },
+        {
+          "target": "e-c1",
+          "flow": 0.8
+        },
+        {
+          "target": "e-c2",
+          "flow": 0.45
+        },
+        {
+          "target": "e-c3",
+          "flow": 0.3
+        },
+        {
+          "target": "b1",
+          "color": "amber",
+          "intensity": 0.6,
+          "pulse": true,
+          "label": "writeback backlog"
+        },
+        {
+          "target": "b2",
+          "color": "amber",
+          "intensity": 0.6,
+          "pulse": true,
+          "label": "writeback backlog"
+        },
+        {
+          "target": "b3",
+          "color": "amber",
+          "intensity": 0.6,
+          "pulse": true,
+          "label": "writeback backlog"
+        }
+      ],
+      "metrics": [
+        {
+          "id": "offered",
+          "to": 270,
+          "over_s": 4,
+          "shape": "linear"
+        },
+        {
+          "id": "acked",
+          "to": 245,
+          "over_s": 4
+        },
+        {
+          "id": "consumed",
+          "to": 240,
+          "over_s": 4
+        },
+        {
+          "id": "produce_p99",
+          "to": 900,
+          "over_s": 20
+        },
+        {
+          "id": "req_idle",
+          "to": 9,
+          "over_s": 15
+        },
+        {
+          "id": "cpu",
+          "to": 90,
+          "over_s": 15
+        },
+        {
+          "id": "disk_mbs",
+          "to": 250,
+          "over_s": 4
+        },
+        {
+          "id": "rep_lag",
+          "to": 40,
+          "over_s": 28,
+          "shape": "linear"
+        },
+        {
+          "id": "queue_ms",
+          "to": 600,
+          "over_s": 20
+        },
+        {
+          "id": "disk_await",
+          "to": 60,
+          "over_s": 20
+        },
+        {
+          "id": "dirty_gb",
+          "to": 6.4,
+          "over_s": 20,
+          "shape": "linear"
+        },
+        {
+          "id": "lag",
+          "to": 40,
+          "over_s": 20
+        },
+        {
+          "id": "gc_ms",
+          "to": 31,
+          "over_s": 20
+        }
+      ]
+    },
+    {
+      "t": 253,
+      "title": "b3 leaves the ISR",
+      "feed": {
+        "from": "kafka b1",
+        "kind": "log",
+        "text": "INFO [Partition events-7 broker=1] Shrinking ISR from 1,2,3 to 1,2. Leader: (highWatermark: 88213110, endOffset: 88213441). Out of sync replicas: (brokerId: 3, endOffset: 88197320).",
+        "key": true
+      },
+      "effects": [
+        {
+          "target": "b3",
+          "color": "red",
+          "intensity": 0.7,
+          "label": "out of ISR"
+        },
+        {
+          "target": "e-r23",
+          "flow": 0.1,
+          "color": "red"
+        },
+        {
+          "target": "e-l3",
+          "flow": 0.2
+        }
+      ],
+      "metrics": [
+        {
+          "id": "urp",
+          "to": 28,
+          "over_s": 2,
+          "shape": "step"
+        }
+      ]
+    },
+    {
+      "t": 258,
+      "title": "b2 leaves the ISR: ISR = 1",
+      "feed": {
+        "from": "kafka b1",
+        "kind": "log",
+        "text": "INFO [Partition events-7 broker=1] Shrinking ISR from 1,2 to 1. Leader: (highWatermark: 88213110, endOffset: 88214002). Out of sync replicas: (brokerId: 2, endOffset: 88197902).",
+        "key": true
+      },
+      "effects": [
+        {
+          "target": "b2",
+          "color": "red",
+          "intensity": 0.7,
+          "label": "out of ISR"
+        },
+        {
+          "target": "b1",
+          "color": "red",
+          "intensity": 0.8,
+          "pulse": true,
+          "label": "ISR = 1 (28 parts)"
+        },
+        {
+          "target": "e-r12",
+          "flow": 0,
+          "color": "red"
+        },
+        {
+          "target": "e-l1",
+          "flow": 0.3,
+          "color": "red",
+          "reverse": 0.8
+        },
+        {
+          "target": "e-l2",
+          "flow": 0.35
+        }
+      ],
+      "metrics": [
+        {
+          "id": "under_min",
+          "to": 28,
+          "over_s": 2,
+          "shape": "step"
+        },
+        {
+          "id": "errs",
+          "to": 118,
+          "over_s": 4
+        },
+        {
+          "id": "acked",
+          "to": 95,
+          "over_s": 4
+        },
+        {
+          "id": "buf_pct",
+          "to": 100,
+          "over_s": 3
+        },
+        {
+          "id": "produce_p99",
+          "to": 3500,
+          "over_s": 12
+        },
+        {
+          "id": "req_idle",
+          "to": 5,
+          "over_s": 10
+        },
+        {
+          "id": "cpu",
+          "to": 96,
+          "over_s": 10
+        },
+        {
+          "id": "queue_ms",
+          "to": 2800,
+          "over_s": 12
+        },
+        {
+          "id": "disk_await",
+          "to": 95,
+          "over_s": 12
+        },
+        {
+          "id": "urp",
+          "to": 44,
+          "over_s": 8,
+          "shape": "step"
+        },
+        {
+          "id": "rep_lag",
+          "to": 62,
+          "over_s": 40,
+          "shape": "linear"
+        },
+        {
+          "id": "consumed",
+          "to": 70,
+          "over_s": 10
+        },
+        {
+          "id": "gc_ms",
+          "to": 34,
+          "over_s": 20
+        }
+      ]
+    },
+    {
+      "t": 266,
+      "feed": {
+        "from": "perf-test-3",
+        "kind": "log",
+        "text": "WARN [Producer clientId=perf-3] Got error produce response with correlation id 91274 on topic-partition events-7, retrying (2147483646 attempts left). Error: NOT_ENOUGH_REPLICAS"
+      },
+      "effects": [
+        {
+          "target": "loadgen",
+          "color": "amber",
+          "intensity": 0.5,
+          "pulse": true,
+          "label": "blocked: buffer full"
+        },
+        {
+          "target": "e-l2",
+          "flow": 0.2
+        },
+        {
+          "target": "e-l3",
+          "flow": 0.15
+        },
+        {
+          "target": "e-c1",
+          "flow": 0.15
+        },
+        {
+          "target": "e-c2",
+          "flow": 0.1
+        },
+        {
+          "target": "e-c3",
+          "flow": 0.05
+        }
+      ],
+      "metrics": [
+        {
+          "id": "acked",
+          "to": 38,
+          "over_s": 8
+        },
+        {
+          "id": "errs",
+          "to": 70,
+          "over_s": 12
+        },
+        {
+          "id": "consumed",
+          "to": 40,
+          "over_s": 8
+        },
+        {
+          "id": "lag",
+          "to": 28,
+          "over_s": 30,
+          "shape": "linear"
+        }
+      ]
+    },
+    {
+      "t": 268,
+      "feed": {
+        "from": "Kofi · #kafka-perf",
+        "kind": "chat",
+        "text": "every error is NOT_ENOUGH_REPLICAS. can we set min.insync.replicas=1 so the test can finish? or add a 4th broker?"
+      }
+    },
+    {
+      "t": 270,
+      "feed": {
+        "from": "b2 · dmesg",
+        "kind": "log",
+        "text": "INFO: task ReplicaFetcherThread-0-1:1873 blocked for more than 120 seconds.  (kernel: balance_dirty_pages throttling)",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 272,
+      "feed": {
+        "from": "perf-test-3",
+        "kind": "log",
+        "text": "ERROR [Producer clientId=perf-3] org.apache.kafka.common.errors.TimeoutException: Expiring 128 record(s) for events-7:120003 ms has passed since batch creation  (delivery.timeout.ms=120000)",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 274,
+      "title": "Wall 3: the ISR collapses",
+      "beat": {
+        "tone": "bad",
+        "hint": "At 270 MB/s the disks can't drain the load. Dirty pages hit the 6.4 GB limit and followers stall past 30 s. b3, then b2, leave the ISR of b1's 28 partitions: one replica, below min.insync.replicas=2, so every write is rejected. Retrying batches then fill the shared producer buffer and starve even the healthy partitions.",
+        "deep": "min.insync.replicas=1 would hide the errors by acking single-copy writes; a 4th broker means copying terabytes through these saturated disks. With unclean.leader.election.enable=false, losing b1 now takes 28 partitions offline.",
+        "focus": [
+          "b1",
+          "b2",
+          "b3",
+          "loadgen",
+          "panel:repl",
+          "panel:flow",
+          "feed"
+        ],
+        "notes": [
+          {
+            "panel": "repl",
+            "text": "Below min ISR 0 to 28, under-replicated 0 to 44"
+          },
+          {
+            "panel": "errs",
+            "text": "118k rec/s rejected: NOT_ENOUGH_REPLICAS"
+          },
+          {
+            "panel": "flow",
+            "metric": "acked",
+            "text": "Acked falls 245 to 38 MB/s while offered stays 270"
+          },
+          {
+            "panel": "rep_lag",
+            "text": "Followers 40 to 60 s behind: past the 30 s limit"
+          },
+          {
+            "panel": "buf_pct",
+            "text": "Buffers full of retrying batches"
+          }
+        ]
+      }
+    },
+    {
+      "t": 300,
+      "title": "Test stopped",
+      "feed": {
+        "from": "loadgen",
+        "kind": "deploy",
+        "text": "test aborted by Marta: all 6 generators stopped",
+        "key": true
+      },
+      "effects": [
+        {
+          "target": "loadgen",
+          "color": "grey",
+          "intensity": 0.3,
+          "pulse": false,
+          "label": "stopped"
+        },
+        {
+          "target": "e-l1",
+          "flow": 0
+        },
+        {
+          "target": "e-l2",
+          "flow": 0.0
+        },
+        {
+          "target": "e-l3",
+          "flow": 0.0
+        },
+        {
+          "target": "e-r12",
+          "flow": 0.35
+        },
+        {
+          "target": "e-r23",
+          "flow": 0.35
+        },
+        {
+          "target": "e-c1",
+          "flow": 0.0
+        },
+        {
+          "target": "e-c2",
+          "flow": 0.0
+        },
+        {
+          "target": "e-c3",
+          "flow": 0.0
+        }
+      ],
+      "metrics": [
+        {
+          "id": "offered",
+          "to": 0,
+          "over_s": 3,
+          "shape": "linear"
+        },
+        {
+          "id": "acked",
+          "to": 0,
+          "over_s": 6
+        },
+        {
+          "id": "consumed",
+          "to": 0,
+          "over_s": 8
+        },
+        {
+          "id": "errs",
+          "to": 0,
+          "over_s": 15
+        },
+        {
+          "id": "buf_pct",
+          "to": 3,
+          "over_s": 15
+        },
+        {
+          "id": "cpu",
+          "to": 30,
+          "over_s": 25
+        },
+        {
+          "id": "req_idle",
+          "to": 62,
+          "over_s": 25
+        },
+        {
+          "id": "produce_p99",
+          "to": 9,
+          "over_s": 20
+        },
+        {
+          "id": "queue_ms",
+          "to": 2,
+          "over_s": 25
+        },
+        {
+          "id": "disk_mbs",
+          "to": 235,
+          "over_s": 5
+        },
+        {
+          "id": "dirty_gb",
+          "to": 1.8,
+          "over_s": 10
+        },
+        {
+          "id": "disk_await",
+          "to": 14,
+          "over_s": 10
+        },
+        {
+          "id": "rep_lag",
+          "to": 0,
+          "over_s": 36,
+          "shape": "linear"
+        },
+        {
+          "id": "lag",
+          "to": 6,
+          "over_s": 15
+        },
+        {
+          "id": "gc_ms",
+          "to": 24,
+          "over_s": 20
+        }
+      ]
+    },
+    {
+      "t": 312,
+      "feed": {
+        "from": "Kofi · terminal",
+        "kind": "chat",
+        "text": "$ kafka-topics.sh --describe --under-min-isr-partitions  >  Topic: events Partition: 7 Leader: 1 Replicas: 1,2,3 Isr: 1   (28 lines)",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 324,
+      "title": "b2 rejoins the ISR",
+      "feed": {
+        "from": "kafka b1",
+        "kind": "log",
+        "text": "INFO [Partition events-7 broker=1] Expanding ISR from 1 to 1,2",
+        "key": true
+      },
+      "effects": [
+        {
+          "target": "b2",
+          "color": "amber",
+          "intensity": 0.3,
+          "label": "caught up"
+        },
+        {
+          "target": "b1",
+          "color": "amber",
+          "intensity": 0.3,
+          "pulse": false,
+          "label": "ISR = 2 again"
+        },
+        {
+          "target": "e-r12",
+          "flow": 0.5,
+          "color": "teal"
+        }
+      ],
+      "metrics": [
+        {
+          "id": "under_min",
+          "to": 0,
+          "over_s": 2,
+          "shape": "step"
+        },
+        {
+          "id": "urp",
+          "to": 20,
+          "over_s": 5
+        }
+      ]
+    },
+    {
+      "t": 334,
+      "title": "b3 rejoins: ISR whole",
+      "feed": {
+        "from": "kafka b1",
+        "kind": "log",
+        "text": "INFO [Partition events-7 broker=1] Expanding ISR from 1,2 to 1,2,3"
+      },
+      "effects": [
+        {
+          "target": "b3",
+          "color": "teal",
+          "intensity": 0.15,
+          "label": "leads 8/48"
+        },
+        {
+          "target": "b2",
+          "color": "teal",
+          "intensity": 0.15,
+          "label": "leads 12/48"
+        },
+        {
+          "target": "b1",
+          "color": "teal",
+          "intensity": 0.15,
+          "label": "leads 28/48"
+        },
+        {
+          "target": "e-r12",
+          "flow": 0.1
+        },
+        {
+          "target": "e-r23",
+          "flow": 0.1
+        }
+      ],
+      "metrics": [
+        {
+          "id": "urp",
+          "to": 0,
+          "over_s": 4,
+          "shape": "step"
+        },
+        {
+          "id": "disk_mbs",
+          "to": 6,
+          "over_s": 8
+        },
+        {
+          "id": "dirty_gb",
+          "to": 0.1,
+          "over_s": 8
+        },
+        {
+          "id": "disk_await",
+          "to": 1.0,
+          "over_s": 8
+        }
+      ]
+    },
+    {
+      "t": 341,
+      "title": "Healing starts when the load stops",
+      "beat": {
+        "tone": "good",
+        "hint": "Marta stopped the test. Producers drained, but healing took about six more minutes: followers had to re-fetch the gap while the disks were still busy. Once each caught up to the high watermark it re-entered the ISR. Below-min-ISR cleared first, then under-replicated.",
+        "deep": "A follower re-enters the ISR once its log end offset reaches the leader's high watermark. num.replica.fetchers=1 and the busy disks set the catch-up speed; no config change was needed.",
+        "focus": [
+          "b2",
+          "b3",
+          "panel:repl",
+          "panel:rep_lag",
+          "panel:disk_mbs"
+        ],
+        "notes": [
+          {
+            "panel": "repl",
+            "text": "Below min ISR 28 to 0 as b2 rejoins, then URP to 0"
+          },
+          {
+            "panel": "rep_lag",
+            "text": "Follower lag drains from 62 s to 0 once load is off"
+          },
+          {
+            "panel": "disk_mbs",
+            "text": "Disk stayed busy until catch-up finished"
+          }
+        ]
+      }
+    },
+    {
+      "t": 348,
+      "feed": {
+        "from": "Ana · #kafka-perf",
+        "kind": "chat",
+        "text": "ISR is whole. rebalancing leaders now: kafka-leader-election --election-type PREFERRED --all-topic-partitions. b1 should stop leading 58% of everything.",
+        "key": true
+      },
+      "effects": [
+        {
+          "target": "b1",
+          "label": "leads 16/48"
+        },
+        {
+          "target": "b2",
+          "label": "leads 16/48"
+        },
+        {
+          "target": "b3",
+          "label": "leads 16/48"
+        }
+      ]
+    },
+    {
+      "t": 356,
+      "feed": {
+        "from": "Ana · terminal",
+        "kind": "chat",
+        "text": "$ kafka-leader-election.sh --bootstrap-server b1:9092 --election-type PREFERRED --all-topic-partitions  >  Successfully completed leader election (PREFERRED) for partitions events-0 ... events-47",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 364,
+      "title": "Re-test: 175 MB/s, balanced leaders",
+      "feed": {
+        "from": "loadgen",
+        "kind": "deploy",
+        "text": "re-test: 175 MB/s (70% of the 250 MB/s volume cap), 10 min hold"
+      },
+      "effects": [
+        {
+          "target": "e-l1",
+          "flow": 0.75
+        },
+        {
+          "target": "e-l2",
+          "flow": 0.41
+        },
+        {
+          "target": "e-l3",
+          "flow": 0.3
+        },
+        {
+          "target": "e-r12",
+          "flow": 0.45
+        },
+        {
+          "target": "e-r23",
+          "flow": 0.34
+        },
+        {
+          "target": "e-c1",
+          "flow": 0.6
+        },
+        {
+          "target": "e-c2",
+          "flow": 0.34
+        },
+        {
+          "target": "e-c3",
+          "flow": 0.22
+        },
+        {
+          "target": "loadgen",
+          "color": "violet",
+          "intensity": 0.2,
+          "label": "175 MB/s steady"
+        }
+      ],
+      "metrics": [
+        {
+          "id": "offered",
+          "to": 175,
+          "over_s": 6,
+          "shape": "linear"
+        },
+        {
+          "id": "acked",
+          "to": 175,
+          "over_s": 8
+        },
+        {
+          "id": "consumed",
+          "to": 175,
+          "over_s": 8
+        },
+        {
+          "id": "produce_p99",
+          "to": 14,
+          "over_s": 10
+        },
+        {
+          "id": "req_idle",
+          "to": 52,
+          "over_s": 12
+        },
+        {
+          "id": "cpu",
+          "to": 44,
+          "over_s": 12
+        },
+        {
+          "id": "disk_mbs",
+          "to": 175,
+          "over_s": 8
+        },
+        {
+          "id": "rep_lag",
+          "to": 0.6,
+          "over_s": 10
+        },
+        {
+          "id": "queue_ms",
+          "to": 3,
+          "over_s": 10
+        },
+        {
+          "id": "disk_await",
+          "to": 2.0,
+          "over_s": 10
+        },
+        {
+          "id": "dirty_gb",
+          "to": 0.7,
+          "over_s": 10
+        },
+        {
+          "id": "lag",
+          "to": 6,
+          "over_s": 10
+        },
+        {
+          "id": "gc_ms",
+          "to": 22,
+          "over_s": 20
+        }
+      ]
+    },
+    {
+      "t": 385,
+      "feed": {
+        "from": "Kofi · #kafka-perf",
+        "kind": "chat",
+        "text": "175 MB/s: p99 14 ms, b1 handlers 52% idle, CPU 44%. boring again."
+      }
+    },
+    {
+      "t": 400,
+      "feed": {
+        "from": "kafka b1",
+        "kind": "log",
+        "text": "JMX RequestHandlerAvgIdlePercent=0.52  UnderReplicatedPartitions=0  UnderMinIsrPartitionCount=0  Produce 99thPercentile=14.0",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 415,
+      "feed": {
+        "from": "Marta · #kafka-perf",
+        "kind": "chat",
+        "text": "holding 175. three numbers for the write-up: where it hurts (150 to 190), where it breaks (270), where we run it (175)."
+      }
+    },
+    {
+      "t": 440,
+      "title": "The safe ceiling: 175 MB/s",
+      "beat": {
+        "tone": "good",
+        "hint": "With leaders rebalanced (16/16/16) and the load at 175 MB/s, 70% of the disk cap, p99 is 14 ms, handlers are about 50% idle, and 75 MB/s of disk is spare for catch-up after a restart. It hurt at 150 to 190, broke at 270, and is safe at 175: three different numbers.",
+        "deep": "Why 70%: after a broker restart its replicas re-fetch the gap while still taking new writes, and that extra traffic shares the same 250 MB/s. Re-run the same ramp to confirm before trusting the number.",
+        "focus": [
+          "loadgen",
+          "b1",
+          "b2",
+          "b3",
+          "panel:produce_p99",
+          "panel:req_idle",
+          "panel:disk_mbs"
+        ],
+        "notes": [
+          {
+            "panel": "produce_p99",
+            "text": "p99 back to about 14 ms at 175 MB/s"
+          },
+          {
+            "panel": "req_idle",
+            "text": "Handlers about 50% idle: balancing moved the wall"
+          },
+          {
+            "panel": "disk_mbs",
+            "text": "175 of 250 MB/s: 75 MB/s spare"
+          },
+          {
+            "panel": "cpu",
+            "text": "b1 CPU 44%, was 78% at 190 MB/s"
+          }
+        ]
+      }
+    },
+    {
+      "t": 452,
+      "feed": {
+        "from": "Marta · #kafka-perf",
+        "kind": "chat",
+        "text": "writing it up. next: same ramp with a broker killed mid-step."
+      }
+    }
+  ],
+  "report": {
+    "tldr": "Ramping a 3-broker Kafka from 20 to 270 MB/s: it got slow at 150 to 190 MB/s (a hot leader), saturated its disks at 230, and broke at 270 when stalled followers left the ISR and producers starved. A safe steady-state is about 175 MB/s.",
+    "fix_t": 348,
+    "chain": [
+      {
+        "id": "cap",
+        "kind": "cause",
+        "text": "Offered 270 MB/s > 250 MB/s disk cap per broker"
+      },
+      {
+        "id": "dirty",
+        "kind": "effect",
+        "text": "Dirty pages hit vm.dirty_ratio: writers stall"
+      },
+      {
+        "id": "isr",
+        "kind": "effect",
+        "text": "Followers stall > 30 s and leave the ISR"
+      },
+      {
+        "id": "reject",
+        "kind": "amp",
+        "text": "ISR = 1 < min.insync.replicas: writes rejected"
+      },
+      {
+        "id": "retry",
+        "kind": "amp",
+        "text": "Retries fill the shared buffer, starving all"
+      },
+      {
+        "id": "fix",
+        "kind": "fix",
+        "text": "Stop load, let followers catch up, rebalance leaders"
+      }
+    ],
+    "loop": {
+      "from": "retry",
+      "to": "dirty",
+      "label": "retries burn handlers, stalls last longer"
+    },
+    "stats": [
+      {
+        "label": "Peak acked",
+        "metric": "acked",
+        "unit": "MB/s",
+        "agg": "max"
+      },
+      {
+        "label": "Worst produce p99",
+        "metric": "produce_p99",
+        "unit": "ms",
+        "agg": "max"
+      },
+      {
+        "label": "Partitions below min ISR",
+        "metric": "under_min",
+        "unit": "partitions",
+        "agg": "max"
+      },
+      {
+        "label": "Producer errors",
+        "metric": "errs",
+        "unit": "k rec/s",
+        "agg": "max"
+      }
+    ],
+    "learnings": [
+      {
+        "glyph": "1",
+        "title": "Find the knee, not the cliff",
+        "body": "p99 and handler idle moved 80 MB/s before anything failed. Plan capacity from the knee."
+      },
+      {
+        "glyph": "2",
+        "title": "Balance leaders before you benchmark",
+        "body": "A 28/12/8 leader skew made b1 the early bottleneck. Enable auto.leader.rebalance or run preferred election."
+      },
+      {
+        "glyph": "3",
+        "title": "Alert on p99 and under-min-ISR",
+        "body": "Consumer lag stayed under 50k msgs the whole time. It measures consumers, not producers."
+      },
+      {
+        "glyph": "4",
+        "title": "Keep 30% of the disk spare",
+        "body": "Restarts and catch-up share the same volume. A 70% ceiling leaves room to heal."
+      }
+    ],
+    "math": {
+      "title": "Where the numbers come from",
+      "lines": [
+        "RF 3 on 3 brokers: each disk writes one full copy, disk MB/s = produce MB/s",
+        "28 of 48 partitions led by b1 = 58% of produce work (fair share 33%)",
+        "volume cap 250 MB/s; offered 270 MB/s: +20 MB/s piles up as dirty pages",
+        "(6.4 GB dirty_ratio - 2.4 GB) / 20 MB/s = 200 s to block writers",
+        "followers stalled > 30 s (replica.lag.time.max.ms) -> ISR shrink",
+        "safe ceiling: 250 MB/s x 70% = 175 MB/s"
+      ]
+    },
+    "myths": [
+      {
+        "myth": "Consumer lag will warn us.",
+        "truth": "Lag stayed small while producers failed. Watch produce p99, under-replicated and under-min-ISR partitions."
+      },
+      {
+        "myth": "Set min.insync.replicas=1 so the test passes.",
+        "truth": "Errors vanish because writes are acked with one copy. The first broker loss then loses data."
+      },
+      {
+        "myth": "More io/network threads will fix it.",
+        "truth": "The threads were waiting on a saturated disk; more of them only adds queueing."
+      }
+    ],
+    "links": [
+      {
+        "label": "Kafka docs: min.insync.replicas",
+        "url": "https://kafka.apache.org/documentation/#brokerconfigs_min.insync.replicas"
+      },
+      {
+        "label": "Kafka docs: monitoring",
+        "url": "https://kafka.apache.org/documentation/#monitoring"
+      }
+    ],
+    "deep": {
+      "config": [
+        "min.insync.replicas=2          # keep; 1 trades durability for a green test",
+        "replica.lag.time.max.ms=30000  # how long a stalled follower stays in the ISR",
+        "num.replica.fetchers=1         # raise if one fetcher thread limits catch-up",
+        "auto.leader.rebalance.enable=true   # was false: let leadership self-heal",
+        "vm.dirty_background_ratio=10 / vm.dirty_ratio=20   # writers block at 6.4 GB here",
+        "delivery.timeout.ms=120000 / max.block.ms=60000    # how long a stuck producer holds on"
+      ],
+      "runbook": [
+        "Check leader balance first: describe the topic and count Leader: per broker.",
+        "Compare RequestHandlerAvgIdlePercent and disk %util: handlers or disk?",
+        "Alert on UnderMinIsrPartitionCount > 0 (critical) and UnderReplicatedPartitions > 0.",
+        "Do not lower min.insync.replicas or add brokers mid-incident.",
+        "Stop or cut the load, wait for ISR to refill, then re-run at 70% of the knee."
+      ]
+    }
+  }
+}
