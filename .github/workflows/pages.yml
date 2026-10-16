@@ -3,7 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
-    paths: ['v2/**', 'docs/**', '.claude/skills/story-to-playbook/**', '.github/workflows/pages.yml']
+    paths: ['v2/**', 'docs/**', '.github/ga-snippet.html', '.claude/skills/story-to-playbook/**', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 permissions:
@@ -27,6 +27,8 @@ jobs:
       # the site root is docs/ (purpose page); the single-file build (player, side panel and bundled playbooks) is served at /v2/. The MVP is deprecated and not deployed
       - run: node v2/build-single.mjs
       - run: mkdir -p _site/v2 && cp -r docs/. _site/ && cp v2/dist/sim-xp.html _site/v2/index.html
+      # Google Analytics goes into the deployed /v2/ page only: the same build is the Claude artifact, whose sandbox blocks external scripts
+      - run: cat .github/ga-snippet.html v2/dist/sim-xp.html > _site/v2/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
