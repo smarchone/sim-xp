@@ -40,7 +40,7 @@ test("curves follow keyframes and alerts fire from them", () => {
 });
 
 test("page tools reject unknown arguments and report the world at any second", async () => {
-  const pb = read("pg-replication-lag.json");
+  const pb = read("kafka-rebalance-storm.json");
   const tools = Object.fromEntries(buildTools({
     index: () => index, simxp: { current: pb }, player: () => null,
     parsePlaybook: (x) => (typeof x === "string" ? JSON.parse(x) : x),
@@ -83,7 +83,7 @@ test("every panel says why it matters, and meta.clock / feed.key are checked", (
     assert.ok(pb.dashboard.every((p) => p.why), `${item.file}: panel why`);
     assert.ok(!r.warnings.some((w) => w.includes('"why"') || w.includes("add \"why\"")), item.file);
   }
-  const pb = read("github-2018-split-brain.json");
+  const pb = read("zerodha-seven-million-tables.json");
   assert.equal(validate(pb).ok, true);
   pb.meta.clock = { start: "nope", scale: -1, changes: [{ t: 50, scale: 2 }, { t: 40, scale: 3 }] };
   pb.timeline.find((e) => e.feed).feed.key = "yes";
