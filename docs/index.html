@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>sim-xp: Learn systems in motion</title>
+  <meta name="description" content="sim-xp turns a story about a system into a short simulation you watch instead of read.">
+  <style>
+    :root {
+      --bg:#121214; --win:#18181b; --line:#2b2b30; --code:#212126; --card:#17171a;
+      --fg:#cfcdc8; --dim:#8c8a85; --faint:#5a5955; --white:#ecebe6; --accent:#de8a68; --accent-soft:rgba(222,138,104,.12);
+      --mono:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      --sans:system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    * { box-sizing:border-box; }
+    html, body { background:var(--bg); color:var(--fg); margin:0; }
+    body { font:15px/1.65 var(--sans); padding:56px 16px 48px; -webkit-font-smoothing:antialiased;
+           background:radial-gradient(900px 420px at 50% -120px, rgba(222,138,104,.10), transparent 70%) no-repeat, var(--bg); }
+    main { max-width:860px; margin:0 auto; }
+    h1 { font:600 13px/1 var(--mono); color:var(--dim); margin:0 0 22px; letter-spacing:-.01em; }
+    h1 span { color:var(--accent); }
+    a { color:var(--accent); }
+    code { font:13px var(--mono); color:var(--accent); background:var(--accent-soft); padding:2px 6px; border-radius:5px; }
+    .hero { margin:0 0 14px; font:700 clamp(34px, 7vw, 56px)/1.05 var(--sans); color:var(--white); letter-spacing:-.035em; }
+    .hero em { font-style:normal; color:var(--accent);
+               background:linear-gradient(100deg, #f0b48f, #de8a68 55%, #c96a4a); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+    .tldr { color:var(--fg); margin:0 0 22px; max-width:640px; }
+    .tldr span, .lbl, .fix { font:11px/1 var(--mono); color:var(--accent); text-transform:uppercase; letter-spacing:.1em; }
+    .tldr span { margin-right:8px; }
+    .cta { display:inline-block; margin:0 0 28px; font:13px var(--mono); color:var(--accent); text-decoration:none; border:1px solid var(--accent); border-radius:999px; padding:10px 16px; }
+    .cta:hover { background:var(--accent-soft); }
+    .problem { margin:8px 0 24px; padding:16px 20px; border-left:2px solid var(--accent); background:linear-gradient(90deg, var(--accent-soft), transparent 80%); border-radius:0 12px 12px 0; }
+    .problem ul { list-style:none; padding:0; margin:12px 0 0; }
+    .problem li { margin:6px 0; padding-left:20px; position:relative; }
+    .problem li::before { content:"×"; position:absolute; left:0; color:var(--faint); }
+    .fix { display:block; margin:0 0 12px; }
+    .pitch { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:14px; margin:0 0 18px; }
+    .pitch div { min-width:0; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px 18px 20px; }
+    .pitch h2 { font:600 16px/1.35 var(--sans); color:var(--white); margin:10px 0 6px; }
+    .pitch p { color:var(--dim); font-size:14px; line-height:1.6; margin:0; }
+    .flow { display:flex; flex-wrap:wrap; align-items:center; gap:8px 6px; margin:0 0 52px; font:13px/1 var(--mono); color:var(--faint); }
+    .flow span { color:var(--dim); border:1px solid var(--line); border-radius:999px; padding:8px 12px; }
+    .flow span.gold { color:var(--accent); border-color:rgba(222,138,104,.45); background:var(--accent-soft); }
+    .eyebrow { font:600 12px/1 var(--mono); color:var(--faint); text-transform:uppercase; letter-spacing:.12em; margin:0 0 14px; }
+    .win { background:var(--win); border:1px solid var(--line); border-radius:14px; padding:6px 20px; margin:0 0 40px; }
+    .win dl { margin:0; }
+    .win dt { font:13px var(--mono); color:var(--white); margin-top:14px; }
+    .win dd { margin:2px 0 14px; color:var(--dim); font-size:14px; }
+    .not { color:var(--dim); font-size:14px; margin:0 0 40px; padding-left:1.2em; }
+    .foot { color:var(--faint); font:12px var(--mono); text-align:center; }
+    .foot a { color:var(--dim); }
+    @media (max-width:600px) { body { padding-top:28px; } .pitch { grid-template-columns:minmax(0, 1fr); } }
+  </style>
+</head>
+<body>
+<main>
+  <h1><span>~/</span>smarchone/sim-xp</h1>
+  <p class="hero">Systems, <em>in motion.</em></p>
+  <p class="tldr"><span>tl;dr</span> Understanding how a system fails usually means reading a pile of blog posts. sim-xp turns the story into a short simulation you <em>watch</em>: components, dashboards and a live feed, pausing at the moments that explain it.</p>
+  <a class="cta" href="../">Play a simulation ↗</a>
+
+  <section class="problem">
+    <span class="lbl">The problem</span>
+    <ul>
+      <li>Postmortems and design posts are long, and the mechanism is spread across paragraphs.</li>
+      <li>Reading about a metric climbing is not the same as seeing it climb next to the alert and the log line.</li>
+      <li>After reading five summaries you still can't picture the system.</li>
+    </ul>
+  </section>
+
+  <span class="fix">The bet</span>
+  <section class="pitch">
+    <div><span class="lbl">Watch</span><h2>Seeing is cheaper than reading.</h2><p>Watching a system move costs less effort than parsing prose. The feel and the ease are the point.</p></div>
+    <div><span class="lbl">Story</span><h2>Concepts and incidents are the same thing.</h2><p>Every simulation is a narrated story: a trigger, a mechanism, a fix, a lesson.</p></div>
+    <div><span class="lbl">Playbook</span><h2>One file per story.</h2><p>A playbook is plain JSON. The player plays it the same way every time, so a good one can be shared.</p></div>
+  </section>
+  <p class="flow"><span>story</span>→<span class="gold">playbook (JSON)</span>→<span>run</span>→<span>report</span></p>
+
+  <p class="eyebrow">How it works</p>
+  <div class="win"><dl>
+    <dt>The playbook</dt><dd>The initial state (components, dashboards, metrics, alerts), a timeline of events, and a report. A small required core, free-form text everywhere else.</dd>
+    <dt>The player</dt><dd>One generic page. Nobody operates anything: the engine plays the playbook deterministically. Space plays and pauses, ←/→ jump between key moments, R opens the report, H switches to Hardcore for the deeper layer.</dd>
+    <dt>The skill</dt><dd><code>story-to-playbook</code> turns a blog post, postmortem, concept or short prompt into a validated playbook file. It writes that one file and nothing else.</dd>
+    <dt>The artifact</dt><dd>The whole app is a single built file, so it also runs as a Claude artifact with an in-page chat where Claude writes the playbook for you.</dd>
+  </dl></div>
+
+  <p class="eyebrow">What it is not</p>
+  <ul class="not">
+    <li>Not a drill you operate. The first version (the MVP) was, and is deprecated.</li>
+    <li>Not a live system or a benchmark. The numbers are written to hold together, not measured.</li>
+    <li>Not non-deterministic yet. Branching choices and random runs come later, if the bet holds.</li>
+  </ul>
+
+  <p class="foot"><a href="https://github.com/smarchone/sim-xp">GitHub</a> · <a href="../">Player</a></p>
+</main>
+</body>
+</html>
