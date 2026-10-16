@@ -977,7 +977,7 @@ const hideModal = (scrim, done) => { hidePop(scrim.querySelector(".pop")); hideP
 const isOpen = el => !el.hidden && !el.classList.contains("leaving");
 
 /* ===================== Playback (implicit: Space, the status chip, or the keys) ===================== */
-let playT = 0, hoverT = null, playing = false, lastFrame = 0, speed = 4, activeBeat = null, reportSeen = false, ready = false, hudFlash = null;
+let playT = 0, hoverT = null, playing = false, lastFrame = 0, speed = 8, activeBeat = null, reportSeen = false, ready = false, hudFlash = null;
 const SPEEDS = [2, 4, 8, 16], speedLabel = v => ({ 2: "0.5×", 4: "1×", 8: "2×", 16: "4×" })[v];
 const wantT = () => hoverT == null ? playT : Math.min(hoverT, playT);
 let shownT = 0, lastNow = 0; // the cursor eases toward the hovered time instead of jumping
