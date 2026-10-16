@@ -34,7 +34,7 @@ const validatorScope = `const __playbook = (() => {\n${playbookJs}\nreturn { ${n
 
 // ---- the format reference Claude reads: the skill's schema and rules, without its file-and-workflow parts
 const skill = readFileSync(join(here, "../.claude/skills/story-to-playbook/SKILL.md"), "utf8");
-const spec = skill.slice(skill.indexOf("## Schema"), skill.indexOf("## Freezing a good run")).trim();
+const spec = skill.slice(skill.indexOf("## Schema")).trim();
 if (!spec.startsWith("## Schema") || spec.length < 5000) throw new Error("build-single: could not extract the schema from SKILL.md");
 
 // ---- the player: its "Open another playbook" menu item opens the panel here

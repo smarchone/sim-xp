@@ -16,8 +16,7 @@ incidents are the same thing here: every playbook is a narrated story.
 
 Story: $ARGUMENTS
 
-Your output is one file, a validated playbook. The person plays it themselves: they open the player at
-https://smarchone.github.io/sim-xp/v2/ and drop the file on it.
+Your output is one file: a validated playbook JSON. Nothing else (no HTML, no extra files, no edits to the repo).
 
 Everything you need is next to this file (`<skill>` below means this skill's folder):
 
@@ -44,10 +43,7 @@ names another place.
    alert times, and check they tell your story: does lag actually rise before the alert? does the
    note's claim match the number? Use `--at` for any other second. Fix and re-run until there are no
    errors, and every warning is either fixed or one you can justify.
-5. **Hand it over** in a few lines: the file path, the arc in one line per key moment, any warnings you
-   kept and why, and how to play it: open https://smarchone.github.io/sim-xp/v2/ and drop the file on the
-   page (or use "Open file…" in the side panel). In the player, Space plays and pauses, ←/→ jump between key
-   moments, and R opens the report.
+5. **Report** in a few lines: the file path, the arc in one line per key moment, and any warnings you kept and why.
 
 ## Schema `sim-xp/playbook@2`
 
@@ -60,7 +56,6 @@ Top level: `schema`, `meta`, `components`, `metrics`, `dashboard`, `alerts`, `in
 - `story`: the hook, 1–2 sentences, shown large at the top of the intro and as the subtitle in the Saved list. Sets the scene, does not spoil the cause.
 - `duration_s`: 240–600 is typical (the viewer watches at 1×–4×).
 - `clock` (optional) `{ start?, scale?, changes? }`: real story time. By default one playbook second is one story second. For a long story set `scale` = story seconds per playbook second (a 2-month story in 420 s: 12,500; one hour per second: 3,600) and the clock, feed times, chart axes and key moments show story time ("Day 23", "Oct 21 22:52"), so nothing is shown as "8 seconds". `start` is an ISO date ("2018-10-21T22:51:18Z", shown in UTC) if the real dates matter, otherwise the clock counts "Day N". `changes` `[{ t, scale }]` switches the scale at playbook second `t` (real time through the trigger, then fast-forward through a long recovery). Keep event times (`t`) in playbook seconds and make sure feed text, durations and curves agree with the clock.
-- `layout` (optional, now ignored by the player): the player arranges charts itself (components over the feed on the left, charts on the right in 2–3 columns, scrolling when there are many). Leave it out.
 - The rest is the **intro**: it is how a viewer who has never seen this system gets the context. Write for an engineer who knows software but not this stack.
   - `background`: 2–4 `{ title, body }` paragraphs, each ≤ ~400 chars, plain words. A good set is "The system" (what it is, rough scale, why it is built this way), "How it normally works" (the mechanism, in the normal state), "Today" (what is about to happen). Do not spoil the cause.
   - `cast`: `[{ name, role }]`, one per component the viewer will see (use the component labels), role in a few words.
@@ -204,9 +199,3 @@ The example playbook has a full deep layer; copy its shape.
 - Include the wrong turn people take when it is realistic ("should I scale out?"), and say in the hint or learnings why it would not help.
 - Keep text short; the viewer is watching, not reading.
 - Free-form fields are fine where the schema says free text. Do not add new top-level keys.
-
-## Freezing a good run
-
-A playbook plays the same every time, so a good one is already frozen: keep the file, and anyone can replay
-it by dropping it on the page. To bundle it with the page, add it to `v2/playbooks/` in sim-xp and list it in
-`v2/playbooks/index.json` (id, file, title, story, duration_s, tags, key_moments).
