@@ -711,6 +711,7 @@
       "t": 3,
       "title": "Meet the system",
       "beat": {
+        "tone": "neutral",
         "notes": [
           {
             "panel": "flow",
@@ -998,6 +999,7 @@
         }
       ],
       "beat": {
+        "tone": "bad",
         "notes": [
           {
             "panel": "flow",
@@ -1195,6 +1197,7 @@
       "t": 140,
       "title": "The redo makes it worse",
       "beat": {
+        "tone": "bad",
         "notes": [
           {
             "panel": "dupes",
@@ -1686,6 +1689,7 @@
         }
       ],
       "beat": {
+        "tone": "bad",
         "notes": [
           {
             "panel": "rebalances",
@@ -1900,6 +1904,7 @@
       "t": 290,
       "title": "Why the fix works",
       "beat": {
+        "tone": "good",
         "notes": [
           {
             "panel": "flow",
@@ -2016,6 +2021,7 @@
       "t": 400,
       "title": "Recovered",
       "beat": {
+        "tone": "good",
         "notes": [
           {
             "panel": "lag",

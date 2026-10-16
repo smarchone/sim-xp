@@ -430,6 +430,7 @@
    "t": 3,
    "title": "Meet the system",
    "beat": {
+    "tone": "neutral",
     "focus": [
      "primary",
      "r1",
@@ -653,6 +654,7 @@
    "t": 72,
    "title": "Saved, refreshed, old value",
    "beat": {
+    "tone": "bad",
     "focus": [
      "browser",
      "api",
@@ -728,6 +730,7 @@
    "t": 108,
    "title": "Replay can't keep up",
    "beat": {
+    "tone": "bad",
     "focus": [
      "primary",
      "r1",
@@ -837,6 +840,7 @@
    "t": 143,
    "title": "Fresh reads, still lagging",
    "beat": {
+    "tone": "neutral",
     "focus": [
      "api",
      "primary",
@@ -931,6 +935,7 @@
    "t": 182,
    "title": "Why the lag drains",
    "beat": {
+    "tone": "good",
     "focus": [
      "backfill",
      "r1",
@@ -1109,6 +1114,7 @@
    "t": 262,
    "title": "Recovered",
    "beat": {
+    "tone": "good",
     "focus": [
      "primary",
      "r1",

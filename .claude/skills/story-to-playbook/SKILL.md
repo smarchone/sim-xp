@@ -127,7 +127,11 @@ Sorted list of events: `{ t, title?, feed?, effects?, metrics?, beat? }`
   `linear` to +300×over_s. Do the arithmetic, then confirm with `--at`.
 - **effects** `[Effect]`: change how components look (below).
 - **title**: a short label; events with a title become chapter names.
-- **beat** `{ hint, focus[], notes[] }` makes this a **key moment**: playback pauses, and
+- **beat** `{ tone, hint, focus[], notes[] }` makes this a **key moment**: playback pauses, and
+  - `tone`: `"good"`, `"neutral"` or `"bad"`, shown as a coloured label on the key moment, its feed line and the status chip,
+    so the viewer reads the arc at a glance. **bad**: something degrades, fails or is misread (the trigger, the cascade, the
+    wrong fix that backfires). **good**: the system recovers or the real fix is understood and working. **neutral**: setup, context,
+    investigation, a mitigation that has not paid off yet. Every key moment gets one; a typical story runs neutral, bad, bad, (neutral), good, good;
   - `hint` (≤ 340 chars, 2–3 plain sentences) rises under the components view and explains *why*;
   - `focus` lists what to highlight: node ids, edge ids, `"panel:<id>"`, `"feed"`;
   - `notes` `[{ panel, metric?, text }]` put a short tooltip (≤ 80 chars) on each chart that moved,

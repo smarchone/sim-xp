@@ -14,8 +14,10 @@ const simxp = (window.simxp = {
   showLibrary() { setOpen(true); pbBox.focus(); },
   onPlayerEvent(type) { if (type === "ready") stage.contentWindow.focus(); },
 });
+const LAST = "sim-xp.last";   // the playbook played last, reopened on the next visit
 function play(pb) {
   simxp.current = pb; simxp.source = "box";
+  try { localStorage.setItem(LAST, JSON.stringify(pb)); } catch (e) { /* storage blocked: it starts on the default next time */ }
   stage.srcdoc = PLAYER_HTML + "<!-- " + Date.now() + " -->";
 }
 
@@ -286,7 +288,20 @@ askEl.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey 
 stopBtn.onclick = () => ctl && ctl.abort();
 
 // ---------- start: put the default playbook in the box and play it ----------
-setBox(JSON.stringify(DEFAULT, null, 2));
+// the box starts with the last playbook played here (the saved copy, else the bundled one, else what was stored), or the default on a first visit
+function startingPlaybook() {
+  try {
+    const x = JSON.parse(localStorage.getItem(LAST) || "null");
+    if (x && x.meta && x.meta.id) {
+      const saved = library.get(docId(x)); let pb = null;
+      try { pb = saved ? JSON.parse(saved.json) : null; } catch (e) { /* unreadable saved copy */ }
+      pb = pb || SEEDS.find((s) => s.meta.id === x.meta.id) || x;
+      if (!validate(pb).errors.length) return pb;
+    }
+  } catch (e) { /* nothing stored */ }
+  return DEFAULT;
+}
+setBox(JSON.stringify(startingPlaybook(), null, 2));
 if (!last.errors.length) play(last.pb);
 (async () => {
   try { sample = await window.claude?.use?.("sample"); } catch (e) { sample = null; }

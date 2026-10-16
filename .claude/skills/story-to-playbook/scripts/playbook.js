@@ -238,6 +238,8 @@ export function validate(PB) {
         if (!n.text) err(`${w}: note needs text`);
         else if (n.text.length > 80) warn(`${w}: note on ${n.panel} is ${n.text.length} chars; keep under ~70`);
       }
+      if (e.beat.tone != null && !["good", "neutral", "bad"].includes(e.beat.tone)) err(`${w}: beat.tone must be "good", "neutral" or "bad"`);
+      else if (e.beat.tone == null) warn(`${w}: key moment has no tone (good, neutral or bad)`);
       if (e.beat.deep != null && (!str(e.beat.deep) || e.beat.deep.length > 240)) warn(`${w}: beat.deep should be one or two sentences (≤ ~240 chars)`);
       const notes = e.beat.notes || [];
       if (notes.length && notes.every(n => (panels.find(p => p.id === n.panel) || {}).level === "deep")) warn(`${w}: every note is on a deep panel, so Standard shows none; note at least one standard panel`);

@@ -480,6 +480,7 @@
    "t": 3,
    "title": "Meet the system",
    "beat": {
+    "tone": "neutral",
     "hint": "Each product page is cached in Redis under a versioned key like pdp:v41:sku-88213, TTL 6h. On a hit the pod never touches Postgres. Only the 4% of misses go through pgbouncer, which has just 20 real connections to the database.",
     "focus": [
      "web",
@@ -646,6 +647,7 @@
    "t": 62,
    "title": "Every key misses at once",
    "beat": {
+    "tone": "bad",
     "hint": "The deploy bumped the cache key version, so every pod now asks for pdp:v42:* keys that don't exist yet. Thousands of pages miss in the same second, and each miss runs the same 40ms catalog query. That's the stampede: the database suddenly receives the traffic the cache used to absorb.",
     "focus": [
      "web",
@@ -839,6 +841,7 @@
    "t": 122,
    "title": "The cache never refills",
    "beat": {
+    "tone": "bad",
     "hint": "A page is only cached after its query succeeds. Queued behind 20 connections, queries now hit statement_timeout=4s and get cancelled, so nothing is written to Redis and the next request misses again. Failed pages also make the mobile app retry, adding traffic.",
     "focus": [
      "bouncer",
@@ -933,6 +936,7 @@
    "t": 168,
    "title": "Scaling out made it worse",
    "beat": {
+    "tone": "bad",
     "hint": "The bottleneck is 20 database connections, not web threads. Twelve pods just put twice as many clients in the pgbouncer queue, so each waits longer and more hit the 4s timeout. New pods also start with nothing to share: the shared Redis is still empty.",
     "focus": [
      "web",
@@ -1075,6 +1079,7 @@
    "t": 218,
    "title": "Why the fix works",
    "beat": {
+    "tone": "good",
     "hint": "The old v41 entries never left Redis, so flipping the version back turns 90% of requests into hits again in seconds. The database only sees misses again, the pgbouncer queue drains, and queries finish inside the timeout.",
     "focus": [
      "redis",
@@ -1228,6 +1233,7 @@
    "t": 380,
    "title": "Recovered",
    "beat": {
+    "tone": "good",
     "hint": "Nothing broke in the code that shipped. A version bump quietly emptied the cache for every page at once, and timeouts kept it from refilling. Next time the new keys are warmed before the switch, and a lock per key makes one miss hit the database once.",
     "focus": [
      "redis",

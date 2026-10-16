@@ -497,6 +497,7 @@
       "t": 3,
       "title": "Meet the system",
       "beat": {
+        "tone": "neutral",
         "hint": "Jobs go into one Postgres table and workers claim them with SKIP LOCKED, so no two workers take the same row. At 200 jobs/s everything is quiet: queue near zero, dequeue in a few milliseconds.",
         "focus": [
           "loadgen",
@@ -698,6 +699,7 @@
         }
       ],
       "beat": {
+        "tone": "bad",
         "hint": "The weekly export starts a read transaction on the same database and keeps it open while it streams. Nobody connects it to the load test. From now on, vacuum may not delete any row this transaction could still see.",
         "focus": [
           "report",
@@ -804,6 +806,7 @@
         }
       ],
       "beat": {
+        "tone": "bad",
         "hint": "Every claim scans an index full of dead entries to find live rows, and it gets worse as the dead pile grows. Workers wait longer per batch, so completed falls even though the load has not changed.",
         "focus": [
           "db",
@@ -892,6 +895,7 @@
         }
       ],
       "beat": {
+        "tone": "bad",
         "hint": "Slow claims hold connections longer, so the pool fills. Inserts can no longer get a connection and start failing. The queue now has 64k jobs behind it and the test has found its limit, but the cause is not load.",
         "focus": [
           "api",
@@ -1010,6 +1014,7 @@
         }
       ],
       "beat": {
+        "tone": "good",
         "hint": "Once the transaction ends, vacuum can finally remove the backlog and claims get fast again. Adding workers would not have helped, since the pool was already full and every worker needs a connection.",
         "focus": [
           "report",
@@ -1125,6 +1130,7 @@
         }
       ],
       "beat": {
+        "tone": "good",
         "hint": "The queue is empty and dequeues are fast again, but the table is still bloated. The limit this test found was not Postgres throughput: it was one open transaction holding back vacuum.",
         "focus": [
           "db",
