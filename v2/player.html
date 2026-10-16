@@ -51,17 +51,15 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--p
 
 /* components stage */
 .stage{display:flex;flex-direction:column;overflow:hidden}
-.zoombar{position:absolute;top:10px;right:16px;z-index:2;display:flex;align-items:center;background:var(--glass);border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+.zoombar{position:absolute;bottom:8px;right:8px;z-index:2;opacity:0;transition:opacity .2s;display:flex;align-items:center;background:var(--glass);border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+.stage:hover .zoombar,.zoombar:focus-within{opacity:1}
 .zoombar button{border:0;border-radius:0;background:transparent;color:var(--muted);padding:2px 8px;font:500 var(--s) var(--mono);line-height:18px;min-width:26px}
 .zoombar button:hover{color:var(--fg);background:var(--sunk);border-color:transparent}
 .zoombar #zoomPct{min-width:46px;border-left:1px solid var(--line);border-right:1px solid var(--line);font-variant-numeric:tabular-nums}
 #comp{cursor:grab;touch-action:none}#comp.panning{cursor:grabbing}
-.split{position:absolute;top:0;bottom:0;right:0;width:8px;cursor:col-resize;z-index:5;touch-action:none;outline:none}
-.split::after{content:"";position:absolute;top:0;bottom:0;left:5px;width:2px;border-radius:1px;background:var(--accent);opacity:0;transition:opacity .15s}
-.split:hover::after,.split:focus-visible::after,.split.drag::after{opacity:.7}
 .ph{display:flex;align-items:baseline;gap:8px;padding:6px 10px 2px;font-size:var(--s);font-weight:600;color:var(--muted);flex:none}
 .ph .hint,.fh .hint{font-weight:400;color:var(--faint)}
-.stagebox{position:relative;flex:1;min-height:0;padding:6px 8px 8px}
+.stagebox{position:relative;flex:1;min-height:0;padding:0}
 #comp{display:block;width:100%;height:100%;transform-origin:50% 0;transition:transform .38s cubic-bezier(.2,.8,.2,1)}
 #beatGo{white-space:nowrap}
 
@@ -78,6 +76,8 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--p
 .feed li{transition:background .3s ease,box-shadow .3s ease,color .3s ease}
 .feed li.near{background:color-mix(in srgb,var(--accent) 12%,transparent);box-shadow:inset 3px 0 0 var(--accent)}
 .feed li.key{background:color-mix(in srgb,var(--amber) 9%,transparent);box-shadow:inset 2px 0 0 color-mix(in srgb,var(--amber) 70%,transparent)}
+/* current line on a key moment: keep the blue bar and ring, over the amber tint */
+.feed li.near.key{background:color-mix(in srgb,var(--accent) 12%,color-mix(in srgb,var(--amber) 9%,transparent));box-shadow:inset 3px 0 0 var(--accent),inset 0 0 0 1px color-mix(in srgb,var(--accent) 45%,transparent)}
 .feed li.key .txt{color:var(--fg)}
 .feed li.key .who{color:var(--fg);font-weight:500}
 .feed li.near .txt,.feed li.near .who{color:var(--fg)}
@@ -102,8 +102,8 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--p
 .panel .why:hover .tip,.panel .why:focus-visible .tip{opacity:1;visibility:visible;transform:none}
 .panel .legend{display:flex;gap:10px;color:var(--faint);overflow:hidden}
 .panel .legend i{display:inline-block;width:10px;height:2px;margin-right:4px;vertical-align:middle}
-.panel .val{margin-left:auto;font:500 var(--m) var(--mono);font-variant-numeric:tabular-nums;text-align:right;color:var(--fg)}
-.panel .val small{font-size:var(--s);color:var(--faint);margin-left:4px}
+.panel .val{margin-left:auto;font:500 11.5px var(--mono);font-variant-numeric:tabular-nums;text-align:right;color:var(--fg)}
+.panel .val small{font-size:10px;color:var(--faint);margin-left:4px}
 .panel .val.warn{color:var(--amber)} .panel .val.bad{color:var(--red)}
 .plot{position:relative;flex:1;min-height:0}
 .plot svg{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
@@ -185,7 +185,7 @@ body:not(.hc) .rp-deep{display:none}
 .t{fill:var(--fg);font:600 var(--ct,16.4px) var(--sans)}
 .ts{fill:var(--muted);font:var(--cs,14px) var(--mono)}
 .tp{fill:var(--fg);font:500 var(--cs,14px) var(--mono)}
-.axis{fill:var(--faint);font:var(--s) var(--mono);font-variant-numeric:tabular-nums}
+.axis{fill:var(--faint);font:10px var(--mono);font-variant-numeric:tabular-nums}
 .alab{font:500 var(--s) var(--mono);paint-order:stroke;stroke:var(--panel);stroke-width:3px}
 .grid{stroke:var(--line);stroke-width:1}
 @keyframes pulse{0%,100%{opacity:var(--o1)}50%{opacity:var(--o2)}}
@@ -477,7 +477,7 @@ function stateAt(T) {
 const beatTimes = new Set(PB.timeline.filter(e => e.beat).map(e => e.t));
 const feedItems = PB.timeline.filter(e => e.feed).map(e => ({ t: e.t, ...e.feed })).concat(alertFeed).sort((a, b) => a.t - b.t);
 feedItems.forEach(f => (f.key = f.key === true || beatTimes.has(f.t) || f.kind === "alert" || f.kind === "resolved"));
-$("#feedCard").style.setProperty("--tcol", (Math.max(...feedItems.map(f => fmtT(f.t).length), 5) * 0.62 + 0.4).toFixed(1) + "em");
+$("#feedCard").style.setProperty("--tcol", (Math.max(...feedItems.map(f => fmtT(f.t).length), 5) * 0.62 + 1.4).toFixed(1) + "em");
 const beats = PB.timeline.filter(e => e.beat);
 // Detail: Standard or Hardcore. Hardcore reveals items the playbook tags level "deep"; the run itself never changes.
 const DETAIL_KEY = "sim-xp.detail";
@@ -541,16 +541,8 @@ $("#zoomPct").onclick = () => resetView();
 // resize observers fire many times while a splitter is dragged; draw at most once per frame
 let renderQueued = false;
 const scheduleRender = () => { if (renderQueued) return; renderQueued = true; requestAnimationFrame(() => { renderQueued = false; render(); }); };
-const layoutScale = (key, w, h) => Math.min((w - 20) / LAYOUTS[key].vb[0], (h - 20) / LAYOUTS[key].vb[1]);
 const pickLayout = () => {
-  if (ONE_SCREEN.matches) {
-    // pick whichever layout draws the graph larger; switch only when the other is clearly (8%) better, so dragging doesn't flicker
-    const w = stageEl.clientWidth, h = stageEl.clientHeight; if (!w || !h) return layoutKey || "tall";
-    const st = layoutScale("tall", w, h), sw = layoutScale("wide", w, h);
-    if (!layoutKey) return st >= sw ? "tall" : "wide";
-    const cur = layoutKey === "tall" ? st : sw, other = layoutKey === "tall" ? sw : st;
-    return other > cur * 1.08 ? (layoutKey === "tall" ? "wide" : "tall") : layoutKey;
-  }
+  if (ONE_SCREEN.matches) return "wide"; // the components tile is wide and short: always draw the flow left to right
   return innerWidth <= 640 ? "tall" : "wide";
 };
 // Excalidraw-style canvas: drag to pan, Ctrl+scroll or pinch to zoom at the cursor, plain scroll pans, double-click or the % button fits.
@@ -747,7 +739,7 @@ new ResizeObserver(() => { if (pickLayout() !== layoutKey) { buildComponents(); 
    - count metrics (rebalances) are events, not a curve: they become an event lane under the charts,
      and their steps (plus deploys) are drawn as annotations on every chart;
    - annotations and the event lane only show what has happened so far (no spoilers). */
-const PL = 58, PR = 14;
+const PL = 40, PR = 14;
 // one colour for data. In a multi-series panel the first series is the reference (e.g. produced) and is drawn quietly;
 // teal/violet/pink stay reserved for partition ownership in the components view
 const seriesColor = (P, i) => P.p.metrics.length > 1 && i === 0 ? "var(--muted)" : "var(--accent)";
@@ -813,7 +805,10 @@ function buildPanel(P) {
   // quiet frame: a baseline, one faint top line with the only y label, no vertical gridlines
   el("line", { x1: PL, x2: W - PR, y1: yOf(0), y2: yOf(0), class: "grid" }, svg);
   el("line", { x1: PL, x2: W - PR, y1: yOf(max), y2: yOf(max), class: "grid", opacity: 0.5 }, svg);
-  const tx = el("text", { x: PL - 6, y: yOf(max) + 4, class: "axis", "text-anchor": "end" }, svg); tx.textContent = fmtV(max, P.units);
+  // y labels: max and 0, plus the half when the chart is tall enough to keep them apart
+  const yl = (v, dy) => { const tx = el("text", { x: PL - 6, y: yOf(v) + dy, class: "axis", "text-anchor": "end" }, svg); tx.textContent = fmtV(v, P.units); };
+  yl(max, 4); yl(0, -2);
+  if (H >= 90) { el("line", { x1: PL, x2: W - PR, y1: yOf(max / 2), y2: yOf(max / 2), class: "grid", opacity: 0.3 }, svg); yl(max / 2, 4); }
   annos.forEach(a => { const g = el("g", {}, svg); el("line", { x1: xOf(a.t), x2: xOf(a.t), y1: PT, y2: H - PBm, stroke: a.kind === "deploy" ? "var(--faint)" : "var(--red)", "stroke-dasharray": "2 3", opacity: a.kind === "deploy" ? 0.8 : 0.45 }, g); P.annoEls.push({ t: a.t, g }); });
   if (P.p.threshold) {
     el("line", { x1: PL, x2: W - PR, y1: yOf(P.p.threshold.value), y2: yOf(P.p.threshold.value), stroke: "var(--red)", "stroke-dasharray": "5 4", opacity: 0.55 }, svg);
@@ -858,9 +853,9 @@ function renderPanels(playT, viewT) {
     const xOf = P.xOf;
     P.annoEls.forEach(a => (a.g.style.display = a.t <= playT ? "" : "none"));
     P.cur.setAttribute("x1", xOf(viewT)); P.cur.setAttribute("x2", xOf(viewT));
-    // at a key moment the time cursor itself is the indicator: accent and a little thicker on every chart
+    // at a key moment the time cursor itself is the indicator: amber (never the curve's blue) and a little thicker on every chart
     const hot = !!activeBeat && hoverT == null;
-    if (P._hot !== hot) { P._hot = hot; P.cur.setAttribute("stroke", hot ? "var(--accent)" : "var(--fg)"); P.cur.setAttribute("stroke-width", hot ? 2 : 1); P.cur.setAttribute("opacity", hot ? 1 : 0.5); }
+    if (P._hot !== hot) { P._hot = hot; P.cur.setAttribute("stroke", hot ? "var(--amber)" : "var(--fg)"); P.cur.setAttribute("stroke-width", hot ? 1.5 : 1); P.cur.setAttribute("opacity", hot ? 0.95 : 0.5); }
     if (P.kind === "lane") { placeNote(P, viewT); P.val.textContent = fmtV(at(P.p.metrics[0], viewT), "count"); return; }
     const step = Math.max(1, Math.round(D / (P.W - PL - PR) * 1.5));
     P.p.metrics.forEach((m, i) => {
@@ -933,9 +928,7 @@ feedEl.addEventListener("click", e => { const li = e.target.closest("li[data-t]"
 
 /* ===================== Caption (key moments only) ===================== */
 function fitAboveSheet(on) {
-  const sh = $("#caption"), box = comp.parentElement;
-  if (!on) { comp.style.transform = ""; return; }
-  requestAnimationFrame(() => { const H = box.clientHeight, free = H - sh.offsetHeight - 6; comp.style.transform = free > 60 && free < H ? `scale(${(free / H).toFixed(3)})` : ""; });
+  comp.style.transform = ""; // the sheet overlays the components; they keep their size
 }
 function setExpanded(on) { $("#caption").classList.toggle("expanded", on); $("#capMore").textContent = on ? "less" : "more"; $("#capMore").setAttribute("aria-expanded", String(on)); if (activeBeat) fitAboveSheet(true); }
 $("#capMore").onclick = () => setExpanded(!$("#caption").classList.contains("expanded"));
@@ -1135,35 +1128,12 @@ $("#scrim").addEventListener("click", e => {
 $("#schema").innerHTML = `<p>The agent writes one JSON file; the app only plays it. Layout coordinates in this proposal come from the app, not from the playbook.</p><pre>${JSON.stringify(PB, null, 2).replace(/</g, "&lt;")}</pre>`;
 
 
-/* ===================== Layout: fixed =====================
-   Components on the left (3 of 12 columns; a slider in its header widens it to 4 or 5, taking only from the charts) and the feed
-   on the right (3 columns), both full height and fixed. The charts share the middle columns, all the same size. The playbook may pick meta.layout { columns, rows };
-   otherwise 2 columns, with as many rows per screen as fit all charts (2 to 5). More charts than fit: the board scrolls. */
-const COLS = 12, GAP = 4, MIN_H = 110;
+/* ===================== Layout: computed, nothing to adjust =====================
+   Two columns. Left (about 40%): components on top, the feed below, both fixed while the charts scroll. Right: the charts, same size,
+   3 columns when there is room and 2 otherwise, rows sized to the screen (150 to 220px); more charts than fit: the board scrolls. */
+const GAP = 4, LEFT = 0.4, CH_MIN = 150, CH_MAX = 220, MIN_CHART_W = 260, COMP_SHARE = 0.5;
 const board = dashGrid, allCharts = panels.filter(P => P.kind === "chart");
 const tiles = [$("#compCard"), $("#feedCard")];
-const LAYOUT = PB.meta.layout || {};
-// the viewer drags the vertical divider on the components tile's right edge: width 3 (default, narrow) to 6 of 12 columns, taken from the charts only
-const WKEY = "sim-xp.comp-cols", CMIN = 3, CMAX = 6;
-let compCols = CMIN;
-try { const v = +localStorage.getItem(WKEY); if (v >= CMIN && v <= CMAX) compCols = v; } catch (e) { /* storage blocked */ }
-const setComp = v => {
-  compCols = Math.max(CMIN, Math.min(CMAX, v));
-  try { compCols === CMIN ? localStorage.removeItem(WKEY) : localStorage.setItem(WKEY, compCols.toFixed(2)); } catch (err) { /* storage blocked */ }
-  renderLayout();
-};
-const split = document.createElement("div");
-split.className = "split"; split.tabIndex = 0; split.setAttribute("role", "separator"); split.setAttribute("aria-orientation", "vertical");
-split.setAttribute("aria-label", "Components width (drag, or arrow keys; double-click resets)");
-tiles[0].appendChild(split);
-split.onpointerdown = e => {
-  e.preventDefault(); split.setPointerCapture(e.pointerId); split.classList.add("drag");
-  const x0 = e.clientX, c0 = compCols, colW = board.clientWidth / COLS;
-  split.onpointermove = m => setComp(c0 + (m.clientX - x0) / colW);
-  split.onpointerup = split.onpointercancel = () => { split.classList.remove("drag"); split.onpointermove = split.onpointerup = split.onpointercancel = null; };
-};
-split.ondblclick = () => setComp(CMIN);
-split.onkeydown = e => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); e.stopPropagation(); setComp(compCols + (e.key === "ArrowRight" ? 0.25 : -0.25)); } };
 function renderLayout() {
   // a surfaced deep chart sits right after the standard charts of the same component, so related signals stay together
   const charts = allCharts.filter(P => !P.deep);
@@ -1179,19 +1149,24 @@ function renderLayout() {
   const all = [...tiles, ...charts.map(P => P.card), quietEl];
   if (!ONE_SCREEN.matches) { // stacked: no grid areas
     board.style.gridTemplateRows = ""; board.style.gridTemplateColumns = "";
-    all.forEach(e => { e.style.gridArea = ""; e.style.height = ""; e.classList.remove("stick"); });
+    all.forEach(e => { e.style.gridArea = ""; e.style.height = ""; e.style.marginTop = ""; e.style.top = ""; e.classList.remove("stick"); });
     return;
   }
-  const H = board.clientHeight, n = charts.length;
-  const cols = [1, 2, 3].includes(LAYOUT.columns) ? LAYOUT.columns : 2, CW = compCols, M = 12 - CW - 3, R = Math.max(1, Math.ceil(n / cols));
-  let per = Number.isInteger(LAYOUT.rows) && LAYOUT.rows >= 1 ? LAYOUT.rows : Math.max(2, Math.min(5, R));
-  per = Math.max(1, Math.min(per, R, Math.floor((H + GAP) / (MIN_H + GAP))));
-  const rh = (H - (per - 1) * GAP) / per, rows = R, tileH = Math.min(H, rows * rh + (rows - 1) * GAP);
-  board.style.gridTemplateRows = `repeat(${rows}, ${rh}px)` + (quiet.length ? " max-content" : "");
-  board.style.gridTemplateColumns = `minmax(0,${CW}fr) repeat(${cols}, minmax(0,${M / cols}fr)) minmax(0,3fr)`;
-  [[tiles[0], 1], [tiles[1], cols + 2]].forEach(([e, x]) => { e.style.gridArea = `1 / ${x} / ${rows + 1} / ${x + 1}`; e.style.height = `${tileH}px`; e.classList.add("stick"); });
+  const H = board.clientHeight, W = board.clientWidth, n = charts.length;
+  const chartW = W * (1 - LEFT) - GAP * 2;
+  const cols = Math.max(1, Math.min(3, Math.floor((chartW + GAP) / (MIN_CHART_W + GAP))));
+  const R = Math.max(1, Math.ceil(n / cols));
+  const fit = (H - (R - 1) * GAP) / R, rh = Math.max(CH_MIN, Math.min(CH_MAX, fit));
+  board.style.gridTemplateRows = `repeat(${R}, ${rh}px)` + (quiet.length ? " max-content" : "");
+  board.style.gridTemplateColumns = `minmax(0,${LEFT}fr) repeat(${cols}, minmax(0,${(1 - LEFT) / cols}fr))`;
+  const compH = Math.round((H - GAP) * COMP_SHARE), feedH = H - GAP - compH;
+  tiles[0].style.gridArea = tiles[1].style.gridArea = `1 / 1 / ${R + 1} / 2`;
+  tiles[0].style.height = compH + "px"; tiles[1].style.height = feedH + "px";
+  tiles[0].style.marginTop = "0"; tiles[1].style.marginTop = (compH + GAP) + "px";
+  tiles[0].style.top = "0"; tiles[1].style.top = (compH + GAP) + "px";
+  tiles.forEach(e => e.classList.add("stick"));
   charts.forEach((P, i) => { const r = Math.floor(i / cols) + 1, c = 2 + (i % cols); P.card.style.gridArea = `${r} / ${c} / ${r + 1} / ${c + 1}`; });
-  quietEl.style.gridArea = `${rows + 1} / 2 / ${rows + 2} / ${cols + 2}`;
+  quietEl.style.gridArea = `${R + 1} / 2 / ${R + 2} / ${cols + 2}`;
 }
 // Standard / Hardcore: the same run, with or without the deep layer
 function setDetail(on) {
