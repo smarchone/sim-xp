@@ -44,7 +44,7 @@ const player = patch(patch(read("player.html"), ">Open another playbook<", ">Pla
 // ---- bundled playbooks, in index order
 const index = JSON.parse(read("playbooks/index.json"));
 const seeds = index.map((p) => JSON.parse(read("playbooks/" + p.file)));
-const DEFAULT_ID = "postgres-queue-load-test", EXAMPLE_ID = "kafka-rebalance-storm";   // what the box starts with / what Claude reads as the format example (it has a full Hardcore layer)
+const DEFAULT_ID = "kafka-load-test-until-it-breaks", EXAMPLE_ID = "kafka-rebalance-storm";   // what the box starts with / what Claude reads as the format example (it has a full Hardcore layer)
 for (const id of [DEFAULT_ID, EXAMPLE_ID]) if (!seeds.some((p) => p.meta.id === id)) throw new Error(`build-single: playbook ${id} is not in playbooks/index.json`);
 
 const script = [
