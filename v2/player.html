@@ -1137,12 +1137,11 @@ const GAP = 4, LEFT = 0.4, CH_MIN = 150, CH_MAX = 220, MIN_CHART_W = 260, COMP_S
 const board = dashGrid, allCharts = panels.filter(P => P.kind === "chart");
 const tiles = [$("#compCard"), $("#feedCard")];
 function renderLayout() {
-  // a surfaced deep chart sits right after the standard charts of the same component, so related signals stay together
-  const charts = allCharts.filter(P => !P.deep);
-  allCharts.filter(P => P.deep && panelShown(P)).forEach(P => {
-    let i = -1; charts.forEach((Q, j) => { if (P.p.component && Q.p.component === P.p.component) i = j; });
-    charts.splice(i < 0 ? charts.length : i + 1, 0, P);
-  });
+  // charts of one component sit together (groups in order of first appearance; a chart with no component stays where the author put it);
+  // a surfaced deep chart joins its component's group
+  const base = [...allCharts.filter(P => !P.deep), ...allCharts.filter(P => P.deep && panelShown(P))], groups = new Map();
+  base.forEach(P => { const k = P.p.component || "#" + P.p.id; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(P); });
+  const charts = [...groups.values()].flat();
   const quiet = quietPanels();
   panels.forEach(P => (P.card.hidden = !panelShown(P)));
   const qk = quiet.map(P => P.p.id).join(",");

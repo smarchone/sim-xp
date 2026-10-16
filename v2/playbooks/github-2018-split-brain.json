@@ -288,7 +288,8 @@
     "value": 50,
     "label": "alert 50ms"
    },
-   "why": "Apps in the East now write to West primaries across the country, so every write is slower."
+   "why": "Apps in the East now write to West primaries across the country, so every write is slower.",
+   "component": "apps"
   },
   {
    "id": "err",
@@ -300,7 +301,8 @@
     "value": 2,
     "label": "alert 2%"
    },
-   "why": "What users see: failed requests while the data layer is degraded."
+   "why": "What users see: failed requests while the data layer is degraded.",
+   "component": "apps"
   },
   {
    "id": "topo",
@@ -308,7 +310,8 @@
    "metrics": [
     "west_prim"
    ],
-   "why": "How many clusters Orchestrator failed over to West. 4 means everything moved."
+   "why": "How many clusters Orchestrator failed over to West. 4 means everything moved.",
+   "component": "orch"
   },
   {
    "id": "orph",
@@ -316,7 +319,8 @@
    "metrics": [
     "orphans"
    ],
-   "why": "Writes accepted by East primaries that never reached West: data that exists on one side only."
+   "why": "Writes accepted by East primaries that never reached West: data that exists on one side only.",
+   "component": "east"
   },
   {
    "id": "sync",
@@ -324,7 +328,8 @@
    "metrics": [
     "east_sync"
    ],
-   "why": "How consistent the East replicas are with the new West primaries. Failback is safe only at 100%."
+   "why": "How consistent the East replicas are with the new West primaries. Failback is safe only at 100%.",
+   "component": "east"
   },
   {
    "id": "backlog",
@@ -336,7 +341,8 @@
     "value": 1000000,
     "label": "1M jobs"
    },
-   "why": "Webhook deliveries waiting while the data is repaired. Paused on purpose."
+   "why": "Webhook deliveries waiting while the data is repaired. Paused on purpose.",
+   "component": "jobs"
   },
   {
    "id": "repl_lag",
@@ -344,7 +350,8 @@
    "metrics": [
     "repl_lag"
    ],
-   "why": "How far the restored East replicas are behind West. Failback waits until this reaches zero."
+   "why": "How far the restored East replicas are behind West. Failback waits until this reaches zero.",
+   "component": "east"
   },
   {
    "id": "cross_dc",
@@ -353,7 +360,8 @@
     "cross_dc"
    ],
    "max": 100,
-   "why": "Share of writes that cross the country. This is the latency cost of the failover."
+   "why": "Share of writes that cross the country. This is the latency cost of the failover.",
+   "component": "hub"
   },
   {
    "id": "pages_q",
@@ -361,7 +369,8 @@
    "metrics": [
     "pages_q"
    ],
-   "why": "Pages builds held back during recovery, and how fast the queue drains afterwards."
+   "why": "Pages builds held back during recovery, and how fast the queue drains afterwards.",
+   "component": "jobs"
   }
  ],
  "alerts": [
