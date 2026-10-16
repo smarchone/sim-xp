@@ -1,0 +1,40 @@
+<iframe id="stage" title="Player"></iframe>
+<aside class="panel" id="panel" aria-label="Claude and playbook">
+  <button type="button" class="rail" id="rail" aria-label="Open the Claude and playbook panel" hidden>
+    <span class="rail-arrow" aria-hidden="true">◂</span><span class="rail-text">Claude · Playbook</span>
+  </button>
+  <div class="panel-in" id="panelIn">
+    <div class="grip" id="grip" role="separator" aria-orientation="vertical" aria-label="Resize the panel" title="Drag to resize"></div>
+    <header class="ph">
+      <b>Claude</b><span class="muted">writes the playbook, you run it</span>
+      <span class="spacer"></span>
+      <button type="button" id="collapse" aria-label="Collapse the panel">Collapse ▸</button>
+    </header>
+    <section class="chat" aria-label="Chat with Claude">
+      <ol id="log" aria-live="polite"></ol>
+      <div class="bar" id="bar">
+        <input id="ask" type="text" autocomplete="off" placeholder="A story, a postmortem, a concept, or a change to this playbook" aria-label="Message to Claude">
+        <button type="button" id="send" class="primary">Send</button>
+        <button type="button" id="stop" hidden>Stop</button>
+      </div>
+    </section>
+    <section class="pbbox" aria-label="Playbook">
+      <div class="pbhead">
+        <b>Playbook</b>
+        <span class="status" id="status"></span>
+        <span class="spacer"></span>
+        <label class="btn" for="file">Open file…</label>
+        <input type="file" id="file" accept=".json,application/json" hidden>
+        <button type="button" id="saveBtn" hidden>Save .json</button>
+        <button type="button" id="runBtn" class="primary">Run ▶</button>
+      </div>
+      <details class="saved" id="saved" hidden>
+        <summary>Saved <span id="savedCount"></span></summary>
+        <ul id="savedList"></ul>
+      </details>
+      <textarea id="pb" spellcheck="false" aria-label="Playbook JSON" placeholder="Paste a playbook here, or ask Claude above to write one."></textarea>
+      <ul class="problems" id="problems" hidden></ul>
+    </section>
+  </div>
+</aside>
+<div class="drop" id="drop" hidden><span>Drop the playbook file to load it into the box</span></div>

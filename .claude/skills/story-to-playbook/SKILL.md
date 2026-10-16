@@ -46,7 +46,7 @@ names another place.
    errors, and every warning is either fixed or one you can justify.
 5. **Hand it over** in a few lines: the file path, the arc in one line per key moment, any warnings you
    kept and why, and how to play it: open https://smarchone.github.io/sim-xp/v2/ and drop the file on the
-   page (or use "Open a playbook file…"). In the player, Space plays and pauses, ←/→ jump between key
+   page (or use "Open file…" in the side panel). In the player, Space plays and pauses, ←/→ jump between key
    moments, and R opens the report.
 
 ## Schema `sim-xp/playbook@2`
@@ -57,7 +57,7 @@ Top level: `schema`, `meta`, `components`, `metrics`, `dashboard`, `alerts`, `in
 ### meta
 `{ id, title, story, duration_s, tags[], background[], cast[], watch[], learn[] }`
 - `title`: short and evocative ("The rebalance storm: when slow looks dead").
-- `story`: the hook, 1–2 sentences, shown large at the top of the intro and as the subtitle in the gallery. Sets the scene, does not spoil the cause.
+- `story`: the hook, 1–2 sentences, shown large at the top of the intro and as the subtitle in the Saved list. Sets the scene, does not spoil the cause.
 - `duration_s`: 240–600 is typical (the viewer watches at 1×–4×).
 - `clock` (optional) `{ start?, scale?, changes? }`: real story time. By default one playbook second is one story second. For a long story set `scale` = story seconds per playbook second (a 2-month story in 420 s: 12,500; one hour per second: 3,600) and the clock, feed times, chart axes and key moments show story time ("Day 23", "Oct 21 22:52"), so nothing is shown as "8 seconds". `start` is an ISO date ("2018-10-21T22:51:18Z", shown in UTC) if the real dates matter, otherwise the clock counts "Day N". `changes` `[{ t, scale }]` switches the scale at playbook second `t` (real time through the trigger, then fast-forward through a long recovery). Keep event times (`t`) in playbook seconds and make sure feed text, durations and curves agree with the clock.
 - `layout` (optional) `{ columns: 1|2|3, rows: 1–8 }`: how the charts are arranged. The components (left) and feed (right) are fixed; the viewer can only widen the components by dragging the vertical divider (3 to 6 of 12 columns), which is not a playbook setting. `columns` is the number of chart columns between them (default 2); `rows` is how many chart rows fit on one screen before the board scrolls (default: fit all charts, between 2 and 5). Use 2 columns × 4–5 rows for ~8–10 charts; 3 columns for many small charts; 1 column × 3 rows for a few tall ones.

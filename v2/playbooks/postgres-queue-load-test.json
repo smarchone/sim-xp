@@ -1,0 +1,1207 @@
+{
+  "schema": "sim-xp/playbook@2",
+  "meta": {
+    "id": "postgres-queue-load-test",
+    "title": "Postgres as a queue: the load test that found the wall",
+    "story": "A team runs its job queue on a Postgres table with SKIP LOCKED and ramps a load test to see where it breaks. The first two stages pass easily, then something quiet starts piling up. Compressed: 1 s ≈ 4 s.",
+    "duration_s": 330,
+    "tags": [
+      "postgres",
+      "queue",
+      "load-test",
+      "vacuum",
+      "dramatized"
+    ],
+    "clock": {
+      "scale": 4
+    },
+    "layout": {
+      "columns": 3,
+      "rows": 3
+    },
+    "background": [
+      {
+        "title": "The system",
+        "body": "checkout enqueues jobs into a jobs table in Postgres. 20 workers claim 50 rows at a time with SELECT ... FOR UPDATE SKIP LOCKED, process them and delete them. No broker, one less thing to run."
+      },
+      {
+        "title": "How it normally works",
+        "body": "Every claim and delete leaves dead row versions behind. Autovacuum removes them, but only versions no open transaction could still see. Normally that is milliseconds after the delete, so the table stays small."
+      },
+      {
+        "title": "Today",
+        "body": "A load test ramps from 200 to 800 to 1,500 jobs/s to find the limit. At some point in the run, a scheduled weekly export also starts on the same database."
+      }
+    ],
+    "cast": [
+      {
+        "name": "k6 load test",
+        "role": "ramps enqueue rate in stages"
+      },
+      {
+        "name": "enqueue-api",
+        "role": "inserts jobs, 100 DB connections shared"
+      },
+      {
+        "name": "jobs-db",
+        "role": "Postgres holding the jobs table"
+      },
+      {
+        "name": "worker-pool",
+        "role": "20 workers claiming and deleting jobs"
+      },
+      {
+        "name": "autovacuum",
+        "role": "cleans dead row versions"
+      },
+      {
+        "name": "weekly-export",
+        "role": "cron job reading the jobs table"
+      }
+    ],
+    "watch": [
+      {
+        "label": "Queue depth",
+        "normal": "normal: under 500"
+      },
+      {
+        "label": "Dequeue p99",
+        "normal": "normal: under 20 ms"
+      },
+      {
+        "label": "Dead tuples",
+        "normal": "normal: tens of thousands"
+      }
+    ],
+    "learn": [
+      "why a queue table is hard on Postgres",
+      "what holds vacuum back, and why CPU hides it",
+      "how a slow dequeue turns into enqueue errors"
+    ]
+  },
+  "components": {
+    "nodes": [
+      {
+        "id": "loadgen",
+        "label": "k6 load test",
+        "kind": "load generator",
+        "details": [
+          {
+            "label": "Offered load",
+            "metric": "enq_rate"
+          }
+        ]
+      },
+      {
+        "id": "api",
+        "label": "enqueue-api",
+        "kind": "service",
+        "details": [
+          {
+            "label": "Enqueue errors",
+            "metric": "errors"
+          },
+          {
+            "label": "Accepted rate",
+            "metric": "enq_rate"
+          }
+        ]
+      },
+      {
+        "id": "db",
+        "label": "jobs-db",
+        "kind": "postgres",
+        "details": [
+          {
+            "label": "Queue depth",
+            "metric": "depth"
+          },
+          {
+            "label": "Dequeue p99",
+            "metric": "deq_p99"
+          },
+          {
+            "label": "Dead tuples",
+            "metric": "dead_tup"
+          },
+          {
+            "label": "Table size",
+            "metric": "table_gb"
+          },
+          {
+            "label": "CPU",
+            "metric": "db_cpu"
+          }
+        ]
+      },
+      {
+        "id": "workers",
+        "label": "worker-pool",
+        "kind": "20 consumers",
+        "details": [
+          {
+            "label": "Completed",
+            "metric": "done_rate"
+          },
+          {
+            "label": "Connections in use",
+            "metric": "conns"
+          }
+        ]
+      },
+      {
+        "id": "vacuum",
+        "label": "autovacuum",
+        "kind": "postgres daemon",
+        "details": [
+          {
+            "label": "Dead tuples",
+            "metric": "dead_tup"
+          }
+        ]
+      },
+      {
+        "id": "report",
+        "label": "weekly-export",
+        "kind": "cron job",
+        "details": [
+          {
+            "label": "Oldest open txn",
+            "metric": "xact_age"
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-lg",
+        "from": "loadgen",
+        "to": "api"
+      },
+      {
+        "id": "e-api",
+        "from": "api",
+        "to": "db"
+      },
+      {
+        "id": "e-w",
+        "from": "db",
+        "to": "workers"
+      },
+      {
+        "id": "e-vac",
+        "from": "vacuum",
+        "to": "db"
+      },
+      {
+        "id": "e-rep",
+        "from": "report",
+        "to": "db"
+      }
+    ]
+  },
+  "metrics": [
+    {
+      "id": "enq_rate",
+      "label": "Enqueue rate (accepted)",
+      "unit": "jobs/s",
+      "start": 200,
+      "noise": 0.05
+    },
+    {
+      "id": "done_rate",
+      "label": "Completed rate",
+      "unit": "jobs/s",
+      "start": 200,
+      "noise": 0.05
+    },
+    {
+      "id": "depth",
+      "label": "Queue depth",
+      "unit": "jobs",
+      "start": 50,
+      "noise": 0.06,
+      "normal": [
+        0,
+        500
+      ]
+    },
+    {
+      "id": "deq_p99",
+      "label": "Dequeue p99",
+      "unit": "ms",
+      "start": 4,
+      "noise": 0.08,
+      "normal": [
+        1,
+        20
+      ]
+    },
+    {
+      "id": "dead_tup",
+      "label": "Dead tuples",
+      "unit": "k tuples",
+      "start": 20,
+      "noise": 0.04
+    },
+    {
+      "id": "db_cpu",
+      "label": "DB CPU",
+      "unit": "%",
+      "start": 20,
+      "noise": 0.05
+    },
+    {
+      "id": "conns",
+      "label": "DB connections in use",
+      "unit": "conns",
+      "start": 30,
+      "noise": 0.04
+    },
+    {
+      "id": "xact_age",
+      "label": "Oldest open transaction",
+      "unit": "s",
+      "start": 1,
+      "noise": 0.05
+    },
+    {
+      "id": "table_gb",
+      "label": "jobs table size",
+      "unit": "GB",
+      "start": 1.2,
+      "noise": 0
+    },
+    {
+      "id": "errors",
+      "label": "Enqueue errors",
+      "unit": "err/s",
+      "start": 0,
+      "noise": 0
+    }
+  ],
+  "dashboard": [
+    {
+      "id": "flow",
+      "title": "Enqueued vs completed",
+      "metrics": [
+        "enq_rate",
+        "done_rate"
+      ],
+      "why": "Accepted vs finished jobs. When completed falls below enqueued, the queue grows by the difference.",
+      "component": "workers"
+    },
+    {
+      "id": "depth",
+      "title": "Queue depth",
+      "metrics": [
+        "depth"
+      ],
+      "threshold": {
+        "value": 20000,
+        "label": "alert 20k"
+      },
+      "why": "Jobs waiting. It grows at enqueued minus completed, so a flat line means the queue keeps up.",
+      "component": "db"
+    },
+    {
+      "id": "deq_p99",
+      "title": "Dequeue p99",
+      "metrics": [
+        "deq_p99"
+      ],
+      "threshold": {
+        "value": 200,
+        "label": "alert 200 ms"
+      },
+      "why": "Time to claim a batch. Slow claims cut worker throughput directly.",
+      "component": "db"
+    },
+    {
+      "id": "dead_tup",
+      "title": "Dead tuples",
+      "metrics": [
+        "dead_tup"
+      ],
+      "why": "Deleted rows not yet cleaned. Rising while vacuum runs means something is blocking cleanup.",
+      "component": "vacuum"
+    },
+    {
+      "id": "xact_age",
+      "title": "Oldest open transaction",
+      "metrics": [
+        "xact_age"
+      ],
+      "threshold": {
+        "value": 120,
+        "label": "alert 2 min"
+      },
+      "why": "Vacuum cannot remove rows newer than the oldest open transaction. A long one blocks cleanup for everyone.",
+      "component": "report"
+    },
+    {
+      "id": "conns",
+      "title": "DB connections",
+      "metrics": [
+        "conns"
+      ],
+      "max": 120,
+      "threshold": {
+        "value": 100,
+        "label": "pool max 100"
+      },
+      "why": "Slow queries hold connections longer. At the limit, new requests queue or fail.",
+      "component": "db"
+    },
+    {
+      "id": "db_cpu",
+      "title": "DB CPU",
+      "metrics": [
+        "db_cpu"
+      ],
+      "max": 100,
+      "why": "Dead-row scanning burns CPU, but it looks like plain load. It is a symptom, not the cause.",
+      "component": "db"
+    },
+    {
+      "id": "errors",
+      "title": "Enqueue errors",
+      "metrics": [
+        "errors"
+      ],
+      "why": "Producers failing to insert. This is the user-visible failure of the test.",
+      "component": "api"
+    },
+    {
+      "id": "table_gb",
+      "title": "jobs table size",
+      "metrics": [
+        "table_gb"
+      ],
+      "why": "Bloat: the table grows even though few live rows exist, and it will not shrink by itself.",
+      "component": "db"
+    }
+  ],
+  "alerts": [
+    {
+      "id": "depth-high",
+      "metric": "depth",
+      "op": ">",
+      "value": 20000,
+      "for_s": 20,
+      "severity": "critical",
+      "component": "db",
+      "summary": "jobs queue depth > 20k"
+    },
+    {
+      "id": "deq-slow",
+      "metric": "deq_p99",
+      "op": ">",
+      "value": 200,
+      "for_s": 20,
+      "severity": "warning",
+      "component": "db",
+      "summary": "dequeue p99 > 200 ms"
+    },
+    {
+      "id": "xact-long",
+      "metric": "xact_age",
+      "op": ">",
+      "value": 120,
+      "for_s": 20,
+      "severity": "warning",
+      "component": "report",
+      "summary": "open transaction older than 2 min"
+    },
+    {
+      "id": "conns-full",
+      "metric": "conns",
+      "op": ">",
+      "value": 90,
+      "for_s": 15,
+      "severity": "critical",
+      "component": "db",
+      "summary": "DB connections > 90 of 100"
+    }
+  ],
+  "initial": {
+    "effects": [
+      {
+        "target": "loadgen",
+        "color": "blue",
+        "intensity": 0.3,
+        "label": "200/s"
+      },
+      {
+        "target": "db",
+        "color": "green",
+        "intensity": 0.3,
+        "label": "healthy"
+      },
+      {
+        "target": "vacuum",
+        "color": "green",
+        "intensity": 0.3,
+        "label": "keeping up"
+      },
+      {
+        "target": "report",
+        "color": "grey",
+        "intensity": 0.2,
+        "label": "idle"
+      },
+      {
+        "target": "e-lg",
+        "flow": 0.3
+      },
+      {
+        "target": "e-api",
+        "flow": 0.3
+      },
+      {
+        "target": "e-w",
+        "flow": 0.3
+      },
+      {
+        "target": "e-vac",
+        "flow": 0.2,
+        "color": "green"
+      },
+      {
+        "target": "e-rep",
+        "flow": 0
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "t": 3,
+      "title": "Meet the system",
+      "beat": {
+        "hint": "Jobs go into one Postgres table and workers claim them with SKIP LOCKED, so no two workers take the same row. At 200 jobs/s everything is quiet: queue near zero, dequeue in a few milliseconds.",
+        "focus": [
+          "loadgen",
+          "api",
+          "db",
+          "workers",
+          "panel:flow"
+        ],
+        "notes": [
+          {
+            "panel": "flow",
+            "text": "Enqueued and completed match: workers keep pace"
+          },
+          {
+            "panel": "depth",
+            "text": "Queue depth near zero"
+          }
+        ]
+      }
+    },
+    {
+      "t": 20,
+      "title": "Stage 1: 800 jobs/s",
+      "feed": {
+        "from": "k6",
+        "kind": "deploy",
+        "text": "load test stage 1: ramp to 800 jobs/s over 40s"
+      },
+      "effects": [
+        {
+          "target": "loadgen",
+          "label": "800/s stage 1",
+          "intensity": 0.5
+        },
+        {
+          "target": "e-lg",
+          "flow": 0.6
+        },
+        {
+          "target": "e-api",
+          "flow": 0.6
+        },
+        {
+          "target": "e-w",
+          "flow": 0.6
+        }
+      ],
+      "metrics": [
+        {
+          "id": "enq_rate",
+          "to": 800,
+          "over_s": 40,
+          "shape": "linear"
+        },
+        {
+          "id": "done_rate",
+          "to": 800,
+          "over_s": 40,
+          "shape": "linear"
+        },
+        {
+          "id": "db_cpu",
+          "to": 55,
+          "over_s": 40
+        },
+        {
+          "id": "dead_tup",
+          "to": 60,
+          "over_s": 40
+        },
+        {
+          "id": "conns",
+          "to": 45,
+          "over_s": 40
+        },
+        {
+          "id": "deq_p99",
+          "to": 8,
+          "over_s": 40
+        }
+      ]
+    },
+    {
+      "t": 60,
+      "feed": {
+        "from": "worker-7",
+        "kind": "log",
+        "text": "INFO claimed 50 jobs in 3 ms (FOR UPDATE SKIP LOCKED), 50 completed"
+      }
+    },
+    {
+      "t": 90,
+      "title": "Stage 2: 1,500 jobs/s",
+      "feed": {
+        "from": "Ravi · #queue-loadtest",
+        "kind": "chat",
+        "text": "stage 1 clean. going to 1500/s. depth wobbles a bit but drains, looks fine"
+      },
+      "effects": [
+        {
+          "target": "loadgen",
+          "color": "teal",
+          "label": "1500/s stage 2",
+          "intensity": 0.7
+        },
+        {
+          "target": "e-lg",
+          "flow": 0.9
+        },
+        {
+          "target": "e-api",
+          "flow": 0.9
+        },
+        {
+          "target": "e-w",
+          "flow": 0.9
+        }
+      ],
+      "metrics": [
+        {
+          "id": "enq_rate",
+          "to": 1500,
+          "over_s": 20
+        },
+        {
+          "id": "done_rate",
+          "to": 1400,
+          "over_s": 20
+        },
+        {
+          "id": "depth",
+          "to": 3500,
+          "over_s": 40,
+          "shape": "linear"
+        },
+        {
+          "id": "db_cpu",
+          "to": 70,
+          "over_s": 30
+        },
+        {
+          "id": "conns",
+          "to": 60,
+          "over_s": 30
+        },
+        {
+          "id": "dead_tup",
+          "to": 70,
+          "over_s": 30
+        },
+        {
+          "id": "deq_p99",
+          "to": 12,
+          "over_s": 30
+        }
+      ]
+    },
+    {
+      "t": 120,
+      "title": "A long transaction opens",
+      "feed": {
+        "from": "weekly-export",
+        "kind": "log",
+        "text": "BEGIN ISOLATION LEVEL REPEATABLE READ; SELECT status, count(*) FROM jobs GROUP BY 1;  -- export started, streaming results",
+        "key": true
+      },
+      "effects": [
+        {
+          "target": "report",
+          "color": "violet",
+          "intensity": 0.7,
+          "pulse": true,
+          "label": "txn open"
+        },
+        {
+          "target": "e-rep",
+          "flow": 0.4,
+          "color": "violet"
+        }
+      ],
+      "metrics": [
+        {
+          "id": "xact_age",
+          "to": 480,
+          "over_s": 120,
+          "shape": "linear"
+        },
+        {
+          "id": "dead_tup",
+          "to": 700,
+          "over_s": 120,
+          "shape": "linear"
+        },
+        {
+          "id": "table_gb",
+          "to": 3.1,
+          "over_s": 120,
+          "shape": "linear"
+        }
+      ],
+      "beat": {
+        "hint": "The weekly export starts a read transaction on the same database and keeps it open while it streams. Nobody connects it to the load test. From now on, vacuum may not delete any row this transaction could still see.",
+        "focus": [
+          "report",
+          "e-rep",
+          "panel:xact_age",
+          "panel:dead_tup"
+        ],
+        "notes": [
+          {
+            "panel": "xact_age",
+            "text": "Open transaction ages steadily: it pins the cleanup horizon"
+          },
+          {
+            "panel": "dead_tup",
+            "text": "Dead tuples start piling up instead of being swept"
+          }
+        ]
+      }
+    },
+    {
+      "t": 140,
+      "metrics": [
+        {
+          "id": "deq_p99",
+          "to": 850,
+          "over_s": 70
+        },
+        {
+          "id": "done_rate",
+          "to": 300,
+          "over_s": 70,
+          "shape": "linear"
+        },
+        {
+          "id": "depth",
+          "to": 49000,
+          "over_s": 70,
+          "shape": "linear"
+        }
+      ]
+    },
+    {
+      "t": 150,
+      "feed": {
+        "from": "autovacuum",
+        "kind": "log",
+        "text": "automatic vacuum of table jobs: tuples: 0 removed, 412310 dead but not yet removable, oldest xmin: 91823",
+        "key": true
+      },
+      "effects": [
+        {
+          "target": "vacuum",
+          "color": "amber",
+          "intensity": 0.6,
+          "label": "can't remove"
+        },
+        {
+          "target": "db",
+          "color": "amber",
+          "intensity": 0.5,
+          "label": "bloating"
+        }
+      ],
+      "metrics": [
+        {
+          "id": "conns",
+          "to": 100,
+          "over_s": 60
+        },
+        {
+          "id": "db_cpu",
+          "to": 95,
+          "over_s": 40
+        }
+      ]
+    },
+    {
+      "t": 170,
+      "feed": {
+        "from": "Ravi · #queue-loadtest",
+        "kind": "chat",
+        "text": "dequeue p99 is climbing and completed is falling, but nothing changed in the test. CPU is high but no obvious hot query?"
+      }
+    },
+    {
+      "t": 175,
+      "title": "Dequeues slow to a crawl",
+      "effects": [
+        {
+          "target": "workers",
+          "color": "amber",
+          "intensity": 0.6,
+          "pulse": true,
+          "label": "slow claims"
+        },
+        {
+          "target": "db",
+          "pulse": true
+        },
+        {
+          "target": "e-w",
+          "color": "amber",
+          "flow": 0.5
+        }
+      ],
+      "beat": {
+        "hint": "Every claim scans an index full of dead entries to find live rows, and it gets worse as the dead pile grows. Workers wait longer per batch, so completed falls even though the load has not changed.",
+        "focus": [
+          "db",
+          "workers",
+          "panel:deq_p99",
+          "panel:flow",
+          "panel:depth"
+        ],
+        "notes": [
+          {
+            "panel": "deq_p99",
+            "text": "Claims skip over dead entries: p99 climbs far past normal"
+          },
+          {
+            "panel": "flow",
+            "metric": "done_rate",
+            "text": "Completed falls while enqueue holds: the queue grows"
+          },
+          {
+            "panel": "dead_tup",
+            "text": "Still rising: vacuum is blocked, not slow"
+          }
+        ]
+      }
+    },
+    {
+      "t": 185,
+      "feed": {
+        "from": "postgres",
+        "kind": "log",
+        "text": "LOG: duration: 612.4 ms  statement: SELECT id FROM jobs WHERE status = 'ready' ORDER BY id LIMIT 50 FOR UPDATE SKIP LOCKED"
+      }
+    },
+    {
+      "t": 210,
+      "title": "The wall: pool exhausted",
+      "feed": {
+        "from": "enqueue-api",
+        "kind": "log",
+        "text": "ERROR timeout acquiring DB connection after 2000 ms (pool 100/100 in use). Returning 503 to client",
+        "key": true
+      },
+      "effects": [
+        {
+          "target": "db",
+          "color": "red",
+          "intensity": 0.8,
+          "pulse": true,
+          "label": "pool full"
+        },
+        {
+          "target": "api",
+          "color": "red",
+          "intensity": 0.6,
+          "pulse": true,
+          "label": "503s"
+        },
+        {
+          "target": "workers",
+          "color": "red",
+          "intensity": 0.5,
+          "label": "starved"
+        },
+        {
+          "target": "e-api",
+          "color": "red",
+          "flow": 0.3
+        }
+      ],
+      "metrics": [
+        {
+          "id": "errors",
+          "to": 700,
+          "over_s": 10
+        },
+        {
+          "id": "enq_rate",
+          "to": 800,
+          "over_s": 10
+        },
+        {
+          "id": "depth",
+          "to": 64000,
+          "over_s": 30,
+          "shape": "linear"
+        }
+      ],
+      "beat": {
+        "hint": "Slow claims hold connections longer, so the pool fills. Inserts can no longer get a connection and start failing. The queue now has 64k jobs behind it and the test has found its limit, but the cause is not load.",
+        "focus": [
+          "api",
+          "db",
+          "panel:conns",
+          "panel:errors",
+          "panel:depth"
+        ],
+        "notes": [
+          {
+            "panel": "conns",
+            "text": "Pool pinned at 100: slow queries hold connections longer"
+          },
+          {
+            "panel": "errors",
+            "text": "Enqueues fail: users would see 503s"
+          },
+          {
+            "panel": "depth",
+            "text": "Depth past 20k alert and still climbing"
+          }
+        ]
+      }
+    },
+    {
+      "t": 225,
+      "feed": {
+        "from": "Ravi · #queue-loadtest",
+        "kind": "chat",
+        "text": "should we double the workers to drain it? or just bump max_connections?"
+      }
+    },
+    {
+      "t": 240,
+      "title": "Kill the long transaction",
+      "feed": {
+        "from": "Dana · terminal",
+        "kind": "deploy",
+        "text": "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE xact_start < now() - interval '5 min';  → weekly-export killed. Also: more workers would only add connections to an already full pool",
+        "key": true
+      },
+      "effects": [
+        {
+          "target": "report",
+          "color": "grey",
+          "intensity": 0.2,
+          "pulse": false,
+          "label": "killed"
+        },
+        {
+          "target": "e-rep",
+          "flow": 0,
+          "color": null
+        },
+        {
+          "target": "vacuum",
+          "color": "green",
+          "intensity": 0.7,
+          "pulse": true,
+          "label": "cleaning"
+        },
+        {
+          "target": "api",
+          "color": null,
+          "pulse": false,
+          "label": null
+        },
+        {
+          "target": "e-api",
+          "color": null,
+          "flow": 0.6
+        }
+      ],
+      "metrics": [
+        {
+          "id": "xact_age",
+          "to": 0,
+          "over_s": 1,
+          "shape": "step"
+        },
+        {
+          "id": "dead_tup",
+          "to": 40,
+          "over_s": 40
+        },
+        {
+          "id": "table_gb",
+          "to": 3,
+          "over_s": 40
+        },
+        {
+          "id": "deq_p99",
+          "to": 15,
+          "over_s": 40
+        },
+        {
+          "id": "errors",
+          "to": 0,
+          "over_s": 10
+        },
+        {
+          "id": "db_cpu",
+          "to": 40,
+          "over_s": 30
+        },
+        {
+          "id": "conns",
+          "to": 40,
+          "over_s": 30
+        },
+        {
+          "id": "depth",
+          "to": 71500,
+          "over_s": 15,
+          "shape": "linear"
+        }
+      ],
+      "beat": {
+        "hint": "Once the transaction ends, vacuum can finally remove the backlog and claims get fast again. Adding workers would not have helped, since the pool was already full and every worker needs a connection.",
+        "focus": [
+          "report",
+          "vacuum",
+          "panel:xact_age",
+          "panel:dead_tup",
+          "panel:deq_p99"
+        ],
+        "notes": [
+          {
+            "panel": "xact_age",
+            "text": "Transaction gone: the cleanup horizon moves again"
+          },
+          {
+            "panel": "dead_tup",
+            "text": "Dead tuples swept away as vacuum catches up"
+          },
+          {
+            "panel": "errors",
+            "text": "Errors stop as connections free up"
+          }
+        ]
+      }
+    },
+    {
+      "t": 247,
+      "feed": {
+        "from": "autovacuum",
+        "kind": "log",
+        "text": "automatic vacuum of table jobs: tuples: 687412 removed, 0 dead but not yet removable, index scans: 1"
+      }
+    },
+    {
+      "t": 255,
+      "effects": [
+        {
+          "target": "db",
+          "color": "green",
+          "intensity": 0.5,
+          "pulse": false,
+          "label": "draining"
+        },
+        {
+          "target": "workers",
+          "color": "green",
+          "intensity": 0.5,
+          "pulse": false,
+          "label": "catching up"
+        },
+        {
+          "target": "e-w",
+          "color": "green",
+          "flow": 1
+        }
+      ],
+      "metrics": [
+        {
+          "id": "done_rate",
+          "to": 2400,
+          "over_s": 25
+        },
+        {
+          "id": "depth",
+          "to": 200,
+          "over_s": 60,
+          "shape": "linear"
+        }
+      ]
+    },
+    {
+      "t": 270,
+      "feed": {
+        "from": "Ravi · #queue-loadtest",
+        "kind": "chat",
+        "text": "queue is draining fast. but jobs table is still 3 GB for about 50k live rows. vacuum doesn't give that space back, right?"
+      }
+    },
+    {
+      "t": 300,
+      "feed": {
+        "from": "Dana · #queue-loadtest",
+        "kind": "chat",
+        "text": "right, needs pg_repack or partitioning. notes for the writeup: set idle_in_transaction_session_timeout, run exports on a replica, partition the jobs table so old partitions drop instead of vacuum",
+        "key": true
+      }
+    },
+    {
+      "t": 318,
+      "title": "Drained",
+      "effects": [
+        {
+          "target": "db",
+          "color": null,
+          "label": null
+        },
+        {
+          "target": "workers",
+          "color": null,
+          "label": null
+        },
+        {
+          "target": "vacuum",
+          "label": null
+        },
+        {
+          "target": "loadgen",
+          "label": "800/s"
+        },
+        {
+          "target": "e-w",
+          "color": null,
+          "flow": 0.6
+        }
+      ],
+      "beat": {
+        "hint": "The queue is empty and dequeues are fast again, but the table is still bloated. The limit this test found was not Postgres throughput: it was one open transaction holding back vacuum.",
+        "focus": [
+          "db",
+          "workers",
+          "panel:depth",
+          "panel:table_gb"
+        ],
+        "notes": [
+          {
+            "panel": "depth",
+            "text": "Back near zero: workers outrun the 800/s load"
+          },
+          {
+            "panel": "table_gb",
+            "text": "Bloat stays: vacuum frees rows for reuse but does not shrink the file"
+          }
+        ]
+      }
+    }
+  ],
+  "report": {
+    "tldr": "A weekly export held a transaction open, so vacuum could not clear dead job rows. Dequeues slowed, connections filled, and enqueues failed, with the load unchanged.",
+    "fix_t": 240,
+    "chain": [
+      {
+        "id": "txn",
+        "kind": "cause",
+        "text": "Long export transaction pins the cleanup horizon"
+      },
+      {
+        "id": "dead",
+        "kind": "effect",
+        "text": "Vacuum cannot remove dead job rows; table bloats"
+      },
+      {
+        "id": "scan",
+        "kind": "effect",
+        "text": "Each claim scans dead index entries, p99 explodes"
+      },
+      {
+        "id": "pool",
+        "kind": "amp",
+        "text": "Slow claims hold connections; pool fills, inserts fail"
+      },
+      {
+        "id": "fix",
+        "kind": "fix",
+        "text": "Kill the transaction; vacuum catches up, queue drains"
+      }
+    ],
+    "loop": {
+      "from": "pool",
+      "to": "scan",
+      "label": "slower claims keep connections busy longer"
+    },
+    "stats": [
+      {
+        "label": "Queue depth",
+        "metric": "depth",
+        "unit": "jobs",
+        "agg": "max"
+      },
+      {
+        "label": "Dequeue p99",
+        "metric": "deq_p99",
+        "unit": "ms",
+        "agg": "max"
+      },
+      {
+        "label": "Dead tuples",
+        "metric": "dead_tup",
+        "unit": "k",
+        "agg": "max"
+      }
+    ],
+    "learnings": [
+      {
+        "glyph": "⏳",
+        "title": "Cap transaction age",
+        "body": "Set idle_in_transaction_session_timeout and statement_timeout. One forgotten transaction can stall vacuum for the whole database."
+      },
+      {
+        "glyph": "♻",
+        "title": "Churny tables need vacuum headroom",
+        "body": "Queue tables create dead rows at the job rate. Tune autovacuum per table, or partition so old data is dropped instead of vacuumed."
+      },
+      {
+        "glyph": "🔍",
+        "title": "Find the horizon, not the hot query",
+        "body": "When CPU is high with no hot query, check pg_stat_activity for the oldest xact_start and the dead-but-not-removable counts."
+      },
+      {
+        "glyph": "✕",
+        "title": "Don't add workers into a full pool",
+        "body": "More consumers mean more connections competing for the same slow table. Fix cleanup first."
+      }
+    ]
+  }
+}
