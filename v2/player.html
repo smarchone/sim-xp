@@ -57,11 +57,13 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--p
 .zoombar #zoomPct{min-width:46px;border-left:1px solid var(--line);border-right:1px solid var(--line);font-variant-numeric:tabular-nums}
 #comp{cursor:grab;touch-action:none}#comp.panning{cursor:grabbing}
 .split{position:absolute;top:0;bottom:0;right:0;width:8px;cursor:col-resize;z-index:5;touch-action:none;outline:none}
+.split.l{right:auto;left:0}
 .split::after{content:"";position:absolute;top:0;bottom:0;left:5px;width:2px;border-radius:1px;background:var(--accent);opacity:0;transition:opacity .15s}
+.split.l::after{left:1px}
 .split:hover::after,.split:focus-visible::after,.split.drag::after{opacity:.7}
 .ph{display:flex;align-items:baseline;gap:8px;padding:6px 10px 2px;font-size:var(--s);font-weight:600;color:var(--muted);flex:none}
 .ph .hint,.fh .hint{font-weight:400;color:var(--faint)}
-.stagebox{position:relative;flex:1;min-height:0;padding:6px 8px 8px}
+.stagebox{position:relative;flex:1;min-height:0;padding:0}
 #comp{display:block;width:100%;height:100%;transform-origin:50% 0;transition:transform .38s cubic-bezier(.2,.8,.2,1)}
 #beatGo{white-space:nowrap}
 
@@ -102,8 +104,8 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--p
 .panel .why:hover .tip,.panel .why:focus-visible .tip{opacity:1;visibility:visible;transform:none}
 .panel .legend{display:flex;gap:10px;color:var(--faint);overflow:hidden}
 .panel .legend i{display:inline-block;width:10px;height:2px;margin-right:4px;vertical-align:middle}
-.panel .val{margin-left:auto;font:500 var(--m) var(--mono);font-variant-numeric:tabular-nums;text-align:right;color:var(--fg)}
-.panel .val small{font-size:var(--s);color:var(--faint);margin-left:4px}
+.panel .val{margin-left:auto;font:500 11.5px var(--mono);font-variant-numeric:tabular-nums;text-align:right;color:var(--fg)}
+.panel .val small{font-size:10px;color:var(--faint);margin-left:4px}
 .panel .val.warn{color:var(--amber)} .panel .val.bad{color:var(--red)}
 .plot{position:relative;flex:1;min-height:0}
 .plot svg{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
@@ -185,7 +187,7 @@ body:not(.hc) .rp-deep{display:none}
 .t{fill:var(--fg);font:600 var(--ct,16.4px) var(--sans)}
 .ts{fill:var(--muted);font:var(--cs,14px) var(--mono)}
 .tp{fill:var(--fg);font:500 var(--cs,14px) var(--mono)}
-.axis{fill:var(--faint);font:var(--s) var(--mono);font-variant-numeric:tabular-nums}
+.axis{fill:var(--faint);font:10px var(--mono);font-variant-numeric:tabular-nums}
 .alab{font:500 var(--s) var(--mono);paint-order:stroke;stroke:var(--panel);stroke-width:3px}
 .grid{stroke:var(--line);stroke-width:1}
 @keyframes pulse{0%,100%{opacity:var(--o1)}50%{opacity:var(--o2)}}
@@ -338,6 +340,7 @@ pre{font:var(--s)/1.5 var(--mono);background:var(--sunk);border-radius:8px;paddi
         <div class="row"><span class="small" style="flex:1">Speed</span><div class="seg" id="speedSeg"><button data-speed="2">0.5×</button><button data-speed="4">1×</button><button data-speed="8">2×</button><button data-speed="16">4×</button></div></div>
         <div class="row"><span class="small" style="flex:1">Theme</span><div class="seg" id="themeSeg"><button data-theme-set="system">Auto</button><button data-theme-set="light">Light</button><button data-theme-set="dark">Dark</button></div></div>
         <div class="row" id="detailRow" hidden><span class="small" style="flex:1" title="Hardcore shows the deeper layer of the same run: more charts, raw logs and commands, and a deep dive in the report">Detail <kbd>H</kbd></span><div class="seg" id="detailSeg"><button data-detail="standard">Standard</button><button data-detail="hardcore">Hardcore</button></div></div>
+        <div class="row"><span class="small" style="flex:1">Chart height</span><div class="seg" id="chSeg"><button data-ch="xs">XS</button><button data-ch="s">S</button><button data-ch="m">M</button><button data-ch="fill">Fill</button></div></div>
         <button class="mi" id="libraryBtn" role="menuitem">Open another playbook</button>
       </div>
     </div>
@@ -541,7 +544,7 @@ $("#zoomPct").onclick = () => resetView();
 // resize observers fire many times while a splitter is dragged; draw at most once per frame
 let renderQueued = false;
 const scheduleRender = () => { if (renderQueued) return; renderQueued = true; requestAnimationFrame(() => { renderQueued = false; render(); }); };
-const layoutScale = (key, w, h) => Math.min((w - 20) / LAYOUTS[key].vb[0], (h - 20) / LAYOUTS[key].vb[1]);
+const layoutScale = (key, w, h) => Math.min(w / LAYOUTS[key].vb[0], h / LAYOUTS[key].vb[1]);
 const pickLayout = () => {
   if (ONE_SCREEN.matches) {
     // pick whichever layout draws the graph larger; switch only when the other is clearly (8%) better, so dragging doesn't flicker
@@ -747,7 +750,7 @@ new ResizeObserver(() => { if (pickLayout() !== layoutKey) { buildComponents(); 
    - count metrics (rebalances) are events, not a curve: they become an event lane under the charts,
      and their steps (plus deploys) are drawn as annotations on every chart;
    - annotations and the event lane only show what has happened so far (no spoilers). */
-const PL = 58, PR = 14;
+const PL = 40, PR = 14;
 // one colour for data. In a multi-series panel the first series is the reference (e.g. produced) and is drawn quietly;
 // teal/violet/pink stay reserved for partition ownership in the components view
 const seriesColor = (P, i) => P.p.metrics.length > 1 && i === 0 ? "var(--muted)" : "var(--accent)";
@@ -813,7 +816,10 @@ function buildPanel(P) {
   // quiet frame: a baseline, one faint top line with the only y label, no vertical gridlines
   el("line", { x1: PL, x2: W - PR, y1: yOf(0), y2: yOf(0), class: "grid" }, svg);
   el("line", { x1: PL, x2: W - PR, y1: yOf(max), y2: yOf(max), class: "grid", opacity: 0.5 }, svg);
-  const tx = el("text", { x: PL - 6, y: yOf(max) + 4, class: "axis", "text-anchor": "end" }, svg); tx.textContent = fmtV(max, P.units);
+  // y labels: max and 0, plus the half when the chart is tall enough to keep them apart
+  const yl = (v, dy) => { const tx = el("text", { x: PL - 6, y: yOf(v) + dy, class: "axis", "text-anchor": "end" }, svg); tx.textContent = fmtV(v, P.units); };
+  yl(max, 4); yl(0, -2);
+  if (H >= 90) { el("line", { x1: PL, x2: W - PR, y1: yOf(max / 2), y2: yOf(max / 2), class: "grid", opacity: 0.3 }, svg); yl(max / 2, 4); }
   annos.forEach(a => { const g = el("g", {}, svg); el("line", { x1: xOf(a.t), x2: xOf(a.t), y1: PT, y2: H - PBm, stroke: a.kind === "deploy" ? "var(--faint)" : "var(--red)", "stroke-dasharray": "2 3", opacity: a.kind === "deploy" ? 0.8 : 0.45 }, g); P.annoEls.push({ t: a.t, g }); });
   if (P.p.threshold) {
     el("line", { x1: PL, x2: W - PR, y1: yOf(P.p.threshold.value), y2: yOf(P.p.threshold.value), stroke: "var(--red)", "stroke-dasharray": "5 4", opacity: 0.55 }, svg);
@@ -858,9 +864,9 @@ function renderPanels(playT, viewT) {
     const xOf = P.xOf;
     P.annoEls.forEach(a => (a.g.style.display = a.t <= playT ? "" : "none"));
     P.cur.setAttribute("x1", xOf(viewT)); P.cur.setAttribute("x2", xOf(viewT));
-    // at a key moment the time cursor itself is the indicator: accent and a little thicker on every chart
+    // at a key moment the time cursor itself is the indicator: amber (never the curve's blue) and a little thicker on every chart
     const hot = !!activeBeat && hoverT == null;
-    if (P._hot !== hot) { P._hot = hot; P.cur.setAttribute("stroke", hot ? "var(--accent)" : "var(--fg)"); P.cur.setAttribute("stroke-width", hot ? 2 : 1); P.cur.setAttribute("opacity", hot ? 1 : 0.5); }
+    if (P._hot !== hot) { P._hot = hot; P.cur.setAttribute("stroke", hot ? "var(--amber)" : "var(--fg)"); P.cur.setAttribute("stroke-width", hot ? 1.5 : 1); P.cur.setAttribute("opacity", hot ? 0.95 : 0.5); }
     if (P.kind === "lane") { placeNote(P, viewT); P.val.textContent = fmtV(at(P.p.metrics[0], viewT), "count"); return; }
     const step = Math.max(1, Math.round(D / (P.W - PL - PR) * 1.5));
     P.p.metrics.forEach((m, i) => {
@@ -933,9 +939,7 @@ feedEl.addEventListener("click", e => { const li = e.target.closest("li[data-t]"
 
 /* ===================== Caption (key moments only) ===================== */
 function fitAboveSheet(on) {
-  const sh = $("#caption"), box = comp.parentElement;
-  if (!on) { comp.style.transform = ""; return; }
-  requestAnimationFrame(() => { const H = box.clientHeight, free = H - sh.offsetHeight - 6; comp.style.transform = free > 60 && free < H ? `scale(${(free / H).toFixed(3)})` : ""; });
+  comp.style.transform = ""; // the sheet overlays the components; they keep their size
 }
 function setExpanded(on) { $("#caption").classList.toggle("expanded", on); $("#capMore").textContent = on ? "less" : "more"; $("#capMore").setAttribute("aria-expanded", String(on)); if (activeBeat) fitAboveSheet(true); }
 $("#capMore").onclick = () => setExpanded(!$("#caption").classList.contains("expanded"));
@@ -1146,6 +1150,20 @@ const LAYOUT = PB.meta.layout || {};
 // the viewer drags the vertical divider on the components tile's right edge: width 3 (default, narrow) to 6 of 12 columns, taken from the charts only
 const WKEY = "sim-xp.comp-cols", CMIN = 3, CMAX = 6;
 let compCols = CMIN;
+// the viewer drags the divider on the feed's left edge: 2 to 5 of 12 columns, taken from the charts only
+const FKEY = "sim-xp.feed-cols", FMIN = 2, FMAX = 5;
+let feedCols = 3;
+try { const v = +localStorage.getItem(FKEY); if (v >= FMIN && v <= FMAX) feedCols = v; } catch (e) { /* storage blocked */ }
+// chart row height: a preset in px, or Fill (rows share the screen, as the playbook's meta.layout says)
+const CHKEY = "sim-xp.chart-h", CH_PX = { xs: 96, s: 132, m: 180 };
+let chartH = "fill";
+try { const v = localStorage.getItem(CHKEY); if (v in CH_PX) chartH = v; } catch (e) { /* storage blocked */ }
+const setChartH = v => {
+  chartH = v in CH_PX ? v : "fill";
+  try { chartH === "fill" ? localStorage.removeItem(CHKEY) : localStorage.setItem(CHKEY, chartH); } catch (e) { /* storage blocked */ }
+  document.querySelectorAll("#chSeg [data-ch]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.ch === chartH)));
+  renderLayout();
+};
 try { const v = +localStorage.getItem(WKEY); if (v >= CMIN && v <= CMAX) compCols = v; } catch (e) { /* storage blocked */ }
 const setComp = v => {
   compCols = Math.max(CMIN, Math.min(CMAX, v));
@@ -1163,6 +1181,23 @@ split.onpointerdown = e => {
   split.onpointerup = split.onpointercancel = () => { split.classList.remove("drag"); split.onpointermove = split.onpointerup = split.onpointercancel = null; };
 };
 split.ondblclick = () => setComp(CMIN);
+const setFeed = v => {
+  feedCols = Math.max(FMIN, Math.min(FMAX, v));
+  try { feedCols === 3 ? localStorage.removeItem(FKEY) : localStorage.setItem(FKEY, feedCols.toFixed(2)); } catch (err) { /* storage blocked */ }
+  renderLayout();
+};
+const fsplit = document.createElement("div");
+fsplit.className = "split l"; fsplit.tabIndex = 0; fsplit.setAttribute("role", "separator"); fsplit.setAttribute("aria-orientation", "vertical");
+fsplit.setAttribute("aria-label", "Feed width (drag, or arrow keys; double-click resets)");
+tiles[1].appendChild(fsplit);
+fsplit.onpointerdown = e => {
+  e.preventDefault(); fsplit.setPointerCapture(e.pointerId); fsplit.classList.add("drag");
+  const x0 = e.clientX, f0 = feedCols, colW = board.clientWidth / COLS;
+  fsplit.onpointermove = m => setFeed(f0 - (m.clientX - x0) / colW);
+  fsplit.onpointerup = fsplit.onpointercancel = () => { fsplit.classList.remove("drag"); fsplit.onpointermove = fsplit.onpointerup = fsplit.onpointercancel = null; };
+};
+fsplit.ondblclick = () => setFeed(3);
+fsplit.onkeydown = e => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); e.stopPropagation(); setFeed(feedCols + (e.key === "ArrowLeft" ? 0.25 : -0.25)); } };
 split.onkeydown = e => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); e.stopPropagation(); setComp(compCols + (e.key === "ArrowRight" ? 0.25 : -0.25)); } };
 function renderLayout() {
   // a surfaced deep chart sits right after the standard charts of the same component, so related signals stay together
@@ -1183,12 +1218,13 @@ function renderLayout() {
     return;
   }
   const H = board.clientHeight, n = charts.length;
-  const cols = [1, 2, 3].includes(LAYOUT.columns) ? LAYOUT.columns : 2, CW = compCols, M = 12 - CW - 3, R = Math.max(1, Math.ceil(n / cols));
+  const cols = [1, 2, 3].includes(LAYOUT.columns) ? LAYOUT.columns : 2, CW = compCols, FC = feedCols, M = 12 - CW - FC, R = Math.max(1, Math.ceil(n / cols));
   let per = Number.isInteger(LAYOUT.rows) && LAYOUT.rows >= 1 ? LAYOUT.rows : Math.max(2, Math.min(5, R));
   per = Math.max(1, Math.min(per, R, Math.floor((H + GAP) / (MIN_H + GAP))));
-  const rh = (H - (per - 1) * GAP) / per, rows = R, tileH = Math.min(H, rows * rh + (rows - 1) * GAP);
+  const preset = CH_PX[chartH]; // a fixed row height keeps the two side tiles full height; the charts just get shorter
+  const rh = preset || (H - (per - 1) * GAP) / per, rows = R, tileH = preset ? H : Math.min(H, rows * rh + (rows - 1) * GAP);
   board.style.gridTemplateRows = `repeat(${rows}, ${rh}px)` + (quiet.length ? " max-content" : "");
-  board.style.gridTemplateColumns = `minmax(0,${CW}fr) repeat(${cols}, minmax(0,${M / cols}fr)) minmax(0,3fr)`;
+  board.style.gridTemplateColumns = `minmax(0,${CW}fr) repeat(${cols}, minmax(0,${M / cols}fr)) minmax(0,${FC}fr)`;
   [[tiles[0], 1], [tiles[1], cols + 2]].forEach(([e, x]) => { e.style.gridArea = `1 / ${x} / ${rows + 1} / ${x + 1}`; e.style.height = `${tileH}px`; e.classList.add("stick"); });
   charts.forEach((P, i) => { const r = Math.floor(i / cols) + 1, c = 2 + (i % cols); P.card.style.gridArea = `${r} / ${c} / ${r + 1} / ${c + 1}`; });
   quietEl.style.gridArea = `${rows + 1} / 2 / ${rows + 2} / ${cols + 2}`;
@@ -1206,6 +1242,8 @@ document.querySelectorAll("#detailSeg [data-detail]").forEach(b => (b.onclick = 
 document.querySelectorAll("#detailSeg [data-detail]").forEach(b => b.setAttribute("aria-pressed", String((b.dataset.detail === "hardcore") === HC)));
 new ResizeObserver(() => renderLayout()).observe(board);
 ONE_SCREEN.addEventListener("change", () => renderLayout());
+document.querySelectorAll("#chSeg [data-ch]").forEach(b => (b.onclick = () => setChartH(b.dataset.ch)));
+document.querySelectorAll("#chSeg [data-ch]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.ch === chartH)));
 document.querySelectorAll("#themeSeg [data-theme-set]").forEach(b => (b.onclick = () => applyTheme(b.dataset.themeSet, true)));
 applyTheme((() => { try { return localStorage.getItem(THEME_KEY); } catch (e) { return null; } })(), false);
 renderLayout();
