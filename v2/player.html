@@ -76,6 +76,8 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--p
 .feed li{transition:background .3s ease,box-shadow .3s ease,color .3s ease}
 .feed li.near{background:color-mix(in srgb,var(--accent) 12%,transparent);box-shadow:inset 3px 0 0 var(--accent)}
 .feed li.key{background:color-mix(in srgb,var(--amber) 9%,transparent);box-shadow:inset 2px 0 0 color-mix(in srgb,var(--amber) 70%,transparent)}
+/* current line on a key moment: keep the blue bar and ring, over the amber tint */
+.feed li.near.key{background:color-mix(in srgb,var(--accent) 12%,color-mix(in srgb,var(--amber) 9%,transparent));box-shadow:inset 3px 0 0 var(--accent),inset 0 0 0 1px color-mix(in srgb,var(--accent) 45%,transparent)}
 .feed li.key .txt{color:var(--fg)}
 .feed li.key .who{color:var(--fg);font-weight:500}
 .feed li.near .txt,.feed li.near .who{color:var(--fg)}
@@ -475,7 +477,7 @@ function stateAt(T) {
 const beatTimes = new Set(PB.timeline.filter(e => e.beat).map(e => e.t));
 const feedItems = PB.timeline.filter(e => e.feed).map(e => ({ t: e.t, ...e.feed })).concat(alertFeed).sort((a, b) => a.t - b.t);
 feedItems.forEach(f => (f.key = f.key === true || beatTimes.has(f.t) || f.kind === "alert" || f.kind === "resolved"));
-$("#feedCard").style.setProperty("--tcol", (Math.max(...feedItems.map(f => fmtT(f.t).length), 5) * 0.62 + 0.4).toFixed(1) + "em");
+$("#feedCard").style.setProperty("--tcol", (Math.max(...feedItems.map(f => fmtT(f.t).length), 5) * 0.62 + 1.4).toFixed(1) + "em");
 const beats = PB.timeline.filter(e => e.beat);
 // Detail: Standard or Hardcore. Hardcore reveals items the playbook tags level "deep"; the run itself never changes.
 const DETAIL_KEY = "sim-xp.detail";
