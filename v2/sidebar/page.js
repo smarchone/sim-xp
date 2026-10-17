@@ -16,6 +16,7 @@ const simxp = (window.simxp = {
 });
 const LAST = "sim-xp.last";   // the playbook played last, reopened on the next visit
 function play(pb, src = null) {   // src: the library source (key) the playbook came from, when it was loaded from a repo
+  if (!src && SEEDS.some((x) => JSON.stringify(x) === JSON.stringify(pb))) src = DEFAULT_SRC;   // the two bundled playbooks are copies of the default repo's
   simxp.current = pb; simxp.source = "box"; simxp.src = src;
   try { localStorage.setItem(LAST, JSON.stringify(pb)); } catch (e) { /* storage blocked: it starts on the default next time */ }
   stage.srcdoc = PLAYER_HTML + "<!-- " + Date.now() + " -->";
@@ -23,7 +24,7 @@ function play(pb, src = null) {   // src: the library source (key) the playbook 
 }
 // Mark the run in the address (#<playbook id>) and send a Google Analytics event. Both are best effort: the artifact has no gtag and may not allow history changes.
 function track(pb) {
-  const id = String(pb.meta.id), src = simxp.src && simxp.src !== DEFAULT_SRC ? simxp.src : "";   // #<id>, or #<owner/repo[@ref][/path]>:<id> for a repo that is not the default
+  const id = String(pb.meta.id), src = simxp.src || "";   // #<owner/repo[@ref][/path]>:<id> for a repo playbook (the default repo too), plain #<id> for one in the Saved list
   try { history.replaceState(null, "", "#" + (src ? encodeURI(src) + ":" : "") + encodeURIComponent(id)); } catch (e) { /* not allowed here (artifact frame) */ }
   try { if (typeof window.gtag === "function") window.gtag("event", "playbook_run", { playbook_id: id, playbook_title: pb.meta.title }); } catch (e) { /* analytics blocked */ }
 }
@@ -66,8 +67,7 @@ function refresh() {
     statusEl.textContent = `${last.errors.length} problem${last.errors.length === 1 ? "" : "s"}`; statusEl.classList.add("bad");
     for (const e of last.errors) { const li = document.createElement("li"); li.textContent = e; problemsEl.append(li); }
   } else {
-    const m = last.pb.meta, beats = (last.pb.timeline || []).filter((e) => e.beat).length;
-    statusEl.textContent = `valid · ${Math.round(m.duration_s / 60)} min · ${beats} key moments` + (last.warnings.length ? ` · ${last.warnings.length} warning${last.warnings.length === 1 ? "" : "s"}` : "");
+    statusEl.textContent = "valid" + (last.warnings.length ? ` · ${last.warnings.length} warning${last.warnings.length === 1 ? "" : "s"}` : "");
     statusEl.classList.add(last.warnings.length ? "warn" : "ok");
     statusEl.title = last.warnings.join("\n");
   }
@@ -83,6 +83,11 @@ function run() {
   refresh();
   if (last.empty || last.errors.length) return;
   const fromRepo = repoLoaded && repoLoaded.text === pbBox.value;   // a repo playbook stays in its repo; only what the person wrote or edited is saved
+  if (!fromRepo && repoLoaded && last.pb.meta.id === repoLoaded.id) {   // an edited copy never takes the repo playbook's id: its link and Saved entry stay its own
+    let id = repoLoaded.id + "-copy", n = 2;
+    while (library.has(docId({ meta: { id } }))) id = `${repoLoaded.id}-copy-${n++}`;
+    last.pb.meta.id = id; setBox(JSON.stringify(last.pb, null, 2));
+  }
   play(last.pb, fromRepo ? repoLoaded.src : null); setOpen(false);
   if (!fromRepo && last.pb.meta.id !== DEFAULT.meta.id) saveToLibrary(last.pb);
 }
@@ -151,7 +156,28 @@ if (storageOk) { savedEl.hidden = false; renderLibrary(); }
 // ---------- library: playbooks loaded from GitHub repos, on demand ----------
 // A source is a folder of playbook .json files plus an index.json listing them (format in v2/README.md). The panel fetches the index when
 // the Library is opened and a playbook only when it is clicked; nothing from a repo is copied into storage. Only the list of added repos is kept.
-const DEFAULT_SRC = "smarchone/simxp-playbooks@main", SRCS = "sim-xp.repos";
+const DEFAULT_SRC = "smarchone/simxp-playbooks", SRCS = "sim-xp.repos", CACHE = "sim-xp.cache", TTL = 7 * 24 * 3600 * 1000, CACHE_MAX = 20;
+// Fetched playbooks and indexes are kept for a week, apart from the Saved list. Newest 20 entries stay; a blocked or full storage just means no cache.
+function cacheGet(key) {
+  try { const e = JSON.parse(localStorage.getItem(CACHE) || "{}")[key]; return e && Date.now() - e.t < TTL ? e.v : null; } catch (err) { return null; }
+}
+function cachePut(key, v) {
+  try {
+    const all = JSON.parse(localStorage.getItem(CACHE) || "{}");
+    all[key] = { t: Date.now(), v };
+    const keep = Object.entries(all).filter(([, e]) => Date.now() - e.t < TTL).sort((a, b) => b[1].t - a[1].t).slice(0, CACHE_MAX);
+    localStorage.setItem(CACHE, JSON.stringify(Object.fromEntries(keep)));
+  } catch (err) { /* storage blocked or full: no cache */ }
+}
+async function getJson(url, fresh) {   // cached copy for a week; fresh skips it and refills it
+  const hit = fresh ? null : cacheGet(url);
+  if (hit) return hit;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(res.status === 404 ? "not found" : "GitHub answered " + res.status);
+  const j = await res.json();
+  cachePut(url, j);
+  return j;
+}
 function parseSrc(text) {   // "owner/repo", "owner/repo@ref", "owner/repo@ref/dir", or a github.com link (…/tree/<ref>/<dir>)
   let t = String(text).trim().replace(/^https?:\/\/(www\.)?github\.com\//, "").replace(/\.git(?=$|\/|@)/, "").replace(/\/+$/, "");
   const tree = t.match(/^([\w.-]+)\/([\w.-]+)\/tree\/([\w.-]+)(?:\/(.*))?$/);
@@ -173,14 +199,13 @@ function saveSources() { try { localStorage.setItem(SRCS, JSON.stringify(userSou
 addSource(DEFAULT_SRC);
 try { for (const k of JSON.parse(localStorage.getItem(SRCS) || "[]")) if (typeof k === "string") addSource(k); } catch (e) { /* none stored */ }
 const goodItem = (x) => x && typeof x === "object" && ["id", "file", "title"].every((k) => typeof x[k] === "string" && x[k]) && /^[\w.-]+(\/[\w.-]+)*\.json$/.test(x.file) && !x.file.split("/").includes("..");
-function loadIndex(src) {   // one fetch per source until it fails
-  if (src.promise) return src.promise;
+function loadIndex(src, fresh = false) {   // one load per source per visit until it fails; fresh refetches past the cache
+  if (src.promise && !fresh) return src.promise;
   src.state = "loading"; renderRepos();
   src.promise = (async () => {
     try {
-      const res = await fetch(src.base + "/index.json");
-      if (!res.ok) throw new Error(res.status === 404 ? "no index.json in that folder" : "GitHub answered " + res.status);
-      const j = await res.json(), list = Array.isArray(j) ? j : j && Array.isArray(j.playbooks) ? j.playbooks : null;
+      const j = await getJson(src.base + "/index.json", fresh).catch((e) => { throw new Error(e.message === "not found" ? "no index.json in that folder" : e.message); });
+      const list = Array.isArray(j) ? j : j && Array.isArray(j.playbooks) ? j.playbooks : null;
       if (!list) throw new Error("index.json must be a list of playbooks");
       src.items = list.filter(goodItem); src.state = "ok";
     } catch (e) { src.state = "err"; src.error = e instanceof SyntaxError ? "index.json is not valid JSON" : e.message || "could not reach GitHub"; src.promise = null; }
@@ -189,57 +214,63 @@ function loadIndex(src) {   // one fetch per source until it fails
   return src.promise;
 }
 async function fetchPlaybook(src, item) {
-  const res = await fetch(src.base + "/" + item.file);
-  if (!res.ok) throw new Error(`${item.file}: GitHub answered ${res.status}`);
-  const pb = await res.json(), r = validate(pb);
+  const pb = await getJson(src.base + "/" + item.file).catch((e) => { throw new Error(`${item.file}: ${e.message}`); }), r = validate(pb);
   if (r.errors.length) throw new Error(`${item.file} is not a valid playbook (${r.errors[0]})`);
   return pb;
 }
-let repoLoaded = null;   // { text, src }: what the box holds when it came from a repo unchanged
+let repoLoaded = null;   // { text, src, id }: what the box holds when it came from a repo unchanged
 async function openFromRepo(src, item, andRun) {
   try {
     const pb = await fetchPlaybook(src, item);
-    setBox(JSON.stringify(pb, null, 2)); repoLoaded = { text: pbBox.value, src: src.key };
+    setBox(JSON.stringify(pb, null, 2)); repoLoaded = { text: pbBox.value, src: src.key, id: pb.meta.id };
     if (andRun) run();
   } catch (e) { say("note", "Could not load that playbook: " + (e.message || "network error")); setOpen(true); }
 }
 const repoEl = $("repo"), repoList = $("repoList"), repoIn = $("repoIn");
+let openSrc = DEFAULT_SRC;   // the one import that is expanded
+const label = (src) => src.key === DEFAULT_SRC ? "sim-xp playbooks" : src.key;
+function expand(src) {
+  openSrc = openSrc === src.key ? null : src.key;
+  if (openSrc && (src.state === "idle" || (src.state === "err" && !src.promise))) loadIndex(src); else renderRepos();
+}
 function renderRepos() {
   repoList.replaceChildren();
   for (const src of sources.values()) {
-    const head = document.createElement("li"), name = document.createElement("b");
-    head.className = "src"; name.textContent = src.key === DEFAULT_SRC ? "sim-xp playbooks" : src.key; name.title = src.key;
-    const st = document.createElement("span");
+    const open = openSrc === src.key, head = document.createElement("li"), toggle = document.createElement("button"), name = document.createElement("b"), st = document.createElement("span");
+    head.className = "src"; toggle.className = "srctoggle"; toggle.setAttribute("aria-expanded", String(open)); toggle.title = src.key;
+    name.textContent = (open ? "▾ " : "▸ ") + label(src);
     st.textContent = src.state === "loading" ? "loading…" : src.state === "err" ? src.error : src.state === "ok" ? `${src.items.length}` : "";
     if (src.state === "err") st.className = "bad";
-    head.append(name, st);
+    toggle.append(name, st); toggle.onclick = () => expand(src);
+    head.append(toggle);
+    const refresh_ = document.createElement("button");
+    refresh_.textContent = "↻"; refresh_.title = "Fetch the list again (it is kept for a week)"; refresh_.setAttribute("aria-label", "Refresh " + label(src)); refresh_.onclick = () => { openSrc = src.key; loadIndex(src, true); };
+    head.append(refresh_);
     if (src.key !== DEFAULT_SRC) {
       const del = document.createElement("button");
       del.textContent = "✕"; del.title = "Remove this repo from the list"; del.setAttribute("aria-label", "Remove " + src.key);
-      del.onclick = () => { sources.delete(src.key); saveSources(); renderRepos(); };
+      del.onclick = () => { sources.delete(src.key); if (openSrc === src.key) openSrc = DEFAULT_SRC; saveSources(); renderRepos(); };
       head.append(del);
-    } else if (src.state === "err") {
-      const retry = document.createElement("button"); retry.textContent = "Retry"; retry.onclick = () => loadIndex(src); head.append(retry);
     }
     repoList.append(head);
+    if (!open) continue;
     for (const item of src.items) {
-      const li = document.createElement("li"), open = document.createElement("button"), go = document.createElement("button");
-      open.className = "pick"; open.title = item.story || "";
+      const li = document.createElement("li"), pick = document.createElement("button"), go = document.createElement("button");
+      pick.className = "pick"; pick.title = item.story || "";
       const b = document.createElement("b"), s = document.createElement("span");
-      b.textContent = item.title;
-      s.textContent = [item.duration_s ? Math.round(item.duration_s / 60) + " min" : "", item.key_moments ? item.key_moments + " key moments" : "", ...(Array.isArray(item.tags) ? item.tags.slice(0, 3) : [])].filter(Boolean).join(" · ");
-      open.append(b, s); open.onclick = () => openFromRepo(src, item, false);
+      b.textContent = item.title; s.textContent = Array.isArray(item.tags) ? item.tags.slice(0, 3).join(" · ") : "";
+      pick.append(b); if (s.textContent) pick.append(s); pick.onclick = () => openFromRepo(src, item, false);
       go.textContent = "▶"; go.title = "Load and run"; go.setAttribute("aria-label", "Load and run " + item.title); go.onclick = () => openFromRepo(src, item, true);
-      li.append(open, go); repoList.append(li);
+      li.append(pick, go); repoList.append(li);
     }
   }
 }
 renderRepos();
-repoEl.addEventListener("toggle", () => { if (repoEl.open) for (const src of sources.values()) if (src.state === "idle" || (src.state === "err" && !src.promise && src.key !== DEFAULT_SRC)) loadIndex(src); });
+repoEl.addEventListener("toggle", () => { const src = sources.get(openSrc); if (repoEl.open && src && src.state === "idle") loadIndex(src); });
 function addRepoFromInput() {
   const src = addSource(repoIn.value);
   if (!src) { say("note", "That is not a repo. Write it as owner/repo, owner/repo@branch/folder, or paste its github.com link."); setOpen(true); return; }
-  repoIn.value = ""; saveSources(); loadIndex(src);
+  repoIn.value = ""; saveSources(); openSrc = src.key; loadIndex(src, true);
 }
 $("repoAdd").onclick = addRepoFromInput;
 repoIn.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); addRepoFromInput(); } });
@@ -374,12 +405,14 @@ function hashTarget() {
   const i = h.indexOf(":");
   return i > 0 ? { src: h.slice(0, i), id: h.slice(i + 1) } : { src: null, id: h };
 }
-function playbookFromHash() {   // what is already here: the saved copy, else a bundled one
+function playbookFromHash() {   // what is already here: #<id> is the saved copy, else a bundled one (older links); #<default repo>:<id> is the bundled copy, with no fetch
   const t = hashTarget();
-  if (!t || t.src) return null;
+  if (!t || (t.src && t.src !== DEFAULT_SRC)) return null;
   let pb = null;
-  const saved = library.get(docId({ meta: { id: t.id } }));
-  try { pb = saved ? JSON.parse(saved.json) : null; } catch (e) { /* unreadable saved copy */ }
+  if (!t.src) {
+    const saved = library.get(docId({ meta: { id: t.id } }));
+    try { pb = saved ? JSON.parse(saved.json) : null; } catch (e) { /* unreadable saved copy */ }
+  }
   pb = pb || SEEDS.find((s) => s.meta.id === t.id) || null;
   return pb && !validate(pb).errors.length ? pb : null;
 }
@@ -394,7 +427,7 @@ async function playFromRepoHash(t) {   // a repo playbook: the named repo, else 
 }
 function openHash() {
   const t = hashTarget();
-  if (!t || (simxp.current && simxp.current.meta.id === t.id)) return;
+  if (!t || (simxp.current && simxp.current.meta.id === t.id && (t.src || null) === (simxp.src || null))) return;
   const pb = playbookFromHash();
   if (pb) { setBox(JSON.stringify(pb, null, 2)); repoLoaded = null; play(last.pb); } else playFromRepoHash(t);
 }
