@@ -25,7 +25,7 @@ The side panel (right, collapsible, resizable) has four parts:
 |---|---|
 | Chat | Ask Claude for a playbook, or for a change to the one in the box. Only works in the Claude artifact; elsewhere it says so. |
 | Playbook box | The JSON that **Run** plays. Paste into it, open a file, drop a file on the page, or let Claude write it. Shows the validator's result live. |
-| Library | Playbooks listed from GitHub repos ([smarchone/simxp-playbooks](https://github.com/smarchone/simxp-playbooks) by default; add any other with `owner/repo`). Each repo is a collapsible group (one open at a time, ↻ refetches its list, ✕ removes it). Click a playbook to load it into the box, ▶ to load and run. What is fetched is cached for a week, apart from Saved; the list of repos you added is kept too. |
+| Library | Playbooks listed from GitHub repos ([smarchone/simxp-playbooks](https://github.com/smarchone/simxp-playbooks) by default; add any other with `owner/repo`). Each repo is a collapsible group (one open at a time, ↻ refetches its list, ✕ removes it). Click a playbook to load it into the box, ▶ to load and run. The list (`index.json`) is fetched fresh on each visit; each playbook you open is cached for a week, apart from Saved; the list of repos you added is kept too. |
 | Saved | Up to 20 playbooks you made (written by Claude, pasted, or opened from a file) kept in this browser's storage. Click to load, ▶ to load and run, ⤓ to export, ✕ to delete. |
 
 In the player, Space plays and pauses, ←/→ jump between key moments, R opens the report, H switches Hardcore detail.

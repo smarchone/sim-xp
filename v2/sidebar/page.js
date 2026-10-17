@@ -157,7 +157,7 @@ if (storageOk) { savedEl.hidden = false; renderLibrary(); }
 // A source is a folder of playbook .json files plus an index.json listing them (format in v2/README.md). The panel fetches the index when
 // the Library is opened and a playbook only when it is clicked; nothing from a repo is copied into storage. Only the list of added repos is kept.
 const DEFAULT_SRC = "smarchone/simxp-playbooks", SRCS = "sim-xp.repos", CACHE = "sim-xp.cache", TTL = 7 * 24 * 3600 * 1000, CACHE_MAX = 20;
-// Fetched playbooks and indexes are kept for a week, apart from the Saved list. Newest 20 entries stay; a blocked or full storage just means no cache.
+// Fetched playbooks are kept for a week, apart from the Saved list; an index.json is always fetched fresh. Newest 20 entries stay; a blocked or full storage just means no cache.
 function cacheGet(key) {
   try { const e = JSON.parse(localStorage.getItem(CACHE) || "{}")[key]; return e && Date.now() - e.t < TTL ? e.v : null; } catch (err) { return null; }
 }
@@ -169,13 +169,13 @@ function cachePut(key, v) {
     localStorage.setItem(CACHE, JSON.stringify(Object.fromEntries(keep)));
   } catch (err) { /* storage blocked or full: no cache */ }
 }
-async function getJson(url, fresh) {   // cached copy for a week; fresh skips it and refills it
-  const hit = fresh ? null : cacheGet(url);
+async function getJson(url, keep) {   // keep: a copy is kept for a week and used next time; without it the browser revalidates every time
+  const hit = keep ? cacheGet(url) : null;
   if (hit) return hit;
-  const res = await fetch(url);
+  const res = await fetch(url, keep ? undefined : { cache: "no-cache" });
   if (!res.ok) throw new Error(res.status === 404 ? "not found" : "GitHub answered " + res.status);
   const j = await res.json();
-  cachePut(url, j);
+  if (keep) cachePut(url, j);
   return j;
 }
 function parseSrc(text) {   // "owner/repo", "owner/repo@ref", "owner/repo@ref/dir", or a github.com link (…/tree/<ref>/<dir>)
@@ -199,12 +199,12 @@ function saveSources() { try { localStorage.setItem(SRCS, JSON.stringify(userSou
 addSource(DEFAULT_SRC);
 try { for (const k of JSON.parse(localStorage.getItem(SRCS) || "[]")) if (typeof k === "string") addSource(k); } catch (e) { /* none stored */ }
 const goodItem = (x) => x && typeof x === "object" && ["id", "file", "title"].every((k) => typeof x[k] === "string" && x[k]) && /^[\w.-]+(\/[\w.-]+)*\.json$/.test(x.file) && !x.file.split("/").includes("..");
-function loadIndex(src, fresh = false) {   // one load per source per visit until it fails; fresh refetches past the cache
-  if (src.promise && !fresh) return src.promise;
+function loadIndex(src, again = false) {   // one fetch per source per visit until it fails; again fetches it once more
+  if (src.promise && !again) return src.promise;
   src.state = "loading"; renderRepos();
   src.promise = (async () => {
     try {
-      const j = await getJson(src.base + "/index.json", fresh).catch((e) => { throw new Error(e.message === "not found" ? "no index.json in that folder" : e.message); });
+      const j = await getJson(src.base + "/index.json").catch((e) => { throw new Error(e.message === "not found" ? "no index.json in that folder" : e.message); });
       const list = Array.isArray(j) ? j : j && Array.isArray(j.playbooks) ? j.playbooks : null;
       if (!list) throw new Error("index.json must be a list of playbooks");
       src.items = list.filter(goodItem); src.state = "ok";
@@ -214,7 +214,7 @@ function loadIndex(src, fresh = false) {   // one load per source per visit unti
   return src.promise;
 }
 async function fetchPlaybook(src, item) {
-  const pb = await getJson(src.base + "/" + item.file).catch((e) => { throw new Error(`${item.file}: ${e.message}`); }), r = validate(pb);
+  const pb = await getJson(src.base + "/" + item.file, true).catch((e) => { throw new Error(`${item.file}: ${e.message}`); }), r = validate(pb);
   if (r.errors.length) throw new Error(`${item.file} is not a valid playbook (${r.errors[0]})`);
   return pb;
 }
@@ -244,7 +244,7 @@ function renderRepos() {
     toggle.append(name, st); toggle.onclick = () => expand(src);
     head.append(toggle);
     const refresh_ = document.createElement("button");
-    refresh_.textContent = "↻"; refresh_.title = "Fetch the list again (it is kept for a week)"; refresh_.setAttribute("aria-label", "Refresh " + label(src)); refresh_.onclick = () => { openSrc = src.key; loadIndex(src, true); };
+    refresh_.textContent = "↻"; refresh_.title = "Fetch the list again"; refresh_.setAttribute("aria-label", "Refresh " + label(src)); refresh_.onclick = () => { openSrc = src.key; loadIndex(src, true); };
     head.append(refresh_);
     if (src.key !== DEFAULT_SRC) {
       const del = document.createElement("button");
