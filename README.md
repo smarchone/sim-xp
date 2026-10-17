@@ -39,10 +39,13 @@ Then give it a story in Claude Code:
 Open the file in the [player](https://smarchone.github.io/sim-xp/v2/) (drop it on the page, or *Open file…* in
 the side panel) and press Space.
 
-## Playbooks
+## Share your playbook library
 
-Ready-made playbooks: [smarchone/simxp-playbooks](https://github.com/smarchone/simxp-playbooks). Load one by link
-(`https://smarchone.github.io/sim-xp/v2/#smarchone/simxp-playbooks:postgres-queue-load-test`) or import a repo from *Library* in the
-player (`owner/repo`). Share yours the same way: a public repo of playbooks. Details: [`v2/README.md`](v2/README.md#playbook-repos-the-library).
+A library is a public GitHub repo of playbooks. Mine is [smarchone/simxp-playbooks](https://github.com/smarchone/simxp-playbooks);
+copy its layout for yours.
+
+Others open it in the [player](https://smarchone.github.io/sim-xp/v2/): side panel → *Library* → type the repo name → Add.
+Or send a link to one playbook:
+https://smarchone.github.io/sim-xp/v2/#smarchone/simxp-playbooks:postgres-queue-load-test
 
 Part of [agentic experiences](https://smarchone.github.io/agentic-experiences): accelerate learning with agents.
