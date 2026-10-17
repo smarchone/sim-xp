@@ -39,13 +39,11 @@ Then give it a story in Claude Code:
 Open the file in the [player](https://smarchone.github.io/sim-xp/v2/) (drop it on the page, or *Open file…* in
 the side panel) and press Space.
 
-## Share and import playbooks
+## Playbooks
 
-- **Share:** put playbook files and an `index.json` in a public GitHub repo ([simxp-playbooks](https://github.com/smarchone/simxp-playbooks) has `node build-index.mjs` to write the index).
-- **Import:** in the player, open *Library*, type `owner/repo` (or `owner/repo@branch/folder`) and press Add. Playbooks load on click and are cached for a week.
-- **Link:** `https://smarchone.github.io/sim-xp/v2/#smarchone/simxp-playbooks:postgres-queue-load-test` works without importing first.
-
-Index format: [`v2/README.md`](v2/README.md#playbook-repos-the-library).
+Ready-made playbooks: [smarchone/simxp-playbooks](https://github.com/smarchone/simxp-playbooks). Load one by link
+(`https://smarchone.github.io/sim-xp/v2/#smarchone/simxp-playbooks:postgres-queue-load-test`) or import a repo from *Library* in the
+player (`owner/repo`). Share yours the same way: a public repo of playbooks. Details: [`v2/README.md`](v2/README.md#playbook-repos-the-library).
 
 ## In this repo
 
