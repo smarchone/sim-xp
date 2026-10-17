@@ -25,7 +25,7 @@ The side panel (right, collapsible, resizable) has four parts:
 |---|---|
 | Chat | Ask Claude for a playbook, or for a change to the one in the box. Only works in the Claude artifact; elsewhere it says so. |
 | Playbook box | The JSON that **Run** plays. Paste into it, open a file, drop a file on the page, or let Claude write it. Shows the validator's result live. |
-| Library | Playbooks listed from GitHub repos (this repo's `v2/playbooks` by default; add any other with `owner/repo`). Click to load into the box, ▶ to load and run. Nothing is copied into storage; only the list of repos you added is kept. |
+| Library | Playbooks listed from GitHub repos ([smarchone/simxp-playbooks](https://github.com/smarchone/simxp-playbooks) by default; add any other with `owner/repo`). Click to load into the box, ▶ to load and run. Nothing is copied into storage; only the list of repos you added is kept. |
 | Saved | Up to 20 playbooks you made (written by Claude, pasted, or opened from a file) kept in this browser's storage. Click to load, ▶ to load and run, ⤓ to export, ✕ to delete. |
 
 In the player, Space plays and pauses, ←/→ jump between key moments, R opens the report, H switches Hardcore detail.
@@ -36,7 +36,7 @@ A playbook repo is a folder of playbook `.json` files and an `index.json` next t
 `https://raw.githubusercontent.com/<owner>/<repo>/<ref>/<folder>/index.json` when the Library opens, and a playbook only when it is clicked.
 Add a repo as `owner/repo` (default branch, root folder), `owner/repo@branch/folder`, or paste its github.com link.
 
-`index.json` is a list; each entry is one playbook:
+`index.json` is a list; each entry is one playbook. It is generated: in simxp-playbooks, `node build-index.mjs` writes it from the playbook files and CI checks it is current.
 
 ```json
 [
@@ -83,7 +83,7 @@ Pages deploys itself on every push to `main` (`.github/workflows/pages.yml`).
 | `sidebar/` | The side panel: `page.html`, `page.css`, `page.js` (chat, playbook box, Saved list, drop and export) |
 | `js/playbook.js` | Symlink to the skill's validator (`../.claude/skills/story-to-playbook/scripts/playbook.js`), shared by the panel, the skill and the tests |
 | `js/tools.js` | WebMCP tools that let an agent drive a page that exposes them. Kept for reference, not part of the build |
-| `playbooks/` | The default library: the playbooks and their `index.json` (read from `main` on GitHub at run time; the build bundles only the default and the format example); the Kafka rebalance one is a symlink to the skill's example |
+| `playbooks/` | The playbooks the build bundles, and a copy of the library's `index.json` (the build bundles only the default and the format example; the full library now lives in simxp-playbooks); the Kafka rebalance one is a symlink to the skill's example |
 | `test/` | Tests: validator, bundled playbooks, the build |
 | `../.claude/skills/story-to-playbook/` | The skill: format, authoring rules, one example, and the validator (`node scripts/validate.mjs pb.json [--at 60,120]`) |
 
