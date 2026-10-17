@@ -25,7 +25,7 @@ The side panel (right, collapsible, resizable) has four parts:
 |---|---|
 | Chat | Ask Claude for a playbook, or for a change to the one in the box. Only works in the Claude artifact; elsewhere it says so. |
 | Playbook box | The JSON that **Run** plays. Paste into it, open a file, drop a file on the page, or let Claude write it. Shows the validator's result live. |
-| Library | Playbooks listed from GitHub repos ([smarchone/simxp-playbooks](https://github.com/smarchone/simxp-playbooks) by default; add any other with `owner/repo`). Click to load into the box, ▶ to load and run. Nothing is copied into storage; only the list of repos you added is kept. |
+| Library | Playbooks listed from GitHub repos ([smarchone/simxp-playbooks](https://github.com/smarchone/simxp-playbooks) by default; add any other with `owner/repo`). Each repo is a collapsible group (one open at a time, ↻ refetches its list, ✕ removes it). Click a playbook to load it into the box, ▶ to load and run. What is fetched is cached for a week, apart from Saved; the list of repos you added is kept too. |
 | Saved | Up to 20 playbooks you made (written by Claude, pasted, or opened from a file) kept in this browser's storage. Click to load, ▶ to load and run, ⤓ to export, ✕ to delete. |
 
 In the player, Space plays and pauses, ←/→ jump between key moments, R opens the report, H switches Hardcore detail.
@@ -54,7 +54,7 @@ Add a repo as `owner/repo` (default branch, root folder), `owner/repo@branch/fol
 
 `id` (must equal the playbook's `meta.id`), `file` (a path inside the folder, ending in `.json`) and `title` are required; the rest is shown in the list when present. A playbook is validated before it is loaded, so a bad file shows a message instead of running. `{"playbooks": [...]}` is accepted too.
 
-The address picks the playbook: `#<id>` looks in your Saved list, then the bundled two, then the default repo and any repos you added; `#<owner/repo[@ref][/folder]>:<id>` names the repo, so a link works for someone who has not added it. With no id the last playbook played opens.
+The address picks the playbook. A repo playbook's link always names its repo, the default repo too: `#smarchone/simxp-playbooks:<id>` or `#<owner/repo[@ref][/folder]>:<id>`, so it works for someone who has not added the repo and two repos can share an id. A plain `#<id>` is a playbook in your Saved list (older links also fall back to the bundled two and the repos). Editing a repo playbook and running it saves a copy under a new id (`<id>-copy`). With no id the last playbook played opens.
 
 ## Develop
 
