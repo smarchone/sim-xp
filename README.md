@@ -39,10 +39,17 @@ Then give it a story in Claude Code:
 Open the file in the [player](https://smarchone.github.io/sim-xp/v2/) (drop it on the page, or *Open file…* in
 the side panel) and press Space.
 
-## Playbooks
+## Ready-made playbooks
 
-Ready-made playbooks: [smarchone/simxp-playbooks](https://github.com/smarchone/simxp-playbooks). Load one by link
-(`https://smarchone.github.io/sim-xp/v2/#smarchone/simxp-playbooks:postgres-queue-load-test`) or import a repo from *Library* in the
-player (`owner/repo`). Share yours the same way: a public repo of playbooks. Details: [`v2/README.md`](v2/README.md#playbook-repos-the-library).
+A collection of playbooks lives in the GitHub repo [smarchone/simxp-playbooks](https://github.com/smarchone/simxp-playbooks).
+There are two ways to play one:
+
+1. **Open its link.** Each playbook has a link that opens it straight in the player, for example
+   https://smarchone.github.io/sim-xp/v2/#smarchone/simxp-playbooks:postgres-queue-load-test
+2. **Browse the list in the player.** Open the [player](https://smarchone.github.io/sim-xp/v2/), open the side panel on the
+   right, and expand *Library*. The playbooks from this repo are listed there; click one to play it.
+
+**Sharing your own:** put your playbooks in a public GitHub repo, laid out like simxp-playbooks. Anyone can add it in
+*Library* by typing the repo name (for example `your-name/your-playbooks`) and pressing Add.
 
 Part of [agentic experiences](https://smarchone.github.io/agentic-experiences): accelerate learning with agents.
