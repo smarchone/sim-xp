@@ -28,6 +28,14 @@
         <button type="button" id="saveBtn" hidden>Save .json</button>
         <button type="button" id="runBtn" class="primary">Run ▶</button>
       </div>
+      <details class="saved" id="repo">
+        <summary>Library <span class="hint">from GitHub</span></summary>
+        <ul id="repoList"></ul>
+        <div class="repoadd">
+          <input id="repoIn" type="text" autocomplete="off" placeholder="Add a repo: owner/repo or owner/repo@branch/folder" aria-label="GitHub repo of playbooks">
+          <button type="button" id="repoAdd">Add</button>
+        </div>
+      </details>
       <details class="saved" id="saved" hidden>
         <summary>Saved <span id="savedCount"></span></summary>
         <ul id="savedList"></ul>

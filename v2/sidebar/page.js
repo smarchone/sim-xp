@@ -1,6 +1,6 @@
 // sim-xp as an artifact: the player fills the page. A chat bar asks Claude (the viewer's own Claude, through the `sample`
 // capability) to write a playbook into the playbook box; Run plays whatever is in the box.
-// Globals the build adds above this file: PLAYER_HTML, SEEDS (the bundled playbooks), EXAMPLE (the format reference Claude reads), DEFAULT (the playbook the box starts with),
+// Globals the build adds above this file: PLAYER_HTML, SEEDS (the two bundled playbooks: the default and the format example; every other playbook is loaded from a GitHub repo on demand), EXAMPLE (the format reference Claude reads), DEFAULT (the playbook the box starts with),
 // SPEC (the format and authoring rules), __playbook (the validator).
 const { validate } = __playbook;
 const $ = (id) => document.getElementById(id);
@@ -15,16 +15,16 @@ const simxp = (window.simxp = {
   onPlayerEvent(type) { if (type === "ready") stage.contentWindow.focus(); },
 });
 const LAST = "sim-xp.last";   // the playbook played last, reopened on the next visit
-function play(pb) {
-  simxp.current = pb; simxp.source = "box";
+function play(pb, src = null) {   // src: the library source (key) the playbook came from, when it was loaded from a repo
+  simxp.current = pb; simxp.source = "box"; simxp.src = src;
   try { localStorage.setItem(LAST, JSON.stringify(pb)); } catch (e) { /* storage blocked: it starts on the default next time */ }
   stage.srcdoc = PLAYER_HTML + "<!-- " + Date.now() + " -->";
   track(pb);
 }
 // Mark the run in the address (#<playbook id>) and send a Google Analytics event. Both are best effort: the artifact has no gtag and may not allow history changes.
 function track(pb) {
-  const id = String(pb.meta.id);
-  try { history.replaceState(null, "", "#" + encodeURIComponent(id)); } catch (e) { /* not allowed here (artifact frame) */ }
+  const id = String(pb.meta.id), src = simxp.src && simxp.src !== DEFAULT_SRC ? simxp.src : "";   // #<id>, or #<owner/repo[@ref][/path]>:<id> for a repo that is not the default
+  try { history.replaceState(null, "", "#" + (src ? encodeURI(src) + ":" : "") + encodeURIComponent(id)); } catch (e) { /* not allowed here (artifact frame) */ }
   try { if (typeof window.gtag === "function") window.gtag("event", "playbook_run", { playbook_id: id, playbook_title: pb.meta.title }); } catch (e) { /* analytics blocked */ }
 }
 
@@ -82,8 +82,9 @@ function setBox(text) { pbBox.value = text; refresh(); }
 function run() {
   refresh();
   if (last.empty || last.errors.length) return;
-  play(last.pb); setOpen(false);
-  if (last.pb.meta.id !== DEFAULT.meta.id) saveToLibrary(last.pb);
+  const fromRepo = repoLoaded && repoLoaded.text === pbBox.value;   // a repo playbook stays in its repo; only what the person wrote or edited is saved
+  play(last.pb, fromRepo ? repoLoaded.src : null); setOpen(false);
+  if (!fromRepo && last.pb.meta.id !== DEFAULT.meta.id) saveToLibrary(last.pb);
 }
 runBtn.onclick = run;
 
@@ -102,17 +103,6 @@ function persist() {
 }
 const docId = (pb) => "pb_" + String(pb.meta.id).replace(/[^A-Za-z0-9_-]/g, "-").slice(0, 100);
 const entryOf = (pb, updated) => ({ title: pb.meta.title, story: pb.meta.story, duration_s: pb.meta.duration_s, beats: (pb.timeline || []).filter((e) => e.beat).length, updated, json: JSON.stringify(pb) });
-// The bundled playbooks are put into the list on a first visit, and again on "Restore examples". They fill free slots only, after the person's own.
-function addSeeds() {
-  let added = 0, full = false;
-  for (const [i, pb] of SEEDS.entries()) {
-    const id = docId(pb);
-    if (library.has(id)) continue;
-    if (library.size >= MAX_SAVED) { full = true; break; }
-    library.set(id, entryOf(pb, Date.now() - i * 1000)); added++;
-  }
-  return { added, full };
-}
 function saveToLibrary(pb) {
   if (!storageOk) return false;
   const json = JSON.stringify(pb), id = docId(pb), old = library.get(id);
@@ -130,15 +120,7 @@ function saveToLibrary(pb) {
 function renderLibrary() {
   savedList.replaceChildren();
   $("savedCount").textContent = library.size ? `(${library.size} of ${MAX_SAVED})` : "";
-  const foot = document.createElement("li"), restore = document.createElement("button");
-  foot.className = "foot"; restore.textContent = "Restore examples"; restore.title = "Put the bundled examples back into the list";
-  restore.onclick = () => {
-    const r = addSeeds();
-    if (r.added) { persist(); renderLibrary(); }
-    else say("note", r.full ? `Your list holds ${MAX_SAVED} playbooks. Delete one to restore the examples.` : "All the examples are already in your list.");
-  };
-  foot.append(restore);
-  if (!library.size) { const li = document.createElement("li"); li.className = "empty"; li.textContent = "Playbooks Claude writes, and files you run, are kept here, in this browser only."; savedList.append(li); savedList.append(foot); return; }
+  if (!library.size) { const li = document.createElement("li"); li.className = "empty"; li.textContent = "Playbooks Claude writes, and files you run, are kept here, in this browser only."; savedList.append(li); return; }
   for (const [id, x] of library) {
     const li = document.createElement("li"), open = document.createElement("button"), play_ = document.createElement("button"), del = document.createElement("button");
     open.className = "pick"; open.title = x.story || "";
@@ -163,14 +145,104 @@ function renderLibrary() {
     };
     li.append(del); savedList.append(li);
   }
-  savedList.append(foot);
 }
-if (storageOk) {
-  let seeded = false;
-  try { seeded = localStorage.getItem("sim-xp.seeded") === "1"; } catch (e) { /* storage blocked */ }
-  if (!seeded) { addSeeds(); persist(); try { localStorage.setItem("sim-xp.seeded", "1"); } catch (e) { /* storage blocked */ } }
-  savedEl.hidden = false; renderLibrary();
+if (storageOk) { savedEl.hidden = false; renderLibrary(); }
+
+// ---------- library: playbooks loaded from GitHub repos, on demand ----------
+// A source is a folder of playbook .json files plus an index.json listing them (format in v2/README.md). The panel fetches the index when
+// the Library is opened and a playbook only when it is clicked; nothing from a repo is copied into storage. Only the list of added repos is kept.
+const DEFAULT_SRC = "smarchone/sim-xp@main/v2/playbooks", SRCS = "sim-xp.repos";
+function parseSrc(text) {   // "owner/repo", "owner/repo@ref", "owner/repo@ref/dir", or a github.com link (…/tree/<ref>/<dir>)
+  let t = String(text).trim().replace(/^https?:\/\/(www\.)?github\.com\//, "").replace(/\.git(?=$|\/|@)/, "").replace(/\/+$/, "");
+  const tree = t.match(/^([\w.-]+)\/([\w.-]+)\/tree\/([\w.-]+)(?:\/(.*))?$/);
+  if (tree) t = `${tree[1]}/${tree[2]}@${tree[3]}` + (tree[4] ? "/" + tree[4] : "");
+  const m = t.match(/^([\w.-]+)\/([\w.-]+?)(?:@([\w.-]+))?(?:\/([\w./-]+))?$/);
+  if (!m || (m[4] || "").split("/").includes("..")) return null;
+  const [, owner, repo, ref = "HEAD", dir = ""] = m;
+  return { key: `${owner}/${repo}` + (m[3] ? "@" + ref : "") + (dir ? "/" + dir : ""), base: `https://raw.githubusercontent.com/${owner}/${repo}/${ref}` + (dir ? "/" + dir : "") };
 }
+const sources = new Map();   // key -> { key, base, items, state: "idle" | "loading" | "ok" | "err", error, promise }
+function addSource(text) {
+  const p = parseSrc(text);
+  if (!p) return null;
+  if (!sources.has(p.key)) sources.set(p.key, { ...p, items: [], state: "idle", error: "" });
+  return sources.get(p.key);
+}
+const userSources = () => [...sources.keys()].filter((k) => k !== DEFAULT_SRC);
+function saveSources() { try { localStorage.setItem(SRCS, JSON.stringify(userSources())); } catch (e) { /* storage blocked: added repos last this visit only */ } }
+addSource(DEFAULT_SRC);
+try { for (const k of JSON.parse(localStorage.getItem(SRCS) || "[]")) if (typeof k === "string") addSource(k); } catch (e) { /* none stored */ }
+const goodItem = (x) => x && typeof x === "object" && ["id", "file", "title"].every((k) => typeof x[k] === "string" && x[k]) && /^[\w.-]+(\/[\w.-]+)*\.json$/.test(x.file) && !x.file.split("/").includes("..");
+function loadIndex(src) {   // one fetch per source until it fails
+  if (src.promise) return src.promise;
+  src.state = "loading"; renderRepos();
+  src.promise = (async () => {
+    try {
+      const res = await fetch(src.base + "/index.json");
+      if (!res.ok) throw new Error(res.status === 404 ? "no index.json in that folder" : "GitHub answered " + res.status);
+      const j = await res.json(), list = Array.isArray(j) ? j : j && Array.isArray(j.playbooks) ? j.playbooks : null;
+      if (!list) throw new Error("index.json must be a list of playbooks");
+      src.items = list.filter(goodItem); src.state = "ok";
+    } catch (e) { src.state = "err"; src.error = e instanceof SyntaxError ? "index.json is not valid JSON" : e.message || "could not reach GitHub"; src.promise = null; }
+    renderRepos(); return src;
+  })();
+  return src.promise;
+}
+async function fetchPlaybook(src, item) {
+  const res = await fetch(src.base + "/" + item.file);
+  if (!res.ok) throw new Error(`${item.file}: GitHub answered ${res.status}`);
+  const pb = await res.json(), r = validate(pb);
+  if (r.errors.length) throw new Error(`${item.file} is not a valid playbook (${r.errors[0]})`);
+  return pb;
+}
+let repoLoaded = null;   // { text, src }: what the box holds when it came from a repo unchanged
+async function openFromRepo(src, item, andRun) {
+  try {
+    const pb = await fetchPlaybook(src, item);
+    setBox(JSON.stringify(pb, null, 2)); repoLoaded = { text: pbBox.value, src: src.key };
+    if (andRun) run();
+  } catch (e) { say("note", "Could not load that playbook: " + (e.message || "network error")); setOpen(true); }
+}
+const repoEl = $("repo"), repoList = $("repoList"), repoIn = $("repoIn");
+function renderRepos() {
+  repoList.replaceChildren();
+  for (const src of sources.values()) {
+    const head = document.createElement("li"), name = document.createElement("b");
+    head.className = "src"; name.textContent = src.key === DEFAULT_SRC ? "sim-xp examples" : src.key; name.title = src.key;
+    const st = document.createElement("span");
+    st.textContent = src.state === "loading" ? "loading…" : src.state === "err" ? src.error : src.state === "ok" ? `${src.items.length}` : "";
+    if (src.state === "err") st.className = "bad";
+    head.append(name, st);
+    if (src.key !== DEFAULT_SRC) {
+      const del = document.createElement("button");
+      del.textContent = "✕"; del.title = "Remove this repo from the list"; del.setAttribute("aria-label", "Remove " + src.key);
+      del.onclick = () => { sources.delete(src.key); saveSources(); renderRepos(); };
+      head.append(del);
+    } else if (src.state === "err") {
+      const retry = document.createElement("button"); retry.textContent = "Retry"; retry.onclick = () => loadIndex(src); head.append(retry);
+    }
+    repoList.append(head);
+    for (const item of src.items) {
+      const li = document.createElement("li"), open = document.createElement("button"), go = document.createElement("button");
+      open.className = "pick"; open.title = item.story || "";
+      const b = document.createElement("b"), s = document.createElement("span");
+      b.textContent = item.title;
+      s.textContent = [item.duration_s ? Math.round(item.duration_s / 60) + " min" : "", item.key_moments ? item.key_moments + " key moments" : "", ...(Array.isArray(item.tags) ? item.tags.slice(0, 3) : [])].filter(Boolean).join(" · ");
+      open.append(b, s); open.onclick = () => openFromRepo(src, item, false);
+      go.textContent = "▶"; go.title = "Load and run"; go.setAttribute("aria-label", "Load and run " + item.title); go.onclick = () => openFromRepo(src, item, true);
+      li.append(open, go); repoList.append(li);
+    }
+  }
+}
+renderRepos();
+repoEl.addEventListener("toggle", () => { if (repoEl.open) for (const src of sources.values()) if (src.state === "idle" || (src.state === "err" && !src.promise && src.key !== DEFAULT_SRC)) loadIndex(src); });
+function addRepoFromInput() {
+  const src = addSource(repoIn.value);
+  if (!src) { say("note", "That is not a repo. Write it as owner/repo, owner/repo@branch/folder, or paste its github.com link."); setOpen(true); return; }
+  repoIn.value = ""; saveSources(); loadIndex(src);
+}
+$("repoAdd").onclick = addRepoFromInput;
+repoIn.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); addRepoFromInput(); } });
 
 // ---------- files in and out ----------
 async function openText(text, name) {
@@ -295,20 +367,38 @@ askEl.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey 
 stopBtn.onclick = () => ctl && ctl.abort();
 
 // ---------- start: put the default playbook in the box and play it ----------
-// The box starts with the playbook named by the address (#<id>: the saved copy, else the bundled one). With no usable id it is the last playbook played here (the saved copy, else the bundled one, else what was stored), or the default on a first visit.
-function playbookFromHash() {
-  let id = ""; try { id = decodeURIComponent(location.hash.slice(1)); } catch (e) { return null; }
-  if (!id) return null;
+// The box starts with the playbook named by the address (#<id>: the saved copy, else a bundled one, else the one with that id in a repo; #<repo>:<id> for a repo that is not the default). With no usable id it is the last playbook played here (the saved copy, else the bundled one, else what was stored), or the default on a first visit.
+function hashTarget() {
+  let h = ""; try { h = decodeURIComponent(location.hash.slice(1)); } catch (e) { return null; }
+  if (!h) return null;
+  const i = h.indexOf(":");
+  return i > 0 ? { src: h.slice(0, i), id: h.slice(i + 1) } : { src: null, id: h };
+}
+function playbookFromHash() {   // what is already here: the saved copy, else a bundled one
+  const t = hashTarget();
+  if (!t || t.src) return null;
   let pb = null;
-  const saved = library.get(docId({ meta: { id } }));
+  const saved = library.get(docId({ meta: { id: t.id } }));
   try { pb = saved ? JSON.parse(saved.json) : null; } catch (e) { /* unreadable saved copy */ }
-  pb = pb || SEEDS.find((s) => s.meta.id === id) || null;
+  pb = pb || SEEDS.find((s) => s.meta.id === t.id) || null;
   return pb && !validate(pb).errors.length ? pb : null;
 }
-window.addEventListener("hashchange", () => {   // the person edited the address or used Back
+async function playFromRepoHash(t) {   // a repo playbook: the named repo, else the default one, then the repos added here
+  const wanted = t.src ? addSource(t.src) : null;
+  if (t.src && !wanted) return;
+  for (const src of wanted ? [wanted] : sources.values()) {
+    await loadIndex(src);
+    const item = src.items.find((x) => x.id === t.id);
+    if (item) { await openFromRepo(src, item, true); return; }
+  }
+}
+function openHash() {
+  const t = hashTarget();
+  if (!t || (simxp.current && simxp.current.meta.id === t.id)) return;
   const pb = playbookFromHash();
-  if (pb && (!simxp.current || simxp.current.meta.id !== pb.meta.id)) { setBox(JSON.stringify(pb, null, 2)); play(last.pb); }
-});
+  if (pb) { setBox(JSON.stringify(pb, null, 2)); repoLoaded = null; play(last.pb); } else playFromRepoHash(t);
+}
+window.addEventListener("hashchange", openHash);   // the person edited the address or used Back
 function startingPlaybook() {
   const fromHash = playbookFromHash(); if (fromHash) return fromHash;
   try {
@@ -322,8 +412,10 @@ function startingPlaybook() {
   } catch (e) { /* nothing stored */ }
   return DEFAULT;
 }
+const startTarget = hashTarget() && !playbookFromHash() ? hashTarget() : null;   // an id in the address that is not saved or bundled; read before the first play rewrites the address
 setBox(JSON.stringify(startingPlaybook(), null, 2));
 if (!last.errors.length) play(last.pb);
+if (startTarget) playFromRepoHash(startTarget);   // named in the address but not here: fetch it from a repo
 (async () => {
   try { sample = await window.claude?.use?.("sample"); } catch (e) { sample = null; }
   if (!sample) { askEl.disabled = true; sendBtn.disabled = true; askEl.placeholder = "Chat needs Claude. Paste or open a playbook instead."; say("note", "Chat with Claude only works in the sim-xp Claude artifact. Here you can paste or open a playbook, run it, and keep up to 20 in the Saved list."); }
