@@ -28,6 +28,6 @@ test("the script parses and carries only the two bundled playbooks; the rest loa
   const index = JSON.parse(fs.readFileSync(new URL("../playbooks/index.json", import.meta.url), "utf8"));
   const bundled = ["kafka-load-test-until-it-breaks", "kafka-rebalance-storm"];
   for (const p of index) assert.equal(script.includes(`"id":"${p.id}"`), bundled.includes(p.id), `${p.id} is ${bundled.includes(p.id) ? "" : "not "}bundled`);
-  assert.ok(script.includes("raw.githubusercontent.com") && script.includes('const DEFAULT_SRC = "smarchone/sim-xp@main/v2/playbooks"'));
+  assert.ok(script.includes("raw.githubusercontent.com") && script.includes('const DEFAULT_SRC = "smarchone/simxp-playbooks@main"'));
   assert.ok(script.includes("const DEFAULT = SEEDS.find") && script.includes("const EXAMPLE = SEEDS.find"));
 });

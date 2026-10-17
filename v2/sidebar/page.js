@@ -151,7 +151,7 @@ if (storageOk) { savedEl.hidden = false; renderLibrary(); }
 // ---------- library: playbooks loaded from GitHub repos, on demand ----------
 // A source is a folder of playbook .json files plus an index.json listing them (format in v2/README.md). The panel fetches the index when
 // the Library is opened and a playbook only when it is clicked; nothing from a repo is copied into storage. Only the list of added repos is kept.
-const DEFAULT_SRC = "smarchone/sim-xp@main/v2/playbooks", SRCS = "sim-xp.repos";
+const DEFAULT_SRC = "smarchone/simxp-playbooks@main", SRCS = "sim-xp.repos";
 function parseSrc(text) {   // "owner/repo", "owner/repo@ref", "owner/repo@ref/dir", or a github.com link (…/tree/<ref>/<dir>)
   let t = String(text).trim().replace(/^https?:\/\/(www\.)?github\.com\//, "").replace(/\.git(?=$|\/|@)/, "").replace(/\/+$/, "");
   const tree = t.match(/^([\w.-]+)\/([\w.-]+)\/tree\/([\w.-]+)(?:\/(.*))?$/);
@@ -208,7 +208,7 @@ function renderRepos() {
   repoList.replaceChildren();
   for (const src of sources.values()) {
     const head = document.createElement("li"), name = document.createElement("b");
-    head.className = "src"; name.textContent = src.key === DEFAULT_SRC ? "sim-xp examples" : src.key; name.title = src.key;
+    head.className = "src"; name.textContent = src.key === DEFAULT_SRC ? "sim-xp playbooks" : src.key; name.title = src.key;
     const st = document.createElement("span");
     st.textContent = src.state === "loading" ? "loading…" : src.state === "err" ? src.error : src.state === "ok" ? `${src.items.length}` : "";
     if (src.state === "err") st.className = "bad";
