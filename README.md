@@ -39,19 +39,10 @@ Then give it a story in Claude Code:
 Open the file in the [player](https://smarchone.github.io/sim-xp/v2/) (drop it on the page, or *Open file…* in
 the side panel) and press Space.
 
-## Share and import playbooks
+## Playbooks
 
-- **Share:** put playbook files and an `index.json` in a public GitHub repo ([simxp-playbooks](https://github.com/smarchone/simxp-playbooks) has `node build-index.mjs` to write the index).
-- **Import:** in the player, open *Library*, type `owner/repo` (or `owner/repo@branch/folder`) and press Add. Playbooks load on click and are cached for a week.
-- **Link:** `https://smarchone.github.io/sim-xp/v2/#smarchone/simxp-playbooks:postgres-queue-load-test` works without importing first.
-
-Index format: [`v2/README.md`](v2/README.md#playbook-repos-the-library).
-
-## In this repo
-
-- [`v2/`](v2/): the player, side panel and bundled playbooks, built into one file.
-- [`docs/`](docs/): the landing page, served at the site root.
-- [`.claude/skills/story-to-playbook/`](.claude/skills/story-to-playbook/): the skill.
-- [`mvp/`](mvp/) (deprecated): incident drills you operate yourself. Not deployed; kept for reference.
+Ready-made playbooks: [smarchone/simxp-playbooks](https://github.com/smarchone/simxp-playbooks). Load one by link
+(`https://smarchone.github.io/sim-xp/v2/#smarchone/simxp-playbooks:postgres-queue-load-test`) or import a repo from *Library* in the
+player (`owner/repo`). Share yours the same way: a public repo of playbooks. Details: [`v2/README.md`](v2/README.md#playbook-repos-the-library).
 
 Part of [agentic experiences](https://smarchone.github.io/agentic-experiences): accelerate learning with agents.
