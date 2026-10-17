@@ -45,11 +45,4 @@ Ready-made playbooks: [smarchone/simxp-playbooks](https://github.com/smarchone/s
 (`https://smarchone.github.io/sim-xp/v2/#smarchone/simxp-playbooks:postgres-queue-load-test`) or import a repo from *Library* in the
 player (`owner/repo`). Share yours the same way: a public repo of playbooks. Details: [`v2/README.md`](v2/README.md#playbook-repos-the-library).
 
-## In this repo
-
-- [`v2/`](v2/): the player, side panel and bundled playbooks, built into one file.
-- [`docs/`](docs/): the landing page, served at the site root.
-- [`.claude/skills/story-to-playbook/`](.claude/skills/story-to-playbook/): the skill.
-- [`mvp/`](mvp/) (deprecated): incident drills you operate yourself. Not deployed; kept for reference.
-
 Part of [agentic experiences](https://smarchone.github.io/agentic-experiences): accelerate learning with agents.
