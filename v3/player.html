@@ -591,6 +591,153 @@ body{padding:0}
 .hicon:hover{border:0;color:var(--fg);background:var(--sunk)}
 
 .hbtn[aria-pressed="true"]{background:color-mix(in srgb,var(--accent) 16%,transparent);border-color:var(--accent);color:var(--accent)}
+
+/* component filter: a slim row of chips above the charts */
+.cfilter{flex:none;display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:2px 2px 0}
+.cf-l{font-size:12px;color:var(--muted);margin-right:2px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:3px 10px;border-radius:999px;background:none;border:1px solid var(--line2);color:var(--muted)}
+.chip small{font:500 10.5px var(--mono);color:var(--faint)}
+.chip:hover{color:var(--fg);border-color:var(--fg)}
+.chip[aria-pressed="true"]{color:var(--fg);background:var(--sunk);border-color:var(--accent)}
+.chip[aria-pressed="true"] small{color:var(--accent)}
+.chip.attn{position:relative;color:var(--fg);border-color:var(--amber)}
+.chip.attn::after{content:"";position:absolute;top:-3px;right:-3px;width:8px;height:8px;border-radius:50%;background:var(--amber);animation:pulse 1.4s ease-in-out infinite;--o1:1;--o2:.35}
+
+/* the key-moment banner fits three lines of explanation */
+.kmrow .banner.sheet{height:106px}
+.kmrow .banner .strip{height:104px}
+.kmrow .banner .sb{grid-template-rows:auto minmax(0,1fr)}
+
+/* 1b. the dashboard, explained */
+.mbrief{max-width:1400px;margin:0 auto;padding:8px 32px 56px}
+.mbrief h2{margin:0 0 4px;font-size:20px;font-weight:600;letter-spacing:-.01em}
+.mbrief > .small{margin:0 0 18px;font-size:13.5px}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;align-items:start}
+.mcard{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px 6px}
+.mcard header{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.mcard header b{font-size:15px;font-weight:600}
+.mcard header span{font-size:12.5px;color:var(--muted)}
+.mcard ul{list-style:none;margin:0;padding:0}
+.mcard li{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}
+.mcard li:last-child{border-bottom:0}
+.mcard li .wnum{margin-top:2px}
+.mcard li > div{min-width:0;flex:1}
+.mt{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mt b{font-size:14px;font-weight:500}
+.mth{font:500 10.5px var(--mono);color:var(--red);border:1px solid color-mix(in srgb,var(--red) 40%,transparent);border-radius:2px;padding:0 5px;line-height:16px}
+.mcard li p{margin:4px 0 0;font-size:13.5px;line-height:1.55;color:var(--muted);text-wrap:pretty}
+
+/* the dashboard, explained: one compact table */
+.mgrid{display:block}
+.mtable{width:100%;border-collapse:collapse;font-size:13px}
+.mtable thead th{text-align:left;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:0 12px 8px 0;border-bottom:1px solid var(--line2)}
+.mtable td,.mtable tbody th{padding:7px 12px 7px 0;vertical-align:top;border-bottom:1px solid var(--line);text-align:left}
+.mtable tbody th{font-weight:600;color:var(--fg);white-space:nowrap}
+.mtable tr.g0 td,.mtable tr.g0 th{border-top:1px solid var(--line2)}
+.mtable .mc{white-space:nowrap;font-weight:500;color:var(--fg)}
+.mtable .mc .wnum{margin-right:6px;vertical-align:1px}
+.mtable .mu{font:12px var(--mono);color:var(--muted);white-space:nowrap;width:1%}
+.mtable td.mth{font:12px var(--mono);color:var(--red);white-space:nowrap;width:1%;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:7px 12px 7px 0;line-height:inherit}
+.mtable .mw{color:var(--muted);line-height:1.5}
+.wnum.blank{visibility:hidden}
+
+/* component name in the dashboard table: a description on hover or focus */
+.chost{position:relative;cursor:help;border-bottom:1px dotted var(--faint);outline:none}
+.chost:focus-visible{border-bottom-color:var(--accent)}
+.ctip{position:absolute;left:0;top:calc(100% + 8px);z-index:20;width:300px;padding:10px 12px;border-radius:6px;background:var(--panel);border:1px solid var(--line2);box-shadow:0 10px 28px rgba(0,0,0,.45);font-weight:400;white-space:normal;color:var(--fg);opacity:0;visibility:hidden;transform:translateY(-3px);transition:opacity .15s,transform .15s,visibility .15s;pointer-events:none}
+.chost:hover .ctip,.chost:focus .ctip{opacity:1;visibility:visible;transform:none}
+.ctip b{display:block;font-size:13.5px;font-weight:600;margin-bottom:4px}
+.ctip p{margin:0 0 6px;font-size:13px;line-height:1.45;color:var(--fg)}
+.ctip .ck{display:inline-block;font:11px var(--mono);color:var(--muted);background:var(--sunk);border-radius:2px;padding:1px 6px;margin-bottom:6px}
+.ctip dl{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin:2px 0 0;font-size:12px}
+.ctip dt{color:var(--muted)} .ctip dd{margin:0;font-family:var(--mono);color:var(--fg)}
+
+/* the dashboard table reads in a narrow column */
+.mtable{max-width:880px}
+.mtable .mw{max-width:60ch}
+
+/* the dashboard table and its heading sit centred on the page */
+.mbrief{max-width:944px}
+.mtable{margin:0 auto}
+
+/* last column: wraps in a comfortable measure, no lone last words */
+.mtable{width:auto;padding-right:0}
+.mtable td:last-child,.mtable th:last-child{padding-right:0}
+.mtable .mw{white-space:normal}
+.mtable .mw > div{max-width:48ch;text-wrap:pretty;overflow-wrap:break-word}
+
+/* the section is as wide as its table, centred, so the heading lines up with the table */
+.mbrief{width:fit-content;max-width:944px;box-sizing:content-box;padding-left:32px;padding-right:32px}
+.mbrief .mtable{margin:0}
+
+/* key-moment explanation as points */
+.kpts{margin:0;padding:0 0 0 16px;display:flex;flex-direction:column;gap:1px}
+.kpts li{padding-left:2px;line-height:1.4}
+.kpts li::marker{color:var(--tone,var(--accent))}
+
+.kmrow .banner .sb{grid-template-rows:auto auto;align-content:start}
+.kmrow .banner .sb p{overflow:visible}
+
+/* a taller key-moment banner makes the player taller, never the charts smaller */
+
+
+/* the result as slides */
+.deck{display:flex;flex-direction:column;gap:14px}
+.deck-top{display:flex;align-items:baseline;justify-content:space-between}
+.deck-n{font:500 12px var(--mono);color:var(--muted)}
+.deck-stage{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:30px 36px}
+.slide{display:flex;flex-direction:column;gap:14px;animation:slideIn .28s ease-out}
+@keyframes slideIn{from{opacity:0;transform:translateX(10px)}}
+@media (prefers-reduced-motion:reduce){.slide{animation:none}}
+.sl-k{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--accent)}
+.sl-big{margin:0;font-size:21px;line-height:1.5;color:var(--fg);text-wrap:pretty;font-weight:450}
+.sl-t{margin:0;font-size:24px;font-weight:600;line-height:1.25;letter-spacing:-.01em;text-wrap:balance}
+.sl-p{margin:0;font-size:16.5px;line-height:1.6;color:var(--fg);text-wrap:pretty}
+.slide .rp-num{font-size:15px} .slide .rp-num td{padding:9px 0}
+.slide .rp-chain li{font-size:15px}
+.sl-ol{margin:0;padding-left:20px;font-size:15px;line-height:1.6}
+.deck-nav{display:flex;align-items:center;justify-content:center;gap:14px}
+.dnav{width:36px;height:36px;padding:0;border-radius:50%;font-size:20px;line-height:1;display:grid;place-items:center;background:none;border-color:var(--line2);color:var(--fg)}
+.dnav:disabled{opacity:.3;cursor:default}
+.dots{display:flex;gap:8px}
+.dot{width:9px;height:9px;padding:0;border-radius:50%;border:0;background:var(--line2)}
+.dot:hover{background:var(--muted);border:0}
+.dot[aria-current="true"]{background:var(--accent);width:22px;border-radius:5px}
+
+.deck-stage{display:flex;flex-direction:column}
+.slide{flex:1;justify-content:center}
+.slide .sl-k{margin-bottom:2px}
+
+/* v3: the frame is the dashboard only; the component filter sits above it and the key moments below, outside the frame */
+@media (min-width:1000px) and (min-height:600px){
+  .simwrap{height:auto;align-items:stretch;margin:20px auto 4dvh;scroll-margin-top:12px}
+  .simcol{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+  .app.feed-off .simwrap .simcol{flex:none;width:calc(100% - clamp(300px,24vw,380px) - 12px)}
+  .simwrap .sim{flex:none;height:min(80dvh,880px);width:100%}
+  .chatcol{height:auto}
+}
+.app.feed-off .simwrap .sim{width:100%}
+.simcol > .cfilter{padding:0 2px}
+.simcol > .kmrow{flex:none}
+
+/* Medium-style section break: three spaced dots, centred */
+.sep{display:block;text-align:center;color:var(--muted);font-size:26px;line-height:1;letter-spacing:.9em;padding:28px 0 32px .9em;user-select:none}
+.mbrief{padding-top:0}
+.result{padding-top:16px}
+
+.brief{min-height:0!important;padding-bottom:8px}
+
+.mbrief{padding-bottom:8px}
+@media (min-width:1000px) and (min-height:600px){ .simwrap{margin-top:0;margin-bottom:8px} }
+
+/* under ~14" (narrower than 1500px): the wide gap goes, and the two columns keep their size and move in toward the centre */
+@media (max-width:1499px) and (min-width:1000px) and (min-height:600px){ .brief{column-gap:32px;width:90%;max-width:none;margin-left:auto;margin-right:auto} }
+
+.res-k{color:#e5484d;font-weight:600}
+.rlock b.res-k{color:#e5484d}
+
+/* the result slides are slide-shaped: 16:9, content centred (taller when a slide needs more) */
+.deck-stage{aspect-ratio:16 / 9;padding:36px 48px;justify-content:center}
 </style>
 </head>
 <body>
@@ -614,8 +761,17 @@ body{padding:0}
     </figure>
   </section>
 
+  <div class="sep" role="separator" aria-hidden="true">···</div>
+  <!-- 1b. The dashboard, explained: per component, each chart and why it matters. Still reading, before the run. -->
+  <section class="sec mbrief" id="metricsSec" aria-label="What each chart on the dashboard tells you">
+    <div class="mgrid" id="mgrid"></div>
+  </section>
+
+  <div class="sep" role="separator" aria-hidden="true">···</div>
   <!-- 2. Run: one screen. Dashboard left, the system and the events right. Charts never move; key moments only highlight. -->
   <div class="simwrap" id="simWrap">
+  <div class="simcol">
+    <div class="cfilter" id="cfilter" role="group" aria-label="Show the charts of one component" hidden></div>
   <section class="sec sim" id="simSec" aria-label="Simulation">
     <div class="progress" id="progress" aria-hidden="true" hidden><i></i></div>
     <h2 class="simtitle" id="pbTitle" hidden></h2>
@@ -628,18 +784,6 @@ body{padding:0}
         <div class="lanes" id="dash" aria-label="Events"></div>
       </div>
     </main>
-    <div class="kmrow">
-        <div class="sheet banner expanded" id="caption" aria-live="polite">
-        <div class="strip" id="sheetStrip"></div>
-        <div class="sb">
-          <div class="top"><span class="tn" id="capTone" hidden><i></i><b></b></span><span class="eb" id="capK"></span></div>
-          <h3 id="capT"></h3>
-          <div class="foot"><button class="more" id="capMore" aria-expanded="true" hidden>explain</button><kbd>Space</kbd><button class="primary" id="beatGo" tabindex="-1">Continue ▶</button></div>
-          <p id="capH"></p>
-          <ol class="wlist" id="capList" hidden></ol>
-        </div>
-      </div>
-    </div>
     <div class="vbar" id="vbar">
       <div class="scrub" id="scrub" role="slider" tabindex="0" aria-label="Seek" aria-valuemin="0">
         <div class="chaps" id="chaps"></div>
@@ -689,6 +833,19 @@ body{padding:0}
       </div>
     </div>
   </section>
+    <div class="kmrow">
+        <div class="sheet banner expanded" id="caption" aria-live="polite">
+        <div class="strip" id="sheetStrip"></div>
+        <div class="sb">
+          <div class="top"><span class="tn" id="capTone" hidden><i></i><b></b></span><span class="eb" id="capK"></span></div>
+          <h3 id="capT"></h3>
+          <div class="foot"><button class="more" id="capMore" aria-expanded="true" hidden>explain</button><kbd>Space</kbd><button class="primary" id="beatGo" tabindex="-1">Continue ▶</button></div>
+          <p id="capH"></p>
+          <ol class="wlist" id="capList" hidden></ol>
+        </div>
+      </div>
+    </div>
+  </div>
   <aside class="chatcol" id="chatCol" aria-label="Live events">
         <div class="pn feed dimmable" data-pn="feed" data-id="feed" id="feedCard">
           <div class="fh"><b>Live events</b><span class="hint">the team’s chat, logs and alerts</span></div>
@@ -697,9 +854,10 @@ body{padding:0}
   </aside>
   </div>
 
+  <div class="sep" role="separator" aria-hidden="true">···</div>
   <!-- 3. Result: reading again. Locked until the run ends, so a scroll cannot give the answer away. -->
   <section class="sec result" id="resultSec" aria-label="Result">
-    <div class="rlock" id="resLock"><b>The result</b><span>Finish the run to read what happened.</span></div>
+    <div class="rlock" id="resLock"><b class="res-k">The result</b><span>Finish the run to read what happened.</span></div>
     <div class="report-in" id="report" hidden></div>
   </section>
 </div>
@@ -1255,7 +1413,9 @@ function revealTime(P) {
   return revealAt.has(P.p.id) ? revealAt.get(P.p.id) : 0;
 }
 const reached = P => P.kind !== "chart" || revealTime(P) <= playT + 0.5 || (!!activeBeat && revealTime(P) <= activeBeat.t);
-const panelShown = P => P.deep ? HC : true;   // v3: a fixed board, so nothing jumps while the student is reading it
+// v3: a fixed board, so nothing jumps while the student is reading it; the component filter (chips above the charts) narrows it on request
+let compFilter = null;
+const panelShown = P => (P.deep ? HC : true) && (compFilter == null || P.kind !== "chart" || (P.p.component || "") === compFilter);
 const quietPanels = () => [];
 function renderPanels(playT, viewT) {
   panels.forEach(P => {
@@ -1371,7 +1531,7 @@ const isOpen = el => !el.hidden && !el.classList.contains("leaving");
    The live value, big, coloured by its alert (firing red, pending amber, else green), its normal range, and a small trend so far. */
 const gauges = (() => {
   const norm = x => String(x || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(), box = $("#gauges");
-  const list = watchList().map((w, i) => {
+  const list = [].map((w, i) => {   // v3: no gauges; the numbered charts carry the watched signals
     const ms = w.P.p.metrics, k = ms.findIndex(m => norm(metricById[m].label) === norm(w.label)), m = ms[k >= 0 ? k : 0];
     const tile = document.createElement("div"); tile.className = "pn gauge"; tile.dataset.id = "panel:" + w.P.p.id;
     tile.innerHTML = `<div class="g-h"><span class="wnum">${i + 1}</span><b>${esc(w.label)}</b></div><div class="g-row"><span class="g-v"></span><svg class="g-s" viewBox="0 0 120 30" preserveAspectRatio="none"><polygon class="g-a"/><polyline class="g-l"/></svg></div><div class="g-n">${esc(w.normal)}</div>`;
@@ -1505,6 +1665,29 @@ function setPlaying(p) {
   if (ready) renderHud(viewT());
 }
 function seek(t) { hideBeat(); playT = Math.max(0, Math.min(D, t)); hoverT = null; shownT = playT; render(); }
+/* ===================== Component filter: All, or the charts of one component ===================== */
+const cfilterEl = $("#cfilter");
+function buildFilter() {
+  const comps = [];
+  panels.filter(P => P.kind === "chart" && (!P.deep || HC)).forEach(P => { const k = P.p.component || ""; if (!comps.includes(k)) comps.push(k); });
+  cfilterEl.hidden = comps.length < 2;
+  const label = k => k ? (PB.components.nodes.find(n => n.id === k) || { label: k }).label : "other";
+  const count = k => panels.filter(P => P.kind === "chart" && (!P.deep || HC) && (P.p.component || "") === k).length;
+  cfilterEl.innerHTML = `<span class="cf-l">Charts</span>` + [null, ...comps].map(k => `<button class="chip" data-c="${k == null ? "*" : esc(k)}" aria-pressed="${compFilter === k}">${k == null ? "All" : esc(label(k))}<small>${k == null ? panels.filter(P => P.kind === "chart" && (!P.deep || HC)).length : count(k)}</small></button>`).join("");
+  markFilter();
+}
+function markFilter() {   // a key moment pointing at charts the filter hides: a pulsing dot on their component's chip
+  const want = new Set(activeBeat ? [...(activeBeat.beat.notes || []).map(n => n.panel), ...(activeBeat.beat.focus || []).filter(id => id.startsWith("panel:")).map(id => id.slice(6))] : []);
+  cfilterEl.querySelectorAll(".chip").forEach(b => {
+    const k = b.dataset.c === "*" ? null : b.dataset.c;
+    b.setAttribute("aria-pressed", String(compFilter === k));
+    const hiddenHere = k != null && compFilter !== k && compFilter != null && panels.some(P => P.kind === "chart" && want.has(P.p.id) && (P.p.component || "") === k);
+    b.classList.toggle("attn", hiddenHere || (k == null && compFilter != null && panels.some(P => want.has(P.p.id) && !panelShown(P))));
+  });
+}
+cfilterEl.addEventListener("click", e => { const b = e.target.closest(".chip"); if (!b) return; compFilter = b.dataset.c === "*" ? null : b.dataset.c; markFilter(); render(); if (activeBeat) applyFocus(activeBeat); });
+buildFilter();
+
 function applyFocus(e) {
   document.querySelectorAll(".dimmable").forEach(d => d.classList.remove("focused"));
   $("#compCard").classList.add("focused");
@@ -1523,13 +1706,30 @@ function showBeat(e) {
   applyFocus(e);
   render();
   revealFocusedPanels(e);
-  renderHud(viewT());
+  renderHud(viewT()); markFilter();
   const b = $("#caption"); b.classList.remove("arrive"); void b.offsetWidth; b.classList.add("arrive");   // slide in with a glow, once
 }
 
+// the explanation as points: one per sentence (a full stop, ! or ? followed by a space and a capital, digit or quote)
+const toPoints = t => String(t || "").split(/(?<=[.!?])\s+(?=[A-Z0-9'"(“‘])/).map(x => x.trim()).filter(Boolean);
 function setCapHint(e) {
-  const h = $("#capH"); h.textContent = e.beat.hint;
+  const h = $("#capH"), pts = toPoints(e.beat.hint);
+  h.innerHTML = pts.length > 1 ? `<ul class="kpts">${pts.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : esc(e.beat.hint || "");
   if (HC && e.beat.deep) { const d = document.createElement("span"); d.className = "dh"; d.textContent = e.beat.deep; h.appendChild(d); }
+}
+// the banner is as tall as this playbook's longest key moment needs, measured once (and again when the width changes),
+// so it never overflows and never changes height during the run
+function fitBanner() {
+  const cap = $("#caption"), p = $("#capH"), row = cap.closest(".kmrow"); if (!row || !beats.length) return;
+  const keep = p.innerHTML, wasOpen = cap.classList.contains("open");
+  cap.style.height = "auto"; cap.classList.add("open"); p.style.overflow = "visible";
+  let need = 0;
+  beats.forEach(e => { setCapHint(e); need = Math.max(need, cap.scrollHeight); });
+  p.innerHTML = keep; p.style.overflow = ""; if (!wasOpen) cap.classList.remove("open");
+  const h = Math.max(106, Math.ceil(need) + 4) + "px";
+  cap.style.height = h; cap.querySelector(".strip").style.height = `calc(${h} - 2px)`;
+  // the frame grows by what the banner needs beyond its base height, so the charts keep their size
+
 }
 // a focused panel that is scrolled out of the dashboard pane is brought into view
 function revealFocusedPanels(e) {
@@ -1562,8 +1762,9 @@ function endBrief() {
   $("#app").classList.remove("focus-mode"); $("#caption").classList.remove("open"); $("#beatGo").tabIndex = -1;
 }
 function hideBeat() {
-  endBrief();
+  endBrief(); $("#caption").classList.remove("arrive");   // the arrival glow plays once, on the way in only
   if (!activeBeat) return;
+  setTimeout(markFilter, 0);
   activeBeat = null; panels.forEach(P => P.note && P.note.classList.remove("show")); $("#app").classList.remove("focus-mode"); $("#caption").classList.remove("open"); $("#beatGo").tabIndex = -1; fitAboveSheet(false);
 }
 function frame(now) {
@@ -1597,7 +1798,13 @@ function primaryAction(fromBar) {
 }
 function jumpBeat(dir) {
   const b = dir > 0 ? beats.find(x => x.t > playT + 0.01) : [...beats].reverse().find(x => x.t < playT - 0.01);
-  if (!b) { if (dir < 0) { seek(0); setPlaying(false); flash("start"); } else flash("no more key moments"); return; }
+  if (!b) {
+    if (dir < 0) { seek(0); setPlaying(false); flash("start"); return; }
+    // past the last key moment: skip to the end of the run, which unlocks the result
+    if (playT < D) { seek(D); setPlaying(false); emit("end", { t: D }); if (!reportSeen) { reportSeen = true; unlockResult(); } render(); flash("end of the run"); }
+    else flash("that is the end");
+    return;
+  }
   seek(b.t); showBeat(b);
 }
 function setSpeed(v) { speed = v; if ($("#vSpeed")) $("#vSpeed").textContent = speedLabel(v); document.querySelectorAll("#speedSeg button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.speed === v))); }
@@ -1625,6 +1832,7 @@ document.addEventListener("keydown", e => {
   if (e.code === "Space") { e.preventDefault(); if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); primaryAction(); return; }
   if (e.key === "?") { toggleMenu("help"); return; }
   if (isOpen($("#intro"))) return;
+  if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && resultInView()) { e.preventDefault(); showSlide(slideAt + (e.key === "ArrowRight" ? 1 : -1)); return; }
   if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); if (isOpen($("#scrim"))) closeReport(); jumpBeat(e.key === "ArrowLeft" ? -1 : 1); return; }
   if ((e.key === "h" || e.key === "H") && hasDeep) { setDetail(!HC); return; }
   if (e.key === "r" || e.key === "R") { if (isOpen($("#scrim"))) closeReport(); else openReport(); return; }
@@ -1657,25 +1865,51 @@ const chainHTML = () => {
 };
 const safeUrl = u => /^https?:\/\//i.test(u) ? u : "#";
 const sec = (title, body) => body ? `<section><h4>${title}</h4>${body}</section>` : "";
+// the result as a short deck: one idea per slide, ‹ › or the dots (or ←/→ while the result is on screen) to move
+const SLIDES = [
+  { k: "What happened", h: `<p class="sl-big">${esc(R.tldr)}</p>` },
+  R.stats.length ? { k: "The numbers", h: `<table class="rp-num"><tr><th></th><th>Worst</th><th>At the end</th></tr>${R.stats.map(st => { const [b, a] = statVals(st); return `<tr><td>${esc(st.label)}</td><td class="bf">${withUnit(b, st.unit)}</td><td class="af">${withUnit(a, st.unit)}</td></tr>`; }).join("")}</table>` } : null,
+  ...R.learnings.map((l, i) => ({ k: `Takeaway ${i + 1} of ${R.learnings.length}`, h: `<h3 class="sl-t">${esc(l.title)}</h3><p class="sl-p">${esc(l.body)}</p>` })),
+  (R.chain || []).length ? { k: "How it happened", h: chainHTML() } : null,
+  R.math ? { k: esc(R.math.title || "The arithmetic"), h: `<pre class="rp-math">${esc(R.math.lines.join("\n"))}</pre>` } : null,
+  (R.myths || []).length ? { k: "Common myths", h: R.myths.map(m => `<div class="rp-myth"><q>${esc(m.myth)}</q><p>${esc(m.truth)}</p></div>`).join("") } : null,
+  HC && R.deep && ((R.deep.config || []).length || (R.deep.runbook || []).length) ? { k: "Deep dive", h: `${(R.deep.config || []).length ? `<h5>Config involved</h5><pre class="rp-math">${esc(R.deep.config.join("\n"))}</pre>` : ""}${(R.deep.runbook || []).length ? `<h5>What to check next time</h5><ol class="sl-ol">${R.deep.runbook.map(x => `<li>${esc(x)}</li>`).join("")}</ol>` : ""}` } : null,
+  (R.links || []).length ? { k: "Read more", h: `<div class="rp-links">${R.links.map(l => `<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener noreferrer">${esc(l.label)} ↗</a>`).join("")}</div>` } : null,
+].filter(Boolean);
 $("#report").innerHTML = `
-  <span class="eb">The result · ${humanDur(TOTAL)} of story · ${beats.length} key moments</span>
-  <h2 id="repT">What happened</h2>
-  <div class="pbody"><div class="rp">
-    <p class="rp-tldr">${esc(R.tldr)}</p>
-    ${sec("The numbers", `<table class="rp-num"><tr><th></th><th>Worst</th><th>At the end</th></tr>${R.stats.map(st => { const [b, a] = statVals(st); return `<tr><td>${esc(st.label)}</td><td class="bf">${withUnit(b, st.unit)}</td><td class="af">${withUnit(a, st.unit)}</td></tr>`; }).join("")}</table>`)}
-    ${sec("What to take away", `<ol class="rp-take">${R.learnings.slice(0, 3).map(l => `<li><b>${esc(l.title)}</b><span>${esc(l.body)}</span></li>`).join("")}</ol>`)}
-    <details class="rp-more"><summary>How it happened, and more</summary><div class="rp">
-    ${sec("How it happened", chainHTML())}
-    ${sec(esc((R.math && R.math.title) || "The arithmetic"), R.math ? `<pre class="rp-math">${esc(R.math.lines.join("\n"))}</pre>` : "")}
-    ${R.learnings.length > 3 ? sec("More takeaways", `<ol class="rp-take" start="4">${R.learnings.slice(3).map(l => `<li><b>${esc(l.title)}</b><span>${esc(l.body)}</span></li>`).join("")}</ol>`) : ""}
-    ${sec("Common myths", (R.myths || []).length ? R.myths.map(m => `<div class="rp-myth"><q>${esc(m.myth)}</q><p>${esc(m.truth)}</p></div>`).join("") : "")}
-    ${R.deep && ((R.deep.config || []).length || (R.deep.runbook || []).length) ? `<details class="rp-deep"><summary>Deep dive<span>Hardcore</span></summary>${(R.deep.config || []).length ? `<h5>Config involved</h5><pre class="rp-math">${esc(R.deep.config.join("\n"))}</pre>` : ""}${(R.deep.runbook || []).length ? `<h5>What to check next time</h5><ol>${R.deep.runbook.map(x => `<li>${esc(x)}</li>`).join("")}</ol>` : ""}</details>` : ""}
-    ${sec("Read more", (R.links || []).length ? `<div class="rp-links">${R.links.map(l => `<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener noreferrer">${esc(l.label)} ↗</a>`).join("")}</div>` : "")}
-    </div></details>
-  </div></div>
+  <div class="deck" id="deck" aria-roledescription="slides" aria-label="The result">
+    <div class="deck-top"><span class="eb"><b class="res-k">The result</b> · ${humanDur(TOTAL)} of story · ${beats.length} key moments</span><span class="deck-n" id="deckN"></span></div>
+    <div class="deck-stage">${SLIDES.map((sl, i) => `<section class="slide" data-i="${i}" aria-roledescription="slide" aria-label="${i + 1} of ${SLIDES.length}" ${i ? "hidden" : ""}><span class="sl-k">${sl.k}</span><div class="sl-body">${sl.h}</div></section>`).join("")}</div>
+    <div class="deck-nav">
+      <button class="dnav" id="deckPrev" aria-label="Previous slide">‹</button>
+      <div class="dots">${SLIDES.map((sl, i) => `<button class="dot" data-i="${i}" aria-label="Slide ${i + 1}: ${sl.k.replace(/<[^>]+>/g, "")}"></button>`).join("")}</div>
+      <button class="dnav" id="deckNext" aria-label="Next slide">›</button>
+    </div>
+  </div>
   <div class="foot"><button class="ghost" id="repClose">▲ Back to the dashboard</button><span class="spacer"></span><button class="primary" id="repAgain">↺ Watch again</button></div>`;
+let slideAt = 0;
+function showSlide(i) {
+  slideAt = Math.max(0, Math.min(SLIDES.length - 1, i));
+  document.querySelectorAll("#deck .slide").forEach(el => (el.hidden = +el.dataset.i !== slideAt));
+  document.querySelectorAll("#deck .dot").forEach(el => el.setAttribute("aria-current", String(+el.dataset.i === slideAt)));
+  $("#deckN").textContent = `${slideAt + 1} / ${SLIDES.length}`;
+  $("#deckPrev").disabled = slideAt === 0; $("#deckNext").disabled = slideAt === SLIDES.length - 1;
+}
+$("#deckPrev").onclick = () => showSlide(slideAt - 1);
+$("#deckNext").onclick = () => showSlide(slideAt + 1);
+document.querySelectorAll("#deck .dot").forEach(b => (b.onclick = () => showSlide(+b.dataset.i)));
+const resultInView = () => { const r = $("#resultSec").getBoundingClientRect(); return !$("#report").hidden && r.top < innerHeight * 0.6 && r.bottom > innerHeight * 0.4; };
+showSlide(0);
+function fitDeck() {   // the slide area takes the tallest slide's height, so the controls never move between slides
+  const st = $("#deck .deck-stage") || document.querySelector("#deck .deck-stage"); if (!st || $("#report").hidden) return;
+  st.style.minHeight = ""; let hMax = 0;
+  document.querySelectorAll("#deck .slide").forEach(el => { const was = el.hidden; el.hidden = false; el.style.animation = "none"; hMax = Math.max(hMax, el.offsetHeight); el.hidden = was; el.style.animation = ""; });
+  const pad = parseFloat(getComputedStyle(st).paddingTop) + parseFloat(getComputedStyle(st).paddingBottom);
+  st.style.minHeight = Math.max(300, Math.ceil(hMax + pad)) + "px";
+}
+new ResizeObserver(() => fitDeck()).observe($("#resultSec"));
 let resultOpen = false;
-function unlockResult() { if (resultOpen) return; resultOpen = true; $("#resLock").hidden = true; $("#report").hidden = false; renderHud(viewT()); renderBar(); }
+function unlockResult() { if (resultOpen) return; resultOpen = true; $("#resLock").hidden = true; $("#report").hidden = false; renderHud(viewT()); renderBar(); fitDeck(); }
 function openReport() {   // R, the menu, or Space at the end: scroll down to the result (it stays locked until the run has ended once)
   closeMenus();
   if (!resultOpen) { flash("finish the run to see the result"); return; }
@@ -1706,10 +1940,11 @@ function renderLayout() {
   panels.forEach(P => { P.card.hidden = !panelShown(P); });
   quietEl.hidden = true;
   if (!ONE_SCREEN.matches) { board.style.gridTemplateRows = ""; board.style.gridTemplateColumns = ""; charts.forEach(P => (P.card.style.gridArea = "")); return; }
-  const H = board.clientHeight, W = board.clientWidth, n = charts.length;
+  // size the cells for the whole board (as if "All" were picked), so a filtered view keeps the same chart size and columns
+  const H = board.clientHeight, W = board.clientWidth, n = allCharts.filter(P => P.deep ? HC : true).length;
   const cols = Math.max(1, Math.min(3, Math.floor((W + GAP) / (MIN_CHART_W + GAP))));
-  const R = Math.max(1, Math.ceil(n / cols)), rh = Math.max(CH_MIN, Math.floor((H - (R - 1) * GAP) / R));
-  board.style.gridTemplateRows = `repeat(${R}, ${rh}px)`;
+  const R = Math.max(1, Math.ceil(n / cols)), rh = Math.min(9999, Math.max(CH_MIN, Math.floor((H - (R - 1) * GAP) / R)));   // a filtered few stay chart-shaped
+  board.style.gridTemplateRows = `repeat(${Math.max(1, Math.ceil(charts.length / cols))}, ${rh}px)`; board.style.alignContent = "start";
   board.style.gridTemplateColumns = `repeat(${cols}, minmax(0,1fr))`;
   charts.forEach((P, i) => { const r = Math.floor(i / cols) + 1, c = 1 + (i % cols); P.card.style.gridArea = `${r} / ${c} / ${r + 1} / ${c + 1}`; });
 }
@@ -1718,7 +1953,7 @@ function setDetail(on) {
   HC = hasDeep && on; document.body.classList.toggle("hc", HC);
   try { HC ? localStorage.setItem(DETAIL_KEY, "hardcore") : localStorage.removeItem(DETAIL_KEY); } catch (e) { /* storage blocked */ }
   document.querySelectorAll("#detailSeg [data-detail]").forEach(b => b.setAttribute("aria-pressed", String((b.dataset.detail === "hardcore") === HC)));
-  feedShown = -1; if (activeBeat) setCapHint(activeBeat);
+  feedShown = -1; if (activeBeat) setCapHint(activeBeat); buildFilter();
   render(); if (activeBeat) revealFocusedPanels(activeBeat); if (ready) flash(HC ? "Hardcore: deeper detail on" : "Standard detail");
 }
 $("#detailRow").hidden = !hasDeep;
@@ -1732,6 +1967,7 @@ applyTheme((() => { try { return localStorage.getItem(THEME_KEY); } catch (e) { 
 renderLayout();
 // the brief's system diagram takes the graph's own proportions, so the box fits the drawing (no empty band under it)
 fitStageAspect();
+fitBanner(); { let bw = 0; new ResizeObserver(() => { const w = $("#caption").clientWidth; if (Math.abs(w - bw) > 2) { bw = w; fitBanner(); } }).observe($("#caption").closest(".kmrow")); }
 
 ready = true; setSpeed(speed);
 render();
@@ -1742,12 +1978,31 @@ $("#introT").textContent = M.title; $("#introStory").textContent = M.story;
   const bg = (M.background || []).map(b => typeof b === "string" ? { body: b } : b);
   const story = bg.map(b => `<div>${b.title ? `<h4>${esc(b.title)}</h4>` : ""}<p>${esc(b.body)}</p></div>`).join("");
   $("#introBody").innerHTML = story;
+  {   // the dashboard, explained: one card per component, its charts in board order, each with its unit, threshold and why it matters
+    const W = watchList(), num = P => { const i = W.findIndex(w => w.P === P); return i < 0 ? `<span class="wnum blank" aria-hidden="true">0</span>` : `<span class="wnum">${i + 1}</span>`; };
+    const groups = new Map();
+    panels.filter(P => P.kind === "chart" && !P.deep).forEach(P => { const k = P.p.component || ""; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(P); });
+    const node = k => PB.components.nodes.find(n => n.id === k);
+    const role = n => { if (!n) return ""; const c = (M.cast || []).find(c => c.name === n.label || String(c.name).split(/[ ,]+/)[0] === n.label); return c ? c.role : n.kind || ""; };
+    // hovering a component name: what it is (its role in the cast, its kind) and its standing facts (the text details, not the live metrics)
+    const compTip = n => {
+      if (!n) return "Other";
+      const facts = (n.details || []).filter(d => d.text && d.level !== "deep");
+      const body = `${role(n) && role(n) !== n.kind ? `<p>${esc(role(n))}</p>` : ""}${n.kind ? `<span class="ck">${esc(n.kind)}</span>` : ""}${facts.length ? `<dl>${facts.map(d => `<dt>${esc(d.label)}</dt><dd>${esc(d.text)}</dd>`).join("")}</dl>` : ""}`;
+      return `<span class="chost" tabindex="0">${esc(n.label)}${body ? `<span class="ctip" role="tooltip"><b>${esc(n.label)}</b>${body}</span>` : ""}</span>`;
+    };
+    // one compact table: component (once per group), chart, what it tells you
+    $("#mgrid").innerHTML = `<table class="mtable"><thead><tr><th>Component</th><th>Chart</th><th>What it tells you</th></tr></thead><tbody>${[...groups].map(([k, list]) => { const n = node(k);
+      return list.map((P, i) => { const why = P.p.why || metricById[P.p.metrics[0]].why || "";
+        return `<tr class="${i === 0 ? "g0" : ""}">${i === 0 ? `<th scope="rowgroup" rowspan="${list.length}">${compTip(n)}</th>` : ""}<td class="mc">${num(P)}${esc(P.p.title)}</td><td class="mw"><div>${esc(why)}</div></td></tr>`; }).join(""); }).join("")}</tbody></table>`;
+    $("#metricsSec").hidden = !groups.size;
+  }
   const W = watchList();
-  $("#briefWatch").innerHTML = W.length ? `<h4>Keep an eye on</h4><ol>${W.map((w, i) => `<li><span class="wnum">${i + 1}</span><b>${esc(w.label)}</b><em>${esc(w.normal)}</em></li>`).join("")}</ol><p class="small">They are the gauges at the top of the dashboard, and the numbered charts.</p>` : "";
+  $("#briefWatch").innerHTML = W.length ? `<h4>Keep an eye on</h4><ol>${W.map((w, i) => `<li><span class="wnum">${i + 1}</span><b>${esc(w.label)}</b><em>${esc(w.normal)}</em></li>`).join("")}</ol><p class="small">They are the numbered charts on the dashboard.</p>` : "";
 }
 $("#introMeta").textContent = `${TOTAL > D * 1.5 ? humanDur(TOTAL) + " run, plays in ~" + Math.max(1, Math.round(D / 4 / 60)) + " min" : humanDur(TOTAL)} · ${beats.length} key moments${(M.tags || []).length ? " · " + M.tags.slice(0, 3).join(" · ") : ""}`;
 var introStarted = false, introWasPlaying = false;   // var: the banner reads it during the first render, before this line runs
-const goTo = id => { try { $("#" + id).scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion:reduce)").matches ? "auto" : "smooth", block: id === "simSec" ? "center" : "start" }); } catch (e) { $("#" + id).scrollIntoView(); } };
+const goTo = id => { if (id === "simSec") id = "simWrap"; try { $("#" + id).scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion:reduce)").matches ? "auto" : "smooth", block: "start" }); } catch (e) { $("#" + id).scrollIntoView(); } };
 function startRun() {   // Run in the brief: bring the dashboard up, then play
   closeMenus(); goTo("simSec");
   startPlaying();
