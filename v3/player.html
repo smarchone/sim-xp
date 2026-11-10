@@ -1,0 +1,2049 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>sim-xp player</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Roboto+Mono:wght@400;500&display=swap">
+<style>
+/* v3: a monitoring-dashboard look. Dark first, flat panels with thin borders, Inter for text and Roboto Mono for numbers,
+   time series with a soft area fill, a grid, a time axis and a legend with the live value, thresholds as a dashed line over a tinted band.
+   Series take the classic palette (--c1..--c6); state stays red/amber/green. Light mirrors it. */
+:root{
+  --bg:#f4f5f5; --panel:#ffffff; --sunk:#f0f1f3; --line:#e4e6e9; --line2:#d3d6da; --fg:#24292e; --muted:#5e646c; --faint:#8a9099; --node:#f7f8fa; --glass:rgba(255,255,255,.97);
+  --accent:#3d71d9; --track:#e4e6e9;
+  --red:#d10e5c; --amber:#b57a00; --green:#1a7f4b; --blue:#1f62e0; --teal:#0f8b8d; --violet:#8a4fd1; --pink:#c4317c; --grey:#8a9099;
+  --c1:#56a64b; --c2:#c9a400; --c3:#3274d9; --c4:#e0752d; --c5:#c4162a; --c6:#8f3bb8;
+  --sans:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --serif:var(--sans);
+  --mono:"Roboto Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --s:12px; --m:13.5px; --l:16px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111217; --panel:#181b1f; --sunk:#22252b; --line:#24272d; --line2:#33363c; --fg:#ccccdc; --muted:#9a9aab; --faint:#6e7079; --node:#1e2126; --glass:rgba(24,27,31,.97);
+  --accent:#6e9fff; --track:#2c3036; --red:#f2495c; --amber:#ff9830; --green:#73bf69; --blue:#5794f2; --teal:#4fc4c7; --violet:#b877d9; --pink:#ff7fbf; --grey:#6e7079;
+  --c1:#73bf69; --c2:#fade2a; --c3:#5794f2; --c4:#ff9830; --c5:#f2495c; --c6:#b877d9;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111217; --panel:#181b1f; --sunk:#22252b; --line:#24272d; --line2:#33363c; --fg:#ccccdc; --muted:#9a9aab; --faint:#6e7079; --node:#1e2126; --glass:rgba(24,27,31,.97);
+  --accent:#6e9fff; --track:#2c3036; --red:#f2495c; --amber:#ff9830; --green:#73bf69; --blue:#5794f2; --teal:#4fc4c7; --violet:#b877d9; --pink:#ff7fbf; --grey:#6e7079;
+  --c1:#73bf69; --c2:#fade2a; --c3:#5794f2; --c4:#ff9830; --c5:#f2495c; --c6:#b877d9;
+  color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:var(--m);line-height:1.4;padding:10px 16px 12px}
+.app{max-width:1600px;margin:0 auto;display:flex;flex-direction:column;gap:8px}
+.small{font-size:var(--s);color:var(--muted)}
+h1{font-size:var(--l);font-weight:600;margin:0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+button,select{font:inherit;font-size:var(--m);color:var(--fg);background:var(--panel);border:1px solid var(--line2);border-radius:6px;padding:4px 10px;cursor:pointer}
+button:hover,select:hover{border-color:var(--accent)}
+button:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--panel);font-weight:600}
+
+/* board: components left, feed right, charts in the middle. Stacked on small windows. */
+.main{display:flex;flex-direction:column;gap:6px;min-width:0}
+.board{position:relative;display:flex;flex-direction:column;gap:4px;min-width:0}
+.pn{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:4px;min-width:0;min-height:0}
+.pn.stick{position:sticky;top:0;align-self:start}
+.lanes{display:flex;flex-direction:column;gap:4px;flex:none}
+
+/* components stage */
+.stage{display:flex;flex-direction:column;overflow:hidden}
+.zoombar{position:absolute;bottom:8px;right:8px;z-index:2;opacity:0;transition:opacity .2s;display:flex;align-items:center;background:var(--glass);border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+.stage:hover .zoombar,.zoombar:focus-within{opacity:1}
+.zoombar button{border:0;border-radius:0;background:transparent;color:var(--muted);padding:2px 8px;font:500 var(--s) var(--mono);line-height:18px;min-width:26px}
+.zoombar button:hover{color:var(--fg);background:var(--sunk);border-color:transparent}
+.zoombar #zoomPct{min-width:46px;border-left:1px solid var(--line);border-right:1px solid var(--line);font-variant-numeric:tabular-nums}
+#comp{cursor:grab;touch-action:none}#comp.panning{cursor:grabbing}
+.ph{display:flex;align-items:baseline;gap:8px;padding:7px 10px 3px;font-size:13px;font-weight:500;color:var(--fg);flex:none}
+.ph .hint,.fh .hint{font-weight:400;color:var(--faint)}
+.stagebox{position:relative;flex:1;min-height:0;padding:0 0 26px} /* the key-moment strip rests on the bottom 25px */
+#comp{display:block;width:100%;height:100%;transform-origin:50% 0;transition:transform .38s cubic-bezier(.2,.8,.2,1)}
+#beatGo,#start{white-space:nowrap}
+
+/* feed: one line per entry, tied to the shared cursor */
+.feed{display:flex;flex-direction:column;overflow:hidden}
+.feed .fh{display:flex;align-items:baseline;gap:8px;padding:6px 10px 2px;flex:none;font-size:var(--s)}
+.feed .fh b{font-weight:500;font-size:13px;color:var(--fg)}
+.feedbox{position:relative;flex:1;min-height:0}
+.feed ol{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 10px);mask-image:linear-gradient(to bottom,transparent 0,#000 10px);position:absolute;inset:0;list-style:none;margin:0;padding:0 6px 6px;overflow-y:auto;scroll-behavior:smooth;scrollbar-width:thin}
+.feed li{display:grid;grid-template-columns:var(--tcol,38px) minmax(0,1fr);gap:10px;align-items:baseline;padding:2px 6px 2px 8px;border-radius:2px;cursor:pointer;font-size:12px;line-height:1.45;box-shadow:inset 3px 0 0 var(--lvl,var(--line2))}
+.feed li.k-alert{--lvl:var(--red)} .feed li.k-resolved{--lvl:var(--green)} .feed li.k-log{--lvl:var(--c3)} .feed li.k-deploy{--lvl:var(--violet)}
+.feed li .msg{overflow-wrap:anywhere}
+.feed li .who{margin-right:6px}
+.feed li:hover{background:var(--sunk)}
+.feed li{transition:background .3s ease,box-shadow .3s ease,color .3s ease}
+.feed li.near{background:color-mix(in srgb,var(--accent) 12%,transparent);box-shadow:inset 3px 0 0 var(--accent)}
+/* key-moment tone: good (green), neutral (grey), bad (red); a key moment with no tone keeps the amber */
+.tone-good{--tone:var(--green)} .tone-bad{--tone:var(--red)} .tone-neutral{--tone:var(--muted)}
+.feed li.key{background:color-mix(in srgb,var(--tone,var(--amber)) 9%,transparent);box-shadow:inset 2px 0 0 color-mix(in srgb,var(--tone,var(--amber)) 75%,transparent)}
+/* current line on a key moment: keep the blue bar and ring, over the amber tint */
+.feed li.near.key{background:color-mix(in srgb,var(--accent) 12%,color-mix(in srgb,var(--tone,var(--amber)) 9%,transparent));box-shadow:inset 3px 0 0 var(--accent),inset 0 0 0 1px color-mix(in srgb,var(--accent) 45%,transparent)}
+.feed li.key .txt{color:var(--fg)}
+.feed li.key .who{color:var(--fg);font-weight:500}
+.feed li.near .txt,.feed li.near .who{color:var(--fg)}
+.feed li.near time{color:var(--muted)}
+.feed li.fresh{animation:arrive .6s ease-out}
+@keyframes arrive{from{opacity:0;background:color-mix(in srgb,var(--accent) 10%,transparent)}to{opacity:1}}
+.feed time{font-family:var(--mono);color:var(--faint);font-variant-numeric:tabular-nums}
+.feed .who{color:var(--muted)}
+.feed .txt{color:var(--muted)}
+.feed li.k-log .txt{font-family:var(--mono)}
+.feed li.k-alert .txt{color:var(--red)}
+.feed li.k-resolved .txt{color:var(--green)}
+.feed .empty{display:block;color:var(--muted);padding:2px 6px;font-size:var(--s)}
+
+/* charts: same size, tight gaps */
+.panel{display:flex;flex-direction:column;padding:6px 10px 4px;min-width:0;min-height:0}
+.panel-h{position:relative;display:flex;align-items:baseline;gap:8px;min-height:23px;white-space:nowrap;min-width:0;font-size:var(--s)}
+.panel-h b{font-weight:500;font-size:13px;color:var(--fg);overflow:hidden;text-overflow:ellipsis}
+.panel .why{position:static;display:inline-grid;place-items:center;flex:none;width:15px;height:15px;border-radius:50%;border:1px solid var(--line2);color:var(--faint);font:500 10px var(--sans);cursor:help;transition:color .2s,border-color .2s,background .2s;align-self:center}
+.panel .why:hover,.panel .why:focus-visible{color:var(--accent);border-color:var(--accent);outline:none}
+.panel .why .tip{position:absolute;left:0;right:0;top:calc(100% + 3px);z-index:9;padding:8px 10px;border-radius:8px;background:var(--glass);border:1px solid var(--line2);box-shadow:0 8px 22px rgba(0,0,0,.16);color:var(--fg);font:400 var(--s)/1.45 var(--sans);white-space:normal;opacity:0;visibility:hidden;transform:translateY(-3px);transition:opacity .18s ease,transform .18s ease,visibility .18s;pointer-events:none}
+.panel .why:hover .tip,.panel .why:focus-visible .tip{opacity:1;visibility:visible;transform:none}
+.panel .legend{flex:none;display:flex;flex-wrap:wrap;gap:2px 14px;padding:2px 0 0 4px;font-size:11.5px;color:var(--muted);overflow:hidden;max-height:34px}
+.panel .legend>span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;min-width:0}
+.panel .legend i{display:inline-block;width:14px;height:4px;border-radius:1px;flex:none}
+.panel .legend .lv{font:500 11.5px var(--mono);font-variant-numeric:tabular-nums;color:var(--fg)}
+.panel .legend .lv.warn{color:var(--amber)} .panel .legend .lv.bad{color:var(--red)}
+.panel .val{margin-left:auto;font:500 11.5px var(--mono);font-variant-numeric:tabular-nums;text-align:right;color:var(--fg)}
+.panel .val small{font-size:10px;color:var(--faint);margin-left:4px}
+.panel .val.warn{color:var(--amber)} .panel .val.bad{color:var(--red)}
+.plot{position:relative;flex:1;min-height:0}
+.plot svg{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
+.panel.lane{flex:none}
+.panel.lane .plot{flex:none;height:42px}
+
+/* ---------- no play bar: progress hairline + status chip + corner menus ---------- */
+.progress{position:fixed;top:0;left:0;right:0;height:2px;z-index:15;pointer-events:none}
+.progress i{display:block;height:100%;width:0;background:var(--accent)}
+.masthead{display:flex;align-items:center;gap:10px;min-height:32px;min-width:0}
+.hud{margin-left:auto;display:flex;align-items:center;gap:6px;position:relative;flex:none}
+.status{display:flex;align-items:center;gap:6px;font-size:var(--s);color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px 10px;max-width:640px;transition:opacity .35s ease}
+.status b{color:var(--fg);font:500 var(--s) var(--mono);font-variant-numeric:tabular-nums}
+.status .ch{color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:330px}
+.status .ic{width:10px;text-align:center;color:var(--accent)}
+.status.flash{border-color:var(--accent)}
+.app.playing:not(.hovering) .status:not(:hover):not(.flash){opacity:.4}
+.iconbtn{width:32px;height:32px;padding:0;border-radius:999px;display:grid;place-items:center;font-size:var(--m);color:var(--muted);border-color:var(--line)}
+.menu{position:absolute;top:calc(100% + 6px);right:0;width:330px;z-index:30;padding:10px 12px 10px;gap:4px}
+.menu .mi{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:left;background:none;border-color:transparent;padding:5px 6px}
+.menu .mi:hover:not(:disabled){background:var(--sunk)}
+.menu .mi:disabled{color:var(--faint);cursor:default}
+.menu .row{display:flex;align-items:center;gap:8px;padding:5px 6px}
+.seg{display:flex;border:1px solid var(--line2);border-radius:6px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:2px 7px;font-size:var(--s);background:none}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--panel)}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:5px 10px;align-items:center;font-size:var(--s);color:var(--muted)}
+.keys span:nth-child(odd){display:flex;gap:3px;justify-content:flex-end}
+.ghost{background:none;border-color:transparent;color:var(--muted);white-space:nowrap}
+.ghost:hover{color:var(--accent);border-color:transparent}
+.ghost{background:none;border-color:transparent;color:var(--muted);font-size:var(--s);padding:4px 6px;white-space:nowrap}
+.ghost:hover{color:var(--accent);border-color:transparent}
+
+/* focus mode: one focal point */
+.dimmable{transition:opacity .45s ease}
+@media (prefers-reduced-motion:no-preference){.panel.arrive{animation:popIn .45s ease-out}}
+.focus-mode .dimmable{opacity:.28}
+.focus-mode .dimmable.focused{opacity:1}
+/* key moments: the focused things glow, so they read around the edges of the centred card */
+.focus-mode .panel.focused,.focus-mode .feed.focused{border-radius:8px;background:color-mix(in srgb,var(--accent) 7%,var(--panel));box-shadow:inset 0 0 0 1.5px var(--accent),0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+.focus-mode #comp g.focused > rect:first-child{stroke:var(--accent);stroke-width:2.5px}
+.focus-mode #comp g.focused{filter:drop-shadow(0 0 5px color-mix(in srgb,var(--accent) 75%,transparent))}
+.focus-mode #comp g.focused g.focused,.focus-mode #comp g[data-id^="e-"].focused{filter:none}
+
+/* hardcore mode: the same run with the engineer's-eye layer on (items tagged level "deep" in the playbook) */
+.panel-h b{flex:none;max-width:60%}
+.ctag{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;align-self:center;display:inline-flex;align-items:center;gap:4px;font:500 10px var(--sans);color:var(--faint);white-space:nowrap}
+.ctag i{width:6px;height:6px;border-radius:50%;background:var(--green);opacity:.8}
+.ctag.degrading{color:var(--amber)} .ctag.degrading i{background:var(--amber);opacity:1}
+.ctag.failing{color:var(--red)} .ctag.failing i{background:var(--red);opacity:1}
+.dtag{flex:none;align-self:center;font:500 9.5px var(--mono);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);border-radius:999px;padding:0 6px;line-height:14px}
+.feed li.lv-deep{opacity:.82;box-shadow:inset 2px 0 0 var(--line2)}
+.feed li.lv-deep .txt{font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+.feed li.lv-deep .who{font-size:10.5px}
+#capH .dh{display:block;margin-top:6px;font:var(--s)/1.5 var(--mono);color:var(--muted)}
+.quiet{display:flex;flex-direction:column;padding:6px 10px 8px;min-height:0}
+.quiet .qh{display:flex;gap:8px;align-items:baseline;font-size:var(--s);font-weight:600;color:var(--muted);padding-bottom:2px}
+.quiet .qh span{font-weight:400;color:var(--faint)}
+.qrows{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px}
+.qrow{display:grid;grid-template-columns:minmax(0,1fr) 72px auto;gap:8px;align-items:center;font-size:var(--s);color:var(--muted);padding:3px 0;border-top:1px solid var(--line);min-width:0}
+.qrow .ql{display:flex;gap:6px;align-items:center;min-width:0;overflow:hidden;white-space:nowrap}
+.qrow .ql b{font-weight:500;overflow:hidden;text-overflow:ellipsis}
+.qrow svg{width:72px;height:16px;display:block}
+.qrow .qv{font:500 var(--s) var(--mono);font-variant-numeric:tabular-nums;color:var(--fg);text-align:right}
+#ntip{position:fixed;z-index:40;width:240px;padding:8px 10px;border-radius:8px;background:var(--glass);border:1px solid var(--line2);box-shadow:0 8px 22px rgba(0,0,0,.16);font-size:var(--s);pointer-events:none}
+#ntip h5{margin:0 0 4px;font-size:var(--m);font-weight:600}
+#ntip h5 span{font-weight:400;color:var(--muted);margin-left:6px}
+#ntip table{width:100%;border-collapse:collapse}
+#ntip td{padding:1px 0;color:var(--muted)} #ntip td:last-child{text-align:right;font-family:var(--mono);color:var(--fg);white-space:nowrap;padding-left:10px}
+#ntip tr.d td:first-child::after{content:" ·deep";color:var(--accent);font-size:9px}
+.rp-deep{border:1px solid var(--line2);border-radius:10px;padding:8px 14px}
+.rp-deep summary{cursor:pointer;font:600 14.4px var(--sans)}
+.rp-deep summary span{font-weight:400;color:var(--muted);font-size:var(--s);margin-left:6px}
+.rp-deep h5{margin:12px 0 4px;font:600 var(--m) var(--sans);color:var(--muted)}
+.rp-deep ol{margin:0;padding-left:20px;font:400 15px/1.55 var(--serif)}
+body:not(.hc) .rp-deep{display:none}
+
+/* svg text: two sizes only */
+/* components text is sized for the screen, not the viewBox: ~10.5px names and ~9px labels whatever the graph's scale (set from JS) */
+.t{fill:var(--fg);font:600 var(--ct,16.4px) var(--sans)}
+.ts{fill:var(--muted);font:var(--cs,14px) var(--mono)}
+.tp{fill:var(--fg);font:500 var(--cs,14px) var(--mono)}
+.axis{fill:var(--faint);font:10px var(--mono);font-variant-numeric:tabular-nums}
+.th-band{pointer-events:none}
+.alab{font:500 var(--s) var(--mono);paint-order:stroke;stroke:var(--panel);stroke-width:3px}
+.grid{stroke:var(--line2);stroke-width:1;opacity:.55}
+.vgrid{stroke:var(--line2);stroke-width:1;opacity:.35}
+@keyframes pulse{0%,100%{opacity:var(--o1)}50%{opacity:var(--o2)}}
+.playing .pulse{animation:pulse 2s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.playing .pulse{animation:none}.feed li.fresh{animation:none}.feed ol{scroll-behavior:auto}}
+
+/* one screen: a 12-column grid (3 | 6 | 3), chart rows sized from JS, scrolls when there are more charts than fit */
+@media (min-width:1000px) and (min-height:600px){
+  .app{height:calc(100dvh - 22px)}
+  .main{flex:1;min-height:0}
+  .board{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scroll-behavior:smooth;scrollbar-width:thin}
+}
+/* a narrow window just stacks */
+@media not ((min-width:1000px) and (min-height:600px)){
+  .stage{height:340px}
+  .feed{height:220px}
+  .panel.chart{height:190px}
+}
+
+/* popups: intro + report */
+/* ---------- one popup family: story, key moment, report, menus ---------- */
+.scrim{position:fixed;inset:0;background:rgba(8,12,18,.45);z-index:20;display:grid;place-items:center;padding:16px;animation:fade .2s ease-out}
+.scrim.leaving{animation:fadeOut .16s ease-in forwards}
+@keyframes fade{from{opacity:0}} @keyframes fadeOut{to{opacity:0}}
+.pop{background:var(--panel);border:1px solid var(--line2);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.28);padding:16px 18px 14px;display:flex;flex-direction:column;gap:8px;min-width:0;color:var(--fg);font-size:var(--m)}
+.pop-in{animation:popIn .2s ease-out}
+.pop.leaving{animation:popOut .16s ease-in forwards}
+@keyframes popIn{from{opacity:0;transform:translateY(6px) scale(.985)}}
+@keyframes popOut{to{opacity:0;transform:translateY(4px) scale(.985)}}
+.pop .eb{font-size:var(--s);color:var(--muted)}
+.pop h2{margin:0;font-size:var(--l);line-height:1.3;text-wrap:balance}
+.pop p{margin:0;line-height:1.55}
+.pop .pbody{display:flex;flex-direction:column;gap:8px;min-height:0;overflow-y:auto}
+.pop .foot{display:flex;align-items:center;gap:8px;margin-top:6px;flex:none}
+.pop .foot .spacer{flex:1}
+.pop .foot button{padding:5px 14px}
+kbd{font:500 var(--s) var(--mono);color:var(--muted);border:1px solid var(--line2);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--sunk);white-space:nowrap}
+.modal{width:min(560px,100%);max-height:calc(100dvh - 32px)}
+.modal.wide{width:min(680px,100%)}
+/* key moment: a compact sheet that rises from the bottom of the components view (overlay, never pushes layout) */
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:3;max-height:calc(100% - 12px);display:flex;flex-direction:column;background:var(--glass);border-top:1px solid var(--line2);border-radius:8px 8px 0 0;transform:translateY(calc(100% - 25px));transition:transform .38s cubic-bezier(.2,.8,.2,1),box-shadow .38s,border-color .38s}
+.sheet.open{transform:none;border-top-color:color-mix(in srgb,var(--tone,var(--accent)) 70%,transparent);box-shadow:0 -8px 22px rgba(0,0,0,.12)}
+.sheet .strip{flex:none;height:25px;line-height:25px;padding:0 10px;font-size:var(--s);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sheet.open .strip{display:none}
+.sheet .sb{display:flex;flex-direction:column;gap:2px;padding:6px 10px 7px;min-height:0;overflow-y:auto}
+.sheet .top{display:flex;align-items:baseline;gap:8px}
+.sheet .eb{font-size:var(--s);color:var(--muted)}
+.sheet .tn{display:inline-flex;align-items:center;gap:5px;font-size:var(--s);font-weight:600;color:var(--tone,var(--muted))}
+.sheet .tn i{width:8px;height:8px;border-radius:50%;background:var(--tone,var(--muted))}
+.sheet .tn[hidden]{display:none}
+.sheet .top .spacer{flex:1}
+.sheet .more{border:0;background:none;color:var(--muted);font-size:var(--s);padding:0 2px}
+.sheet .more:hover{color:var(--accent)}
+.sheet h2{margin:0;font-size:var(--m);font-weight:600;line-height:1.3}
+.sheet p{margin:0;font-size:var(--s);line-height:1.45;color:var(--muted);display:none}
+.sheet.expanded p{display:block;color:var(--fg)}
+.wlist{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:3px;counter-reset:w}
+.wlist li{counter-increment:w;display:flex;align-items:baseline;gap:8px;font-size:var(--s)}
+.wlist li::before{content:counter(w);font:500 10.5px var(--mono);color:var(--accent);width:12px}
+.wlist li b{font-weight:500;color:var(--fg)}
+.wlist li em{font:normal 11.5px var(--mono);color:var(--green);margin-left:auto;white-space:nowrap}
+.wtag{display:none;position:absolute;left:46px;top:2px;z-index:3;max-width:calc(100% - 54px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:500 10.5px var(--mono);color:var(--green);background:var(--panel);border:1px solid color-mix(in srgb,var(--green) 45%,transparent);border-radius:2px;padding:0 6px;line-height:16px}
+.briefing .wtag{display:inline-block}
+.wnum{flex:none;align-self:center;display:inline-grid;place-items:center;width:16px;height:16px;border-radius:2px;background:color-mix(in srgb,var(--accent) 20%,transparent);color:var(--accent);font:600 10px var(--mono)}
+.sheet .foot{display:flex;align-items:center;gap:6px;margin-top:3px}
+.sheet .foot .spacer{flex:1}
+.sheet .foot button{padding:2px 10px;font-size:var(--s)}
+.note{position:absolute;left:0;top:0;z-index:2;pointer-events:none;opacity:0;transition:opacity .3s}
+.note.show{opacity:1}
+.note .nl{position:absolute;max-width:275px;padding:4px 8px;font-size:var(--s);line-height:1.35;color:var(--fg);background:var(--glass);border:1px solid color-mix(in srgb,var(--accent) 60%,transparent);border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.18);white-space:normal}
+.note svg{position:absolute;inset:0;overflow:visible}
+@media (prefers-reduced-motion:reduce){.note{transition:none}}
+@media (prefers-reduced-motion:reduce){.sheet{transition:none}.feed li{transition:none!important}}
+
+.pop h4{margin:8px 0 0;font-size:var(--s);font-weight:600;color:var(--muted)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips span{font-size:var(--s);color:var(--muted);background:var(--sunk);border-radius:999px;padding:1px 8px}
+/* reading screens: intro and report. One calm column, serif prose. */
+.modal.report{width:min(720px,100%)}
+.modal.intro{width:min(720px,100%)} /* same dimensions as the report */
+.intro h2{font:500 26px/1.15 var(--serif);letter-spacing:-.01em}
+.intro .hook{font:400 17.5px/1.5 var(--serif);color:var(--fg);margin:0;text-wrap:pretty}
+.intro .icols{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;margin-top:6px;overflow-y:auto;min-height:0}
+.intro .icols.one{grid-template-columns:minmax(0,1fr)}
+.intro .story,.intro .side{display:flex;flex-direction:column;gap:14px;min-width:0}
+.intro h4{margin:0 0 3px;font-size:var(--s);font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.intro .story p{font:400 15px/1.6 var(--serif);color:var(--fg)}
+.intro ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px}
+.intro li{font-size:14.4px;line-height:1.45;color:var(--fg)}
+.intro .cast li b{font-weight:600}
+.intro .cast li span{color:var(--muted)}
+.intro .watch li{display:flex;gap:8px;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--line);padding-bottom:4px}
+.intro .watch li em{font:normal 12.5px var(--mono);color:var(--green);white-space:nowrap}
+.intro .learn li{padding-left:16px;position:relative}
+.intro .learn li::before{content:"→";position:absolute;left:0;color:var(--accent)}
+.intro{overflow:hidden}
+.intro .imore{min-height:0;display:flex;flex-direction:column;border-top:1px solid var(--line);padding-top:8px}
+.intro .imore summary{cursor:pointer;font-size:var(--s);color:var(--muted);user-select:none;flex:none}
+.intro .imore summary:hover{color:var(--accent)}
+.intro .imore[open]{overflow-y:auto}
+.intro .imore[open] summary{margin-bottom:10px}
+.rp{display:flex;flex-direction:column;gap:20px;padding:4px 2px 6px}
+.rp h4{margin:0 0 6px;font-size:var(--s);font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.modal.report h2{font:500 26px/1.15 var(--serif);letter-spacing:-.01em}
+.rp-tldr{font:400 17.5px/1.5 var(--serif);margin:0;text-wrap:pretty}
+.rp-num{width:100%;border-collapse:collapse;font-size:14.4px}
+.rp-num th{font-size:var(--s);font-weight:500;color:var(--muted);text-align:right;padding:0 0 4px}
+.rp-num th:first-child{text-align:left}
+.rp-num td{padding:5px 0;border-top:1px solid var(--line);font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+.rp-num td:first-child{font-family:var(--sans);text-align:left;color:var(--fg)}
+.rp-num .bf{color:var(--red)} .rp-num .af{color:var(--green)}
+.rp-chain{list-style:none;margin:0;padding:0 0 0 14px;border-left:2px solid var(--line2);display:flex;flex-direction:column;gap:8px}
+.rp-chain li{display:flex;gap:10px;align-items:baseline;font:400 15px/1.45 var(--serif);position:relative}
+.rp-chain li::before{content:"";position:absolute;left:-20px;top:.5em;width:8px;height:8px;border-radius:50%;background:var(--panel);border:2px solid var(--line2)}
+.rp-chain .tag{flex:none;width:86px;font:600 10.5px var(--sans);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.rp-chain .k-cause .tag{color:var(--amber)} .rp-chain .k-amp .tag{color:var(--red)} .rp-chain .k-fix .tag{color:var(--green)}
+.rp-chain .k-cause::before{border-color:var(--amber)} .rp-chain .k-amp::before{border-color:var(--red)} .rp-chain .k-fix::before{border-color:var(--green)}
+.rp-loop{margin:12px 0 0;font:italic 400 15px/1.5 var(--serif);color:var(--muted)}
+.rp-loop b{font-style:normal;color:var(--red);font-weight:500}
+.rp-math{font:13px/1.7 var(--mono);background:var(--sunk);border-radius:8px;padding:10px 14px;margin:0;white-space:pre-wrap;max-height:none;overflow:visible}
+.rp-take{list-style:none;counter-reset:t;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.rp-take li{counter-increment:t;display:grid;grid-template-columns:22px minmax(0,1fr);gap:4px 8px}
+.rp-take li::before{content:counter(t);font:500 12.5px var(--mono);color:var(--accent);padding-top:3px}
+.rp-take b{font:600 14.4px/1.4 var(--sans)}
+.rp-take span{grid-column:2;font:400 15px/1.55 var(--serif);color:var(--fg)}
+.rp-myth{border-left:2px solid var(--line2);padding:2px 0 2px 12px;margin:0 0 10px}
+.rp-myth q{font:italic 400 15px/1.5 var(--serif);color:var(--muted);quotes:"\201C" "\201D"}
+.rp-myth p{margin:3px 0 0;font:400 15px/1.55 var(--serif)}
+.rp-links{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:14.4px}
+.rp-more{border-top:1px solid var(--line);padding-top:10px}
+.rp-more summary{cursor:pointer;font-size:var(--s);color:var(--muted);user-select:none}
+.rp-more summary:hover{color:var(--accent)}
+.rp-more[open] summary{margin-bottom:14px}
+.rp-links a{color:var(--accent)}
+
+.doc{display:flex;flex-direction:column;gap:10px;padding-top:8px}
+.doc p{margin:0;max-width:72ch}
+pre{font:var(--s)/1.5 var(--mono);background:var(--sunk);border-radius:8px;padding:12px;overflow:auto;max-height:480px;margin:0}
+
+/* ===================== v3 page: brief, run, result, one below the other ===================== */
+body{padding:0}
+.app{max-width:none;height:auto!important;display:block}
+.sec{position:relative}
+.eb{font-size:var(--s);color:var(--muted)}
+/* 1. brief: reading on the left, the system on the right */
+.brief{min-height:100dvh;display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:44px;align-items:center;max-width:1400px;margin:0 auto;padding:48px 32px}
+.brief h1{font-size:30px;font-weight:600;letter-spacing:-.01em;white-space:normal;margin:6px 0 10px;line-height:1.2}
+.brief .hook{font-size:17px;line-height:1.55;margin:0 0 20px;color:var(--fg);text-wrap:pretty}
+.bbody{display:flex;flex-direction:column;gap:14px;max-width:64ch}
+.bbody h4,.bwatch h4{margin:0 0 3px;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.bbody p{margin:0;font-size:14.5px;line-height:1.6;color:var(--fg)}
+.bwatch{margin-top:24px;max-width:64ch}
+.bwatch ol{list-style:none;margin:6px 0 4px;padding:0;display:flex;flex-direction:column}
+.bwatch li{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+.bwatch li b{font-weight:500}
+.bwatch li em{margin-left:auto;font:normal 12.5px var(--mono);color:var(--green);white-space:nowrap}
+.bgo{margin-top:24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.bgo button{padding:8px 18px;font-size:14px}
+.bdiag{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:10px 12px}
+.bdiag figcaption{font-size:13px;font-weight:500;margin-bottom:6px}
+.bdiag .stage{border:0;background:none;height:min(60dvh,520px)}
+/* 2. run: one screen. Dashboard left (gauges, then the charts); the system map and the events right */
+.sim{height:100dvh;display:flex;flex-direction:column;gap:8px;padding:12px 16px;border-top:1px solid var(--line)}
+.sim .progress{position:absolute;top:0;left:0;right:0}
+.masthead{flex:none;display:grid;grid-template-columns:minmax(0,auto) minmax(0,1fr) auto;gap:12px;align-items:center}
+.simtitle{margin:0;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:26vw}
+.hud{margin-left:0}
+.main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,30%);gap:8px}
+.dashcol{min-height:0;display:flex;flex-direction:column;gap:6px}
+.sidecol{min-height:0;display:flex;flex-direction:column}
+.sidecol .feed{flex:1}
+.board{flex:1;min-height:0;display:grid;gap:6px;overflow-y:auto;scrollbar-width:thin}
+.sidecol .stage,.sidecol .feed{height:auto;min-height:0}
+.stagebox{padding:0}
+.gauges{flex:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:6px}
+.gauge{padding:8px 12px}
+.g-h{display:flex;gap:8px;align-items:center;font-size:12.5px;font-weight:500;color:var(--fg);white-space:nowrap;overflow:hidden}
+.g-h b{font-weight:500;overflow:hidden;text-overflow:ellipsis}
+.g-row{display:flex;align-items:flex-end;gap:12px;margin-top:2px}
+.g-v{font:500 26px/1.1 var(--sans);font-variant-numeric:tabular-nums;white-space:nowrap}
+.gauge{color:var(--green)} .gauge.warn{color:var(--amber)} .gauge.bad{color:var(--red)}
+.gauge .g-h{color:var(--fg)}
+.g-s{flex:1;height:30px;min-width:40px}
+.g-l{fill:none;stroke:currentColor;stroke-width:1.5;vector-effect:non-scaling-stroke}
+.g-a{fill:currentColor;opacity:.15}
+.g-n{font:11.5px var(--mono);color:var(--muted);margin-top:2px}
+/* the key moment is a banner in the header: the title and Continue; the explanation drops down over the board, so nothing shifts */
+.banner.sheet{position:relative;left:auto;right:auto;bottom:auto;transform:none;max-height:none;border:1px solid var(--line);border-radius:4px;background:var(--panel);min-width:0;box-shadow:none;z-index:12}
+.banner.sheet.open{border-color:color-mix(in srgb,var(--tone,var(--accent)) 70%,transparent);box-shadow:none}
+.banner .strip{display:block;height:32px;line-height:32px;padding:0 12px}
+.banner:not(.open) .sb{display:none}
+.banner .sb{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:0 12px;padding:3px 6px 3px 12px;overflow:visible}
+.banner h3{margin:0;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.banner .foot{margin:0;display:flex;gap:6px;align-items:center}
+.banner .foot button{padding:3px 12px;font-size:var(--s)}
+.banner p{position:absolute;top:calc(100% + 4px);left:0;right:0;padding:10px 14px;background:var(--glass);border:1px solid var(--line2);border-radius:4px;box-shadow:0 10px 28px rgba(0,0,0,.3);font-size:13.5px;line-height:1.55}
+.banner .wlist{display:none}
+.focus-mode .dimmable{opacity:.5}
+/* 3. result: a reading column, locked until the run ends */
+.result{max-width:820px;margin:0 auto;padding:56px 24px 72px;min-height:60dvh}
+.rlock{border:1px dashed var(--line2);border-radius:4px;padding:32px;display:flex;flex-direction:column;gap:4px;align-items:center;color:var(--muted);text-align:center}
+.rlock b{color:var(--fg);font-size:15px;font-weight:600}
+.report-in{display:flex;flex-direction:column;gap:8px}
+.report-in h2{font-size:26px;font-weight:600;margin:2px 0 8px}
+.report-in .pbody{overflow:visible}
+.report-in .foot{display:flex;gap:8px;margin-top:24px}
+.report-in .foot .spacer{flex:1}
+@media not ((min-width:1000px) and (min-height:600px)){
+  .brief{grid-template-columns:minmax(0,1fr);min-height:auto;padding:28px 16px;gap:24px}
+  .sim{height:auto}
+  .masthead{grid-template-columns:minmax(0,1fr) auto}
+  .masthead .banner{grid-column:1 / -1;grid-row:2}
+  .main{display:flex;flex-direction:column}
+  .sidecol{display:flex;flex-direction:column}
+  .sidecol .feed{height:320px} .bdiag .stage{height:320px}
+  .board{display:flex;flex-direction:column}
+  .simtitle{max-width:none}
+}
+
+/* ===================== the run plays like a video: a poster, a centre flash, a control bar with chapters ===================== */
+.hud .status{display:none}
+.dashcol{position:relative}
+.poster{position:absolute;inset:0;z-index:14;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border:0;border-radius:4px;background:rgba(10,11,14,.55);color:#fff;cursor:pointer;backdrop-filter:blur(1px)}
+.poster:hover{border:0;background:rgba(10,11,14,.45)}
+.poster .pbig{width:76px;height:54px;border-radius:14px;background:#e5484d;display:grid;place-items:center;font-size:24px;padding-left:4px;box-shadow:0 6px 24px rgba(0,0,0,.4);transition:transform .15s}
+.poster:hover .pbig{transform:scale(1.06)}
+.poster .ptxt{font-size:13px;font-weight:500;opacity:.85}
+.vflash{position:absolute;left:50%;top:50%;z-index:13;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;display:grid;place-items:center;font-size:24px;opacity:0;pointer-events:none}
+.vflash.go{animation:vflash .55s ease-out}
+@keyframes vflash{0%{opacity:.95;transform:scale(.8)}100%{opacity:0;transform:scale(1.35)}}
+.vbar{flex:none;display:flex;flex-direction:column;gap:2px;padding:0 2px;transition:opacity .3s}
+.app.playing.idle .vbar{opacity:.35}
+.scrub{position:relative;height:16px;cursor:pointer;touch-action:none;outline:none}
+.chaps{position:absolute;left:0;right:0;top:6px;height:4px;display:flex;gap:2px;transition:top .12s,height .12s}
+.scrub:hover .chaps,.scrub.drag .chaps,.scrub:focus-visible .chaps{top:5px;height:6px}
+.chap{position:relative;height:100%;background:color-mix(in srgb,var(--fg) 22%,transparent);overflow:hidden;border-radius:1px}
+.chap .pl{position:absolute;left:0;top:0;bottom:0;background:#e5484d}
+.chap .hv{position:absolute;left:0;top:0;bottom:0;background:color-mix(in srgb,var(--fg) 25%,transparent)}
+.chap.bad{box-shadow:inset 0 -1px 0 color-mix(in srgb,var(--red) 60%,transparent)}
+.knob{position:absolute;top:2px;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:#e5484d;transform:scale(0);transition:transform .12s;pointer-events:none}
+.scrub:hover .knob,.scrub.drag .knob,.scrub:focus-visible .knob{transform:scale(1)}
+.sttip{position:absolute;bottom:22px;transform:translateX(-50%);z-index:15;white-space:nowrap;padding:4px 8px;border-radius:4px;background:rgba(10,11,14,.92);color:#fff;font-size:12px;pointer-events:none}
+.sttip b{font-weight:600} .sttip span{opacity:.75;margin-left:6px;font-family:var(--mono);font-size:11px}
+.vrow{display:flex;align-items:center;gap:6px;min-height:34px}
+.vrow .spacer{flex:1}
+.vb{border:0;background:none;color:var(--fg);width:34px;height:32px;padding:0;border-radius:4px;font-size:16px;display:grid;place-items:center}
+.vb:hover{background:var(--sunk);border:0}
+.vb.vtxt{width:auto;padding:0 10px;font:500 12.5px var(--mono)}
+.vtime{font:500 12.5px var(--mono);font-variant-numeric:tabular-nums;color:var(--fg);margin-left:4px;white-space:nowrap}
+.vtime small{color:var(--muted);font-size:12px}
+.vchap{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.vchap::before{content:"•";margin:0 8px 0 2px;color:var(--faint)}
+.vchap:empty::before{content:none}
+.vresult{background:#e5484d;border-color:#e5484d;color:#fff;font-weight:500;font-size:12.5px;padding:4px 12px}
+.vresult:hover{border-color:#fff}
+.sim:fullscreen{background:var(--bg);padding:12px 16px}
+
+/* v3: settings live in the video bar and open upward; the feed is opt-in; the player is a centred frame, a little under the screen */
+.vrow .hud{position:relative;display:flex;align-items:center;gap:2px;margin:0}
+.vrow .menu{top:auto;bottom:calc(100% + 8px);right:0}
+.vtoggle{color:var(--muted);display:inline-flex;align-items:center}
+.vtoggle[aria-pressed="true"]{color:var(--fg);box-shadow:inset 0 -2px 0 #e5484d}
+.vtoggle.news::after{content:"";width:6px;height:6px;border-radius:50%;background:#e5484d;margin-left:6px;display:inline-block;vertical-align:middle}
+@media (min-width:1000px) and (min-height:600px){
+  .sim{border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+}
+
+/* v3: the run is a video frame with a live-events chat beside it (outside the frame); the explanation always shows */
+@media (min-width:1000px) and (min-height:600px){
+  .simwrap{display:flex;gap:12px;max-width:1780px;margin:4dvh auto;padding:0 16px;height:min(88dvh,940px)}
+  .simwrap .sim{flex:1;min-width:0;height:100%;max-width:none;margin:0}
+  .chatcol{flex:none;width:clamp(300px,24vw,380px);display:flex;min-height:0}
+  .chatcol .feed{flex:1;height:auto;border-radius:8px}
+}
+.main{grid-template-columns:minmax(0,1fr)}
+.app.feed-off .chatcol{display:none}
+.chatcol .feed .fh{padding:10px 12px 6px;border-bottom:1px solid var(--line)}
+.chatcol .feed ol{padding:6px 4px 8px}
+.chatcol .feed li{grid-template-columns:minmax(0,1fr);gap:1px;padding:5px 10px;box-shadow:none;background:none;border-radius:6px}
+.chatcol .feed li time{font-size:10.5px;order:2}
+.chatcol .feed li .msg{order:1}
+.chatcol .feed li .who{font-weight:600;color:var(--c3);margin-right:6px}
+.chatcol .feed li.k-log .who{color:var(--muted)} .chatcol .feed li.k-deploy .who{color:var(--violet)}
+.chatcol .feed li.k-alert{background:color-mix(in srgb,var(--red) 9%,transparent)} .chatcol .feed li.k-alert .who{color:var(--red)}
+.chatcol .feed li.k-resolved{background:color-mix(in srgb,var(--green) 8%,transparent)} .chatcol .feed li.k-resolved .who{color:var(--green)}
+.chatcol .feed li.k-log .txt{font-size:11.5px}
+.chatcol .feed li.near{background:color-mix(in srgb,var(--accent) 12%,transparent);box-shadow:none}
+.uchip{flex:none;align-self:center;font:500 10.5px var(--mono);color:var(--muted);background:var(--sunk);border-radius:2px;padding:0 5px;line-height:16px}
+/* the key-moment banner keeps one height, so the board below never moves; its text is always shown */
+.banner.sheet{height:78px}
+.banner .strip{height:76px;line-height:20px;padding:10px 12px;white-space:normal;color:var(--muted)}
+.banner .sb{grid-template-rows:auto minmax(0,1fr);height:100%;padding:6px 8px 6px 12px;align-content:start}
+.banner .sb p{position:static;display:block;grid-column:1 / -1;margin:2px 0 0;padding:0;background:none;border:0;box-shadow:none;font-size:13px;line-height:1.45;color:var(--fg);overflow-y:auto;min-height:0;-webkit-line-clamp:unset}
+@media not ((min-width:1000px) and (min-height:600px)){ .chatcol .feed{height:320px} .banner.sheet{height:auto} .banner .strip{height:auto} }
+
+.masthead{grid-template-columns:minmax(0,max-content) minmax(0,1fr)}
+.simtitle{max-width:22vw}
+.banner.sheet{height:86px}
+.banner .strip{height:84px}
+.banner .sb{row-gap:4px}
+
+/* hiding the chat does not widen the player: it keeps the width it has beside the chat, centred */
+@media (min-width:1000px) and (min-height:600px){
+  .simwrap{justify-content:center}
+  .app.feed-off .simwrap .sim{flex:none;width:calc(100% - clamp(300px,24vw,380px) - 12px)}
+}
+
+
+/* the key moment is the banner, made hard to miss: it takes the whole header, tinted in its tone, with a thick tone edge,
+   a larger title and the full explanation, and it slides in with a glow. Same height either way, so the board never moves. */
+.app:has(.banner.open) .simtitle{display:none}
+.masthead:has(.banner.open){grid-template-columns:minmax(0,1fr)}
+.banner.sheet.open{background:color-mix(in srgb,var(--tone,var(--accent)) 13%,var(--panel));border-color:color-mix(in srgb,var(--tone,var(--accent)) 55%,transparent);border-left:4px solid var(--tone,var(--accent))}
+.banner.sheet.open .sb{padding:8px 10px 8px 16px}
+.banner.open h3{font-size:17px}
+.banner.open .tn{font-size:13px}
+.banner.open .sb p{font-size:13.5px}
+.banner.open .foot button.primary{padding:5px 16px;font-size:13px}
+.banner.sheet.arrive{animation:kmIn .5s cubic-bezier(.2,.8,.2,1),kmGlow 1.4s ease-out .2s}
+@keyframes kmIn{from{opacity:0;transform:translateY(-8px)}}
+@keyframes kmGlow{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--tone,var(--accent)) 65%,transparent)}100%{box-shadow:0 0 0 16px transparent}}
+@media (prefers-reduced-motion:reduce){.banner.sheet.arrive{animation:none}}
+
+/* v3: no title bar in the player; the key moment sits under the charts, above the scrubber, at one fixed height */
+.kmrow{flex:none}
+.kmrow .banner.sheet{width:100%}
+
+/* page header: the sim-xp name, quiet, at the top of the page (not sticky) */
+.pagehead{display:flex;align-items:center;gap:14px;max-width:1400px;margin:0 auto;padding:16px 32px 0}
+.brand{display:inline-flex;align-items:center;gap:8px;font:600 16px var(--sans);letter-spacing:-.01em;color:var(--fg);text-decoration:none}
+.brand:hover{color:var(--accent)}
+.brand .mark{width:14px;height:14px;border-radius:3px;background:linear-gradient(135deg,var(--c1),var(--c3));box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+.pagehead .tag{font-size:12.5px;color:var(--muted)}
+.brief{min-height:calc(100dvh - 48px)}
+@media not ((min-width:1000px) and (min-height:600px)){ .pagehead{padding:14px 16px 0} .pagehead .tag{display:none} }
+
+/* brief starts right under the header (no vertical centring); a bigger sim-xp name */
+.brief{align-items:start;padding-top:20px}
+.pagehead{padding-top:20px;gap:16px}
+.brand{font-size:26px;font-weight:700;gap:10px;letter-spacing:-.02em}
+.brand .mark{width:22px;height:22px;border-radius:5px}
+.pagehead .tag{font-size:14px;padding-top:4px}
+
+.bdiag{align-self:center}
+.bdiag .stage{height:auto;max-height:66dvh;width:100%}
+.bdiag .stagebox{height:100%}
+
+/* the one-line story under the title uses the body size */
+.brief .hook{font-size:14.5px;line-height:1.6;margin-bottom:16px}
+.brief h1{font-size:25px;margin:0 0 8px}
+#introMeta{display:block;margin-bottom:18px}
+
+/* polish */
+.banner .strip{display:flex;flex-direction:column;justify-content:center;gap:3px;padding:0 18px;line-height:1.4}
+.banner .strip .st-k{font-size:13px;font-weight:600;color:var(--fg)}
+.banner .strip .st-h{font-size:13px;color:var(--muted)}
+.gauge{padding:10px 14px}
+.g-v{font-size:28px}
+.g-s{height:34px}
+
+.report-in h2{font-size:25px}
+.rp-tldr{font-size:15.5px;line-height:1.6}
+.rp-take span{font-size:14.5px}
+
+/* a bigger sim-xp header */
+.pagehead{padding-top:28px;padding-bottom:10px;gap:18px;align-items:baseline}
+.brand{font-size:40px;font-weight:700;letter-spacing:-.03em;gap:12px;align-items:center}
+.brand .mark{width:32px;height:32px;border-radius:7px;align-self:center}
+.pagehead .tag{font-size:16px}
+.brief{min-height:calc(100dvh - 88px)}
+
+/* brief text: one measure for the whole column, balanced title lines, no lone last words */
+.bcol{max-width:60ch}
+.brief h1{text-wrap:balance}
+.brief .hook,.bbody p,.bwatch .small,.bgo .small{text-wrap:pretty;overflow-wrap:break-word}
+.bbody,.bwatch{max-width:none}
+
+/* page settings live in the page header; the player's ⚙ is playback only (speed, detail) */
+.pagehead .spacer{flex:1}
+.pagehead{align-items:center}
+.hbtn{font-size:13px;padding:6px 12px;background:none;border-color:var(--line2);color:var(--fg)}
+.hbtn:hover{border-color:var(--accent);color:var(--accent)}
+.hseg{align-self:center}
+.hseg button{padding:5px 10px;font-size:12.5px}
+
+/* brief: 40 text, a 10 gap, 50 system */
+@media (min-width:1000px) and (min-height:600px){ .brief{grid-template-columns:minmax(0,4fr) minmax(0,5fr);column-gap:10%} }
+.bcol{max-width:none}
+
+/* theme: one quiet icon button */
+.hicon{width:34px;height:34px;padding:0;border-radius:50%;border:0;background:none;color:var(--muted);font-size:17px;display:grid;place-items:center}
+.hicon:hover{border:0;color:var(--fg);background:var(--sunk)}
+
+.hbtn[aria-pressed="true"]{background:color-mix(in srgb,var(--accent) 16%,transparent);border-color:var(--accent);color:var(--accent)}
+
+/* component filter: a slim row of chips above the charts */
+.cfilter{flex:none;display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:2px 2px 0}
+.cf-l{font-size:12px;color:var(--muted);margin-right:2px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:3px 10px;border-radius:999px;background:none;border:1px solid var(--line2);color:var(--muted)}
+.chip small{font:500 10.5px var(--mono);color:var(--faint)}
+.chip:hover{color:var(--fg);border-color:var(--fg)}
+.chip[aria-pressed="true"]{color:var(--fg);background:var(--sunk);border-color:var(--accent)}
+.chip[aria-pressed="true"] small{color:var(--accent)}
+.chip.attn{position:relative;color:var(--fg);border-color:var(--amber)}
+.chip.attn::after{content:"";position:absolute;top:-3px;right:-3px;width:8px;height:8px;border-radius:50%;background:var(--amber);animation:pulse 1.4s ease-in-out infinite;--o1:1;--o2:.35}
+
+/* the key-moment banner fits three lines of explanation */
+.kmrow .banner.sheet{height:106px}
+.kmrow .banner .strip{height:104px}
+.kmrow .banner .sb{grid-template-rows:auto minmax(0,1fr)}
+
+/* 1b. the dashboard, explained */
+.mbrief{max-width:1400px;margin:0 auto;padding:8px 32px 56px}
+.mbrief h2{margin:0 0 4px;font-size:20px;font-weight:600;letter-spacing:-.01em}
+.mbrief > .small{margin:0 0 18px;font-size:13.5px}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;align-items:start}
+.mcard{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px 6px}
+.mcard header{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.mcard header b{font-size:15px;font-weight:600}
+.mcard header span{font-size:12.5px;color:var(--muted)}
+.mcard ul{list-style:none;margin:0;padding:0}
+.mcard li{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}
+.mcard li:last-child{border-bottom:0}
+.mcard li .wnum{margin-top:2px}
+.mcard li > div{min-width:0;flex:1}
+.mt{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mt b{font-size:14px;font-weight:500}
+.mth{font:500 10.5px var(--mono);color:var(--red);border:1px solid color-mix(in srgb,var(--red) 40%,transparent);border-radius:2px;padding:0 5px;line-height:16px}
+.mcard li p{margin:4px 0 0;font-size:13.5px;line-height:1.55;color:var(--muted);text-wrap:pretty}
+
+/* the dashboard, explained: one compact table */
+.mgrid{display:block}
+.mtable{width:100%;border-collapse:collapse;font-size:13px}
+.mtable thead th{text-align:left;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:0 12px 8px 0;border-bottom:1px solid var(--line2)}
+.mtable td,.mtable tbody th{padding:7px 12px 7px 0;vertical-align:top;border-bottom:1px solid var(--line);text-align:left}
+.mtable tbody th{font-weight:600;color:var(--fg);white-space:nowrap}
+.mtable tr.g0 td,.mtable tr.g0 th{border-top:1px solid var(--line2)}
+.mtable .mc{white-space:nowrap;font-weight:500;color:var(--fg)}
+.mtable .mc .wnum{margin-right:6px;vertical-align:1px}
+.mtable .mu{font:12px var(--mono);color:var(--muted);white-space:nowrap;width:1%}
+.mtable td.mth{font:12px var(--mono);color:var(--red);white-space:nowrap;width:1%;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:7px 12px 7px 0;line-height:inherit}
+.mtable .mw{color:var(--muted);line-height:1.5}
+.wnum.blank{visibility:hidden}
+
+/* component name in the dashboard table: a description on hover or focus */
+.chost{position:relative;cursor:help;border-bottom:1px dotted var(--faint);outline:none}
+.chost:focus-visible{border-bottom-color:var(--accent)}
+.ctip{position:absolute;left:0;top:calc(100% + 8px);z-index:20;width:300px;padding:10px 12px;border-radius:6px;background:var(--panel);border:1px solid var(--line2);box-shadow:0 10px 28px rgba(0,0,0,.45);font-weight:400;white-space:normal;color:var(--fg);opacity:0;visibility:hidden;transform:translateY(-3px);transition:opacity .15s,transform .15s,visibility .15s;pointer-events:none}
+.chost:hover .ctip,.chost:focus .ctip{opacity:1;visibility:visible;transform:none}
+.ctip b{display:block;font-size:13.5px;font-weight:600;margin-bottom:4px}
+.ctip p{margin:0 0 6px;font-size:13px;line-height:1.45;color:var(--fg)}
+.ctip .ck{display:inline-block;font:11px var(--mono);color:var(--muted);background:var(--sunk);border-radius:2px;padding:1px 6px;margin-bottom:6px}
+.ctip dl{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin:2px 0 0;font-size:12px}
+.ctip dt{color:var(--muted)} .ctip dd{margin:0;font-family:var(--mono);color:var(--fg)}
+
+/* the dashboard table reads in a narrow column */
+.mtable{max-width:880px}
+.mtable .mw{max-width:60ch}
+
+/* the dashboard table and its heading sit centred on the page */
+.mbrief{max-width:944px}
+.mtable{margin:0 auto}
+
+/* last column: wraps in a comfortable measure, no lone last words */
+.mtable{width:auto;padding-right:0}
+.mtable td:last-child,.mtable th:last-child{padding-right:0}
+.mtable .mw{white-space:normal}
+.mtable .mw > div{max-width:48ch;text-wrap:pretty;overflow-wrap:break-word}
+
+/* the section is as wide as its table, centred, so the heading lines up with the table */
+.mbrief{width:fit-content;max-width:944px;box-sizing:content-box;padding-left:32px;padding-right:32px}
+.mbrief .mtable{margin:0}
+
+/* key-moment explanation as points */
+.kpts{margin:0;padding:0 0 0 16px;display:flex;flex-direction:column;gap:1px}
+.kpts li{padding-left:2px;line-height:1.4}
+.kpts li::marker{color:var(--tone,var(--accent))}
+
+.kmrow .banner .sb{grid-template-rows:auto auto;align-content:start}
+.kmrow .banner .sb p{overflow:visible}
+
+/* a taller key-moment banner makes the player taller, never the charts smaller */
+
+
+/* the result as slides */
+.deck{display:flex;flex-direction:column;gap:14px}
+.deck-top{display:flex;align-items:baseline;justify-content:space-between}
+.deck-n{font:500 12px var(--mono);color:var(--muted)}
+.deck-stage{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:30px 36px}
+.slide{display:flex;flex-direction:column;gap:14px;animation:slideIn .28s ease-out}
+@keyframes slideIn{from{opacity:0;transform:translateX(10px)}}
+@media (prefers-reduced-motion:reduce){.slide{animation:none}}
+.sl-k{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--accent)}
+.sl-big{margin:0;font-size:21px;line-height:1.5;color:var(--fg);text-wrap:pretty;font-weight:450}
+.sl-t{margin:0;font-size:24px;font-weight:600;line-height:1.25;letter-spacing:-.01em;text-wrap:balance}
+.sl-p{margin:0;font-size:16.5px;line-height:1.6;color:var(--fg);text-wrap:pretty}
+.slide .rp-num{font-size:15px} .slide .rp-num td{padding:9px 0}
+.slide .rp-chain li{font-size:15px}
+.sl-ol{margin:0;padding-left:20px;font-size:15px;line-height:1.6}
+.deck-nav{display:flex;align-items:center;justify-content:center;gap:14px}
+.dnav{width:36px;height:36px;padding:0;border-radius:50%;font-size:20px;line-height:1;display:grid;place-items:center;background:none;border-color:var(--line2);color:var(--fg)}
+.dnav:disabled{opacity:.3;cursor:default}
+.dots{display:flex;gap:8px}
+.dot{width:9px;height:9px;padding:0;border-radius:50%;border:0;background:var(--line2)}
+.dot:hover{background:var(--muted);border:0}
+.dot[aria-current="true"]{background:var(--accent);width:22px;border-radius:5px}
+
+.deck-stage{display:flex;flex-direction:column}
+.slide{flex:1;justify-content:center}
+.slide .sl-k{margin-bottom:2px}
+
+/* v3: the frame is the dashboard only; the component filter sits above it and the key moments below, outside the frame */
+@media (min-width:1000px) and (min-height:600px){
+  .simwrap{height:auto;align-items:stretch;margin:20px auto 4dvh;scroll-margin-top:12px}
+  .simcol{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+  .app.feed-off .simwrap .simcol{flex:none;width:calc(100% - clamp(300px,24vw,380px) - 12px)}
+  .simwrap .sim{flex:none;height:min(80dvh,880px);width:100%}
+  .chatcol{height:auto}
+}
+.app.feed-off .simwrap .sim{width:100%}
+.simcol > .cfilter{padding:0 2px}
+.simcol > .kmrow{flex:none}
+
+/* Medium-style section break: three spaced dots, centred */
+.sep{display:block;text-align:center;color:var(--muted);font-size:26px;line-height:1;letter-spacing:.9em;padding:28px 0 32px .9em;user-select:none}
+.mbrief{padding-top:0}
+.result{padding-top:16px}
+
+.brief{min-height:0!important;padding-bottom:8px}
+
+.mbrief{padding-bottom:8px}
+@media (min-width:1000px) and (min-height:600px){ .simwrap{margin-top:0;margin-bottom:8px} }
+
+/* under ~14" (narrower than 1500px): the wide gap goes, and the two columns keep their size and move in toward the centre */
+@media (max-width:1499px) and (min-width:1000px) and (min-height:600px){ .brief{column-gap:32px;width:90%;max-width:none;margin-left:auto;margin-right:auto} }
+
+.res-k{color:#e5484d;font-weight:600}
+.rlock b.res-k{color:#e5484d}
+
+/* the result slides are slide-shaped: 16:9, content centred (taller when a slide needs more) */
+.deck-stage{aspect-ratio:16 / 9;padding:36px 48px;justify-content:center}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="pagehead"><a class="brand" href="https://smarchone.github.io/sim-xp/" target="_blank" rel="noopener noreferrer" title="About sim-xp"><span class="mark" aria-hidden="true"></span>sim-xp</a><span class="tag">simulate a blog, an incident or a load test</span><span class="spacer"></span><button class="hbtn" id="libraryBtn">Open another playbook</button><button class="hicon" id="themeBtn" aria-label="Switch to light theme" title="Switch to light theme">☀</button><div class="seg" id="themeSeg" hidden><button data-theme-set="system">Auto</button><button data-theme-set="light">Light</button><button data-theme-set="dark">Dark</button></div></header>
+
+  <!-- 1. Brief: read the story and what to watch, see the system. Nothing plays yet. -->
+  <section class="sec brief" id="briefSec" aria-labelledby="introT">
+    <div class="bcol">
+      <h1 id="introT"></h1>
+      <span class="eb" id="introMeta"></span>
+      <p class="hook" id="introStory"></p>
+      <div class="bbody" id="introBody"></div>
+      <div class="bwatch" id="briefWatch"></div>
+      <div class="bgo"><button class="primary" id="start">Run the simulation ▼</button><span class="small">then watch the charts and the events. It pauses at each key moment.</span></div>
+    </div>
+    <figure class="bdiag"><figcaption>The system</figcaption>
+        <div class="pn stage dimmable" id="compCard" data-pn="comps">
+                    <div class="stagebox"><svg id="comp" role="img" aria-label="Components"></svg><div class="zoombar"><button type="button" id="zoomOut" title="Zoom out" aria-label="Zoom out">−</button><button type="button" id="zoomPct" title="Fit to view" aria-label="Fit to view">100%</button><button type="button" id="zoomIn" title="Zoom in" aria-label="Zoom in">+</button></div></div>
+        </div>
+    </figure>
+  </section>
+
+  <div class="sep" role="separator" aria-hidden="true">···</div>
+  <!-- 1b. The dashboard, explained: per component, each chart and why it matters. Still reading, before the run. -->
+  <section class="sec mbrief" id="metricsSec" aria-label="What each chart on the dashboard tells you">
+    <div class="mgrid" id="mgrid"></div>
+  </section>
+
+  <div class="sep" role="separator" aria-hidden="true">···</div>
+  <!-- 2. Run: one screen. Dashboard left, the system and the events right. Charts never move; key moments only highlight. -->
+  <div class="simwrap" id="simWrap">
+  <div class="simcol">
+    <div class="cfilter" id="cfilter" role="group" aria-label="Show the charts of one component" hidden></div>
+  <section class="sec sim" id="simSec" aria-label="Simulation">
+    <div class="progress" id="progress" aria-hidden="true" hidden><i></i></div>
+    <h2 class="simtitle" id="pbTitle" hidden></h2>
+    <main class="main">
+      <div class="dashcol">
+        <button class="poster" id="poster" aria-label="Play the simulation"><span class="pbig">▶</span><span class="ptxt">Play</span></button>
+        <div class="vflash" id="vflash" aria-hidden="true"></div>
+        <div class="gauges" id="gauges" aria-label="The signals to watch"></div>
+        <div class="board" id="dashgrid"></div>
+        <div class="lanes" id="dash" aria-label="Events"></div>
+      </div>
+    </main>
+    <div class="vbar" id="vbar">
+      <div class="scrub" id="scrub" role="slider" tabindex="0" aria-label="Seek" aria-valuemin="0">
+        <div class="chaps" id="chaps"></div>
+        <span class="knob" id="knob"></span>
+        <div class="sttip" id="sttip" hidden></div>
+      </div>
+      <div class="vrow">
+        <button class="vb" id="vPlay" aria-label="Play (k)" title="Play (k)">▶</button>
+        <button class="vb" id="vNext" aria-label="Next key moment" title="Next key moment (→)">⏭</button>
+        <span class="vtime" id="vtime"></span>
+        <span class="vchap" id="vchap"></span>
+        <span class="spacer"></span>
+        <button class="vresult" id="vResult" hidden>Read the result ↓</button>
+        <button class="vb vtxt vtoggle" id="vFeed" aria-pressed="false" title="Show live events: the team’s chat, logs and alerts (e)">Events</button>
+        <button class="vb vtxt" id="vSpeed" title="Playback speed (+ / −)">1×</button>
+        <div class="hud">
+        <button class="status" id="status" aria-live="polite" title="Click or press Space to pause and play"></button>
+        <button class="vb" id="helpBtn" aria-label="Keyboard shortcuts" aria-expanded="false" title="Keyboard shortcuts (?)">?</button>
+        <button class="vb" id="menuBtn" aria-label="Settings" aria-expanded="false" title="Settings">⚙</button>
+      <div class="pop menu" id="help" hidden>
+        <span class="eb">Keyboard</span>
+        <div class="keys">
+          <span><kbd>Space</kbd> <kbd>K</kbd></span><span>play · pause · continue</span>
+          <span><kbd>J</kbd> <kbd>L</kbd></span><span>back / forward 10 s</span>
+          <span><kbd>F</kbd></span><span>full screen</span>
+          <span><kbd>E</kbd></span><span>show / hide the event feed</span>
+          <span><kbd>←</kbd><kbd>→</kbd></span><span>previous / next key moment</span>
+          <span><kbd>R</kbd></span><span>report</span>
+          <span><kbd>−</kbd><kbd>+</kbd></span><span>slower / faster</span>
+          <span><kbd>Esc</kbd></span><span>close</span>
+          <span>drag · scroll</span><span>pan the components</span>
+          <span>Ctrl + scroll</span><span>zoom them (or pinch)</span>
+          <span><kbd>H</kbd></span><span>Standard / Hardcore detail (when the playbook has it)</span>
+          <span>hover</span><span>charts or feed to look back</span>
+          <span>click</span><span>a feed line or chart to jump there</span>
+        </div>
+      </div>
+      <div class="pop menu" id="menu" hidden role="menu">
+        <span class="eb">Playback</span>
+        <button class="mi" id="reportBtn" role="menuitem" hidden>Report <kbd>R</kbd></button>
+        <button class="mi" id="introBtn" role="menuitem" hidden>Show intro <kbd>I</kbd></button>
+        <div class="row"><span class="small" style="flex:1">Speed</span><div class="seg" id="speedSeg"><button data-speed="2">0.5×</button><button data-speed="4">1×</button><button data-speed="8">2×</button><button data-speed="16">4×</button></div></div>
+        <div class="row" id="detailRow" hidden><span class="small" style="flex:1" title="Hardcore shows the deeper layer of the same run: more charts, raw logs and commands, and a deep dive in the report">Detail <kbd>H</kbd></span><div class="seg" id="detailSeg"><button data-detail="standard">Standard</button><button data-detail="hardcore">Hardcore</button></div></div>
+      </div>
+      </div>
+        <button class="vb" id="vFull" aria-label="Full screen (f)" title="Full screen (f)">⛶</button>
+      </div>
+    </div>
+  </section>
+    <div class="kmrow">
+        <div class="sheet banner expanded" id="caption" aria-live="polite">
+        <div class="strip" id="sheetStrip"></div>
+        <div class="sb">
+          <div class="top"><span class="tn" id="capTone" hidden><i></i><b></b></span><span class="eb" id="capK"></span></div>
+          <h3 id="capT"></h3>
+          <div class="foot"><button class="more" id="capMore" aria-expanded="true" hidden>explain</button><kbd>Space</kbd><button class="primary" id="beatGo" tabindex="-1">Continue ▶</button></div>
+          <p id="capH"></p>
+          <ol class="wlist" id="capList" hidden></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+  <aside class="chatcol" id="chatCol" aria-label="Live events">
+        <div class="pn feed dimmable" data-pn="feed" data-id="feed" id="feedCard">
+          <div class="fh"><b>Live events</b><span class="hint">the team’s chat, logs and alerts</span></div>
+          <div class="feedbox"><ol id="feed"></ol></div>
+        </div>
+  </aside>
+  </div>
+
+  <div class="sep" role="separator" aria-hidden="true">···</div>
+  <!-- 3. Result: reading again. Locked until the run ends, so a scroll cannot give the answer away. -->
+  <section class="sec result" id="resultSec" aria-label="Result">
+    <div class="rlock" id="resLock"><b class="res-k">The result</b><span>Finish the run to read what happened.</span></div>
+    <div class="report-in" id="report" hidden></div>
+  </section>
+</div>
+
+
+<div id="ntip" hidden></div>
+<!-- the v2 popups are gone; these stay closed so the shared playback code sees "no popup open" -->
+<div id="intro" hidden></div>
+<div id="scrim" hidden></div>
+
+<script>
+// The player plays one playbook, handed over by the page that hosts it (index.html). That page owns loading,
+// validation and the WebMCP tools; it drives playback through window.player (end of this script).
+const host = window.parent !== window ? window.parent.simxp : null;
+const PB = host && host.current ? structuredClone(host.current) : null;
+if (!PB) { document.body.innerHTML = '<p style="padding:24px">No playbook loaded. Open <a href="./" target="_top">sim-xp</a> to pick one.</p>'; throw new Error("no playbook"); }
+
+/* ===================== Theme: auto follows the system; light is cream ===================== */
+const THEME_KEY = "sim-xp.theme";
+function applyTheme(v, persist) {
+  const root = document.documentElement;
+  if (v == null) v = "dark";   // v3 starts dark; "system" (Auto) follows the OS
+  if (v === "light" || v === "dark") root.dataset.theme = v; else delete root.dataset.theme;
+  try { const top = window.parent !== window ? window.parent.document.documentElement : null; if (top) { if (root.dataset.theme) top.dataset.theme = root.dataset.theme; else delete top.dataset.theme; } } catch (e) { /* different origin: the frame alone changes */ }
+  { const tb = document.getElementById("themeBtn"), dark = root.dataset.theme === "dark" || (!root.dataset.theme && matchMedia("(prefers-color-scheme: dark)").matches);
+    if (tb) { tb.textContent = dark ? "☀" : "☾"; tb.title = tb.ariaLabel = dark ? "Switch to light theme" : "Switch to dark theme"; tb.dataset.next = dark ? "light" : "dark"; } }
+  document.querySelectorAll("#themeSeg [data-theme-set]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.themeSet === (v === "light" || v === "dark" ? v : "system"))));
+  if (persist) try { localStorage.setItem(THEME_KEY, v === "light" || v === "dark" ? v : "system"); } catch (e) { /* storage blocked */ }
+}
+try { applyTheme(localStorage.getItem(THEME_KEY), false); } catch (e) { /* storage blocked */ }
+
+/* ===================== Engine (what the app does with it) ===================== */
+const D = PB.meta.duration_s;
+const $ = s => document.querySelector(s);
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs = {}, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+const COLORS = ["red","amber","green","blue","teal","violet","pink","grey"];
+const col = c => c == null ? null : COLORS.includes(c) ? `var(--${c})` : c;
+// Story time. By default one playbook second is one story second; meta.clock { start?, scale?, changes? } makes a long story
+// (hours, days, months) show its real time on the clock, the feed, the axes and the key moments while playback stays short.
+const CLOCK = PB.meta.clock || {};
+const segs = [{ t: 0, k: CLOCK.scale > 0 ? CLOCK.scale : 1 }, ...(CLOCK.changes || []).filter(c => c.scale > 0).sort((a, b) => a.t - b.t).map(c => ({ t: c.t, k: c.scale }))];
+const storyS = t => { let s = 0; for (let i = 0; i < segs.length; i++) { const a = segs[i].t, b = i + 1 < segs.length ? segs[i + 1].t : Infinity; if (t <= a) break; s += (Math.min(t, b) - a) * segs[i].k; } return s; };
+const T0 = CLOCK.start ? Date.parse(CLOCK.start) : NaN, TOTAL = storyS(D), MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const p2 = n => String(n).padStart(2, "0");
+const shortT = t => { const f = fmtT(t); return /^\d\d:\d\d:\d\d$/.test(f) ? f.slice(0, 5) : f; };   // time axis: hh:mm
+const fmtT = t => {
+  const s = Math.max(0, Math.floor(storyS(Math.max(0, t))));
+  if (!isNaN(T0)) {
+    const d = new Date(T0 + s * 1000), hm = `${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}`;
+    if (TOTAL < 3 * 3600) return `${hm}:${p2(d.getUTCSeconds())}`;
+    const day = `${MON[d.getUTCMonth()]} ${d.getUTCDate()}${TOTAL >= 300 * 86400 ? ", " + d.getUTCFullYear() : ""}`;
+    return TOTAL < 14 * 86400 ? `${day} ${hm}` : day;
+  }
+  const dd = Math.floor(s / 86400), r = s % 86400, hh = Math.floor(r / 3600), mm = Math.floor((r % 3600) / 60), ss = r % 60;
+  if (TOTAL < 3600) return `${p2(mm)}:${p2(ss)}`;
+  if (TOTAL < 86400) return `${hh}:${p2(mm)}:${p2(ss)}`;
+  return TOTAL < 14 * 86400 ? `Day ${dd + 1} ${p2(hh)}:${p2(mm)}` : `Day ${dd + 1}`;
+};
+const humanDur = s => s < 90 ? `${Math.round(s)} s` : s < 5400 ? `${Math.round(s / 60)} min` : s < 172800 ? `${Math.round(s / 3600)} hours` : s < 86400 * 90 ? `${Math.round(s / 86400)} days` : s < 86400 * 730 ? `${Math.round(s / 86400 / 30.4)} months` : `${Math.round(s / 86400 / 365)} years`;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// metric series: keyframes + shape, plus deterministic jitter (unchanged)
+const series = {}, clean = {};
+PB.metrics.forEach((m, mi) => {
+  const kfs = {};
+  PB.timeline.forEach(e => (e.metrics || []).filter(x => x.id === m.id).forEach(x => (kfs[e.t] = x)));
+  let v = m.start, seg = null; const out = [], co = [];
+  for (let s = 0; s <= D; s++) {
+    if (kfs[s]) { const k = kfs[s]; seg = { from: v, to: k.to, t0: s, dur: k.over_s || 0, shape: k.shape || "ease" }; }
+    if (seg) { let p = seg.dur ? Math.min(1, (s - seg.t0) / seg.dur) : 1; if (seg.shape === "step") p = 1; const e = seg.shape === "linear" ? p : p * p * (3 - 2 * p); v = seg.from + (seg.to - seg.from) * e; }
+    const n = Math.sin(s * 0.9 + mi * 7) * 0.5 + Math.sin(s * 2.3 + mi * 3) * 0.3 + Math.sin(s * 5.1 + mi) * 0.2;
+    out[s] = Math.max(0, v * (1 + (m.noise || 0) * n)); co[s] = v;
+  }
+  series[m.id] = out; clean[m.id] = co;
+});
+const metricById = Object.fromEntries(PB.metrics.map(m => [m.id, m]));
+const at = (id, t) => series[id][Math.max(0, Math.min(D, Math.floor(t)))];
+
+// alerts (unchanged)
+const alertState = {}, alertFeed = [], alertRanges = [];
+PB.alerts.forEach(a => {
+  const st = []; let since = null, firing = false, start = null;
+  for (let s = 0; s <= D; s++) {
+    const v = series[a.metric][s]; const c = a.op === ">" ? v > a.value : v < a.value;
+    if (c) { if (since == null) since = s; } else since = null;
+    const now = c && s - since >= a.for_s ? "firing" : c ? "pending" : "ok";
+    if (now === "firing" && !firing) { firing = true; start = s; alertFeed.push({ t: s, from: "alertmanager", kind: "alert", text: `FIRING · ${a.summary}` }); }
+    if (now !== "firing" && firing) { firing = false; alertRanges.push({ a, from: start, to: s }); alertFeed.push({ t: s, from: "alertmanager", kind: "resolved", text: `RESOLVED · ${a.summary}` }); }
+    st[s] = now;
+  }
+  if (firing) alertRanges.push({ a, from: start, to: D });
+  alertState[a.id] = st;
+});
+
+function stateAt(T) {
+  const st = {};
+  const apply = eff => { const cur = st[eff.target] || {}; for (const k in eff) { if (k === "target") continue; if (eff[k] === null) delete cur[k]; else cur[k] = eff[k]; } st[eff.target] = cur; };
+  PB.initial.effects.forEach(apply);
+  PB.timeline.forEach(e => { if (e.t <= T) (e.effects || []).forEach(apply); });
+  return st;
+}
+const beatTimes = new Set(PB.timeline.filter(e => e.beat).map(e => e.t));
+const feedItems = PB.timeline.filter(e => e.feed).map(e => ({ t: e.t, ...e.feed })).concat(alertFeed).sort((a, b) => a.t - b.t);
+feedItems.forEach(f => (f.key = f.key === true || beatTimes.has(f.t) || f.kind === "alert" || f.kind === "resolved"));
+// tone of a key moment: good, neutral or bad (the feed line at its time, the caption sheet and the status chip carry it); alerts firing are bad, resolved are good
+const TONES = ["good", "neutral", "bad"], TONE_LABEL = { good: "Good", neutral: "Neutral", bad: "Bad" };
+const beatTone = e => (TONES.includes(e.beat.tone) ? e.beat.tone : null);
+const toneAt = new Map(PB.timeline.filter(e => e.beat && beatTone(e)).map(e => [e.t, beatTone(e)]));
+feedItems.forEach(f => { f.tone = toneAt.get(f.t) || (f.kind === "alert" ? "bad" : f.kind === "resolved" ? "good" : null); });
+$("#feedCard").style.setProperty("--tcol", (Math.max(...feedItems.map(f => fmtT(f.t).length), 5) * 0.62 + 1.4).toFixed(1) + "em");
+const beats = PB.timeline.filter(e => e.beat);
+// Detail: Standard or Hardcore. Hardcore reveals items the playbook tags level "deep"; the run itself never changes.
+const DETAIL_KEY = "sim-xp.detail";
+const hasDeep = PB.dashboard.some(p => p.level === "deep") || PB.timeline.some(e => (e.feed && e.feed.level === "deep") || (e.beat && e.beat.deep))
+  || PB.components.nodes.some(n => (n.details || []).some(d => d.level === "deep")) || !!(PB.report && PB.report.deep);
+let HC = false;
+try { HC = hasDeep && localStorage.getItem(DETAIL_KEY) === "hardcore"; } catch (e) { /* storage blocked */ }
+document.body.classList.toggle("hc", HC);
+const shownFeed = f => HC || f.level !== "deep";
+const titled = PB.timeline.filter(e => e.title);
+// chapters = the key moments; chapter i runs from its beat (the first one from 0) to the next beat
+const chapters = beats.map((b, i) => ({ beat: b, title: b.title, from: i === 0 ? 0 : b.t, to: i + 1 < beats.length ? beats[i + 1].t : D }));
+const chapterAt = t => { let c = 0; chapters.forEach((ch, i) => { if (t >= ch.from) c = i; }); return c; };
+
+/* ===================== Components view =====================
+   Stand-in for engine auto-layout: the agent only says which nodes and edges exist;
+   the app lays them out left-to-right on wide screens and top-to-bottom on phones. */
+// Auto-layout: the playbook only lists nodes and edges. Layers come from the longest path from a source;
+// nodes in a layer are ordered by the average position of their parents. Two directions: LR (wide) and TB (tall).
+function autoLayout(dir) {
+  const ns = PB.components.nodes, es = PB.components.edges, ids = ns.map(n => n.id);
+  const preds = Object.fromEntries(ids.map(i => [i, []])), succ = Object.fromEntries(ids.map(i => [i, []]));
+  es.forEach(e => { if (preds[e.to] && succ[e.from] && e.from !== e.to) { preds[e.to].push(e.from); succ[e.from].push(e.to); } });
+  // drop back edges (cycles) with a DFS so layering terminates
+  const state = {}, back = new Set();
+  const dfs = u => { state[u] = 1; succ[u].forEach(v => { if (state[v] === 1) back.add(u + ">" + v); else if (!state[v]) dfs(v); }); state[u] = 2; };
+  ids.forEach(i => { if (!state[i]) dfs(i); });
+  const layer = {}; const L = u => { if (layer[u] != null) return layer[u]; layer[u] = 0; const ps = preds[u].filter(p => !back.has(p + ">" + u)); layer[u] = ps.length ? Math.max(...ps.map(L)) + 1 : 0; return layer[u]; };
+  ids.forEach(L);
+  const nl = Math.max(...ids.map(i => layer[i])) + 1, layers = Array.from({ length: nl }, () => []);
+  ids.forEach(i => layers[layer[i]].push(i));
+  const pos = {};
+  layers.forEach(l => { l.forEach((id, k) => (pos[id] = k)); });
+  for (let li = 1; li < nl; li++) { const bc = id => { const ps = preds[id].filter(p => layer[p] < li); return ps.length ? ps.reduce((a, p) => a + pos[p], 0) / ps.length : pos[id]; }; layers[li].sort((a, b) => bc(a) - bc(b)); layers[li].forEach((id, k) => (pos[id] = k)); }
+  const byId = Object.fromEntries(ns.map(n => [n.id, n]));
+  const sdir = dir === "GRID" ? "LR" : dir; // a hand-drawn grid uses the wide node sizes
+  const size = id => { const n = byId[id], np = (n.parts || []).length;
+    if (np) { const rows = sdir === "LR" ? Math.ceil(Math.sqrt(np)) : Math.min(2, Math.ceil(np / Math.ceil(Math.sqrt(np)))) || 1, cols = Math.ceil(np / rows), cw = 52, ch = 34, gap = 8;
+      return { w: Math.max(sdir === "LR" ? 180 : 170, 20 + cols * cw + (cols - 1) * gap), h: 39 + rows * ch + (rows - 1) * gap + 10, cols }; }
+    return sdir === "LR" ? { w: 160, h: 70 } : { w: 140, h: 76 }; };
+  const sz = Object.fromEntries(ids.map(i => [i, size(i)])), out = {}, M = 6;
+  if (dir === "GRID") { // the playbook draws the grid: rows of node ids (null = empty cell); columns line up, so edges stay short and straight
+    const gapX = 50, gapY = 34, rowsIn = PB.components.layout.rows.map(r => r.map(id => (byId[id] ? id : null)));
+    const seen = new Set(rowsIn.flat()), rest = ids.filter(i => !seen.has(i)); if (rest.length) rowsIn.push(rest); // a node the grid forgot still shows
+    const nc = Math.max(...rowsIn.map(r => r.length)), colW = Array.from({ length: nc }, (_, c) => Math.max(0, ...rowsIn.map(r => (r[c] ? sz[r[c]].w : 0))));
+    const rowH = rowsIn.map(r => Math.max(0, ...r.map(i => (i ? sz[i].h : 0))));
+    const colX = colW.map((_, c) => M + colW.slice(0, c).reduce((a, w) => a + w + gapX, 0));
+    let y = M; rowsIn.forEach((r, ri) => { r.forEach((i, c) => { if (i) out[i] = { x: colX[c] + (colW[c] - sz[i].w) / 2, y: y + (rowH[ri] - sz[i].h) / 2, ...sz[i] }; }); y += rowH[ri] + gapY; });
+    return { vb: [colX[nc - 1] + colW[nc - 1] + M, y - gapY + M], dir, n: out };
+  }
+  if (dir === "LR") {
+    const gapX = 60, gapY = 16, colW = layers.map(l => Math.max(...l.map(i => sz[i].w))), colH = layers.map(l => l.reduce((a, i) => a + sz[i].h, 0) + gapY * (l.length - 1));
+    const H = Math.max(...colH); let x = M;
+    layers.forEach((l, li) => { let y = M + (H - colH[li]) / 2; l.forEach(i => { out[i] = { x: x + (colW[li] - sz[i].w) / 2, y, ...sz[i] }; y += sz[i].h + gapY; }); x += colW[li] + gapX; });
+    return { vb: [x - gapX + M, H + 2 * M], dir, n: out };
+  }
+  const gapX = 8, gapY = 50, rowH = layers.map(l => Math.max(...l.map(i => sz[i].h))), rowW = layers.map(l => l.reduce((a, i) => a + sz[i].w, 0) + gapX * (l.length - 1));
+  const W = Math.max(...rowW); let y = M;
+  layers.forEach((l, li) => { let x = M + (W - rowW[li]) / 2; l.forEach(i => { out[i] = { x, y: y + (rowH[li] - sz[i].h) / 2, ...sz[i] }; x += sz[i].w + gapX; }); y += rowH[li] + gapY; });
+  return { vb: [W + 2 * M, y - gapY + M], dir, n: out };
+}
+// the playbook may draw the component grid itself (components.layout.rows); the phone-width stack always uses the auto top-to-bottom layout
+const GRID = Array.isArray(PB.components.layout && PB.components.layout.rows) && PB.components.layout.rows.every(Array.isArray);
+const LAYOUTS = { wide: autoLayout(GRID ? "GRID" : "LR"), tall: autoLayout("TB") };
+const nodeStatus = {};
+const comp = $("#comp"); let nodeEls = {}, partEls = {}, edgeEls = {}, nodes = {}, layoutKey = null;
+const ONE_SCREEN = matchMedia("(min-width:1000px) and (min-height:600px)");
+const stageEl = $("#compCard");
+$("#zoomIn").onclick = () => { const c = centerVB(); zoomAt(1.25, c[0], c[1]); };
+$("#zoomOut").onclick = () => { const c = centerVB(); zoomAt(1 / 1.25, c[0], c[1]); };
+$("#zoomPct").onclick = () => resetView();
+// one-screen: pick the layout whose aspect fits the stage box; stacked: top-to-bottom only on phones
+// resize observers fire many times while a splitter is dragged; draw at most once per frame
+let renderQueued = false;
+const scheduleRender = () => { if (renderQueued) return; renderQueued = true; requestAnimationFrame(() => { renderQueued = false; render(); }); };
+// v3: the map lives in the brief's right column, drawn left to right.
+const pickLayout = () => {
+  const W = stageEl.clientWidth || 600, H = Math.round(innerHeight * 0.66);
+  const sc = k => { const vb = LAYOUTS[k].vb; return Math.min(W / vb[0], H / vb[1]); };
+  return "wide";   // the top-to-bottom layout draws parallel nodes (the brokers) as a chain, which misreads the system; keep left to right
+};
+const fitStageAspect = () => { const vb = LAYOUTS[layoutKey].vb; stageEl.style.aspectRatio = `${vb[0]} / ${Math.max(vb[1], vb[0] * 0.28)}`; };
+// Excalidraw-style canvas: drag to pan, Ctrl+scroll or pinch to zoom at the cursor, plain scroll pans, double-click or the % button fits.
+// The viewBox always has the stage's aspect, so view = { z: zoom relative to fit, x/y: top-left in graph units, fit: untouched }.
+// Text is sized in graph units (see fitCompText), so it grows and shrinks with the canvas like any drawing.
+let view = { z: 1, x: 0, y: 0, fit: true };
+const ZMIN = 0.4, ZMAX = 6, clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const stageSize = () => [comp.clientWidth || 1, comp.clientHeight || 1];
+const fitScale = () => { const [W, H] = stageSize(), vb = LAYOUTS[layoutKey].vb; return Math.min(W / vb[0], H / vb[1]) || 1; };
+function applyView() {
+  const vb = LAYOUTS[layoutKey].vb, [W, H] = stageSize(), s = fitScale() * view.z, w = W / s, h = H / s;
+  if (view.fit) { view.x = (vb[0] - w) / 2; view.y = 0; } // centred across, top-aligned
+  else { const m = 60 / s; view.x = clamp(view.x, m - w, vb[0] - m); view.y = clamp(view.y, m - h, vb[1] - m); } // keep some of the graph in view
+  comp.setAttribute("viewBox", `${view.x.toFixed(1)} ${view.y.toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}`);
+  $("#zoomPct").textContent = Math.round(view.z * 100) + "%";
+}
+function zoomAt(f, cx, cy) { // f: factor; (cx,cy) in graph units stays under the cursor
+  const z = clamp(view.z * f, ZMIN, ZMAX); if (z === view.z) return;
+  const k = view.z / z; view.x = cx - (cx - view.x) * k; view.y = cy - (cy - view.y) * k; view.z = z; view.fit = false; applyView();
+}
+const toVB = (x, y) => { const m = comp.getScreenCTM(); if (!m) return null; const p = new DOMPoint(x, y).matrixTransform(m.inverse()); return [p.x, p.y]; };
+const centerVB = () => { const [W, H] = stageSize(), s = fitScale() * view.z; return [view.x + W / s / 2, view.y + H / s / 2]; };
+function resetView() { view = { z: 1, x: 0, y: 0, fit: true }; applyView(); }
+comp.addEventListener("wheel", e => {
+  e.preventDefault();
+  if (e.ctrlKey || e.metaKey) { const p = toVB(e.clientX, e.clientY); if (p) zoomAt(Math.exp(-clamp(e.deltaY, -40, 40) * 0.006), p[0], p[1]); return; } // pinch arrives as ctrl+wheel
+  const k = comp.getScreenCTM().a || 1; view.x += e.deltaX / k; view.y += e.deltaY / k; view.fit = false; applyView();
+}, { passive: false });
+comp.addEventListener("pointerdown", e => {
+  if (e.button > 1) return;
+  const x0 = e.clientX, y0 = e.clientY, v0 = { ...view }; let moved = false;
+  const move = m => {
+    if (!moved && Math.hypot(m.clientX - x0, m.clientY - y0) < 4) return;
+    if (!moved) { moved = true; comp.setPointerCapture(e.pointerId); comp.classList.add("panning"); }
+    const k = comp.getScreenCTM().a || 1; // screen px per graph unit (constant while panning)
+    view.x = v0.x - (m.clientX - x0) / k; view.y = v0.y - (m.clientY - y0) / k; view.fit = false;
+    applyView();
+  };
+  const up = () => { comp.classList.remove("panning"); comp.removeEventListener("pointermove", move); comp.removeEventListener("pointerup", up); comp.removeEventListener("pointercancel", up); };
+  comp.addEventListener("pointermove", move); comp.addEventListener("pointerup", up); comp.addEventListener("pointercancel", up);
+});
+comp.addEventListener("dblclick", e => { if (e.target === comp) resetView(); });
+function buildComponents() {
+  layoutKey = pickLayout(); const L = LAYOUTS[layoutKey]; comp.setAttribute("preserveAspectRatio", "xMidYMin meet");
+  comp.replaceChildren(); view = { z: 1, x: 0, y: 0, fit: true }; applyView(); comp.classList.toggle("tall", layoutKey === "tall");
+  nodeEls = {}; partEls = {}; edgeEls = {};
+  nodes = Object.fromEntries(PB.components.nodes.map(n => [n.id, { ...n, ...(L.n[n.id] || {}) }]));
+  const gEdges = el("g", {}, comp), gNodes = el("g", {}, comp);
+  PB.components.edges.forEach(e => {
+    const a = nodes[e.from], b = nodes[e.to]; let d;
+    if (L.dir === "GRID") { // leave from the side that faces the target: right/left when it is a column over, bottom/top when it is a row over
+      const H = (x1, y1, x2, y2) => { const mx = (x1 + x2) / 2; return `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`; }, V = (x1, y1, x2, y2) => { const my = (y1 + y2) / 2; return `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`; };
+      const ay = a.y + a.h / 2, by = b.y + b.h / 2, ax = a.x + a.w / 2, bx = b.x + b.w / 2;
+      if (b.x >= a.x + a.w + 8) d = H(a.x + a.w, ay, b.x, by);
+      else if (b.x + b.w <= a.x - 8) d = H(a.x, ay, b.x + b.w, by);
+      else if (b.y >= a.y + a.h + 8) d = V(ax, a.y + a.h, bx, b.y);
+      else d = V(ax, a.y, bx, b.y + b.h);
+    } else if (L.dir === "LR") { const x1 = a.x + a.w, y1 = a.y + a.h / 2, x2 = b.x, y2 = b.y + b.h / 2, mx = (x1 + x2) / 2; d = `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`; }
+    else { const x1 = a.x + a.w / 2, y1 = a.y + a.h, x2 = b.x + b.w / 2, y2 = b.y, my = (y1 + y2) / 2; d = `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`; }
+    const g = el("g", { class: "dimmable", "data-id": e.id }, gEdges);
+    const path = el("path", { d, fill: "none", stroke: "var(--line)", "stroke-width": 2 }, g);
+    const dots = el("g", {}, g);
+    edgeEls[e.id] = { g, path, dots, len: 0, n: -1, rn: -1, flow: 0, color: "var(--muted)" };
+  });
+  PB.components.nodes.forEach(n0 => {
+    const n = nodes[n0.id];
+    const g = el("g", { class: "dimmable", "data-id": n.id }, gNodes);
+    const base = el("rect", { x: n.x, y: n.y, width: n.w, height: n.h, rx: 8, fill: "var(--node)", stroke: "var(--line)", "stroke-width": 1.5 }, g);
+    const ov = el("rect", { x: n.x, y: n.y, width: n.w, height: n.h, rx: 8, fill: "transparent", "pointer-events": "none" }, g);
+    const title = el("text", { x: n.x + 10, y: n.y + 17, class: "t" }, g); title.textContent = n.label;
+    // the node kind ("consumer", "postgres") is left out: the label already says it, and the intro beat explains the system
+    const sub = el("text", { x: n.x + 10, y: n.y + 32, class: "ts" }, g);
+    const badgeG = el("g", {}, g); const badgeR = el("rect", { y: n.y - 10, height: 18, rx: 9, fill: "var(--panel)", "stroke-width": 1.5 }, badgeG);
+    const badgeT = el("text", { y: n.y + 3, class: "tp", "text-anchor": "middle" }, badgeG);
+    const alertG = el("g", {}, g); const alertC = el("circle", { cx: n.x + n.w - 12, cy: n.y + 14, r: 7 }, alertG);
+    const alertT = el("text", { x: n.x + n.w - 12, y: n.y + 18, "text-anchor": "middle", class: "tp", style: "fill:var(--panel);font-weight:600" }, alertG); alertT.textContent = "!";
+    if ((n.details || []).length) { g.style.cursor = "help"; g.addEventListener("pointerenter", () => (tipNode = n.id)); g.addEventListener("pointermove", ev => showNodeTip(n.id, ev)); g.addEventListener("pointerleave", () => { tipNode = null; $("#ntip").hidden = true; }); }
+    nodeEls[n.id] = { g, base, ov, sub, badgeG, badgeR, badgeT, alertG, alertC, lastSub: null };
+    if (n.parts) {
+      const cols = n.cols || n.part_cols || 2, rows = Math.ceil(n.parts.length / cols), top = n.y + 29, gap = 8;
+      const pw = (n.w - 20 - gap * (cols - 1)) / cols, ph = (n.h - 39 - gap * (rows - 1)) / rows;
+      n.parts.forEach((p, i) => {
+        const x = n.x + 10 + (i % cols) * (pw + gap), y = top + Math.floor(i / cols) * (ph + gap);
+        const pg = el("g", {}, g);
+        el("rect", { x, y, width: pw, height: ph, rx: 5, fill: "var(--panel)", stroke: "var(--line)" }, pg);
+        const pov = el("rect", { x, y, width: pw, height: ph, rx: 5, fill: "transparent" }, pg);
+        const t1 = el("text", { x: x + 8, y: y + ph / 2 + 4, class: "tp" }, pg); t1.textContent = p.label || p.id;
+        const t2 = el("text", { x: x + pw - 8, y: y + ph / 2 + 4, class: "ts", "text-anchor": "end" }, pg);
+        partEls[n.id + "/" + p.id] = { pov, t1, t2, x, y, pw, ph };
+      });
+    }
+  });
+}
+// hover card on a node: its details rows, live values at the cursor time; deep rows only in Hardcore
+let tipNode = null;
+const unitSuffix = u => ["ms", "count", ""].includes(u) ? "" : u === "%" ? "%" : " " + u;
+function nodeTipHTML(id) {
+  const n = PB.components.nodes.find(x => x.id === id), rows = (n.details || []).filter(d => HC || d.level !== "deep"), v = viewT();
+  if (!rows.length) return "";
+  const val = d => d.metric ? fmtV(at(d.metric, v), metricById[d.metric].unit) + unitSuffix(metricById[d.metric].unit) : esc(d.text);
+  return `<h5>${esc(n.label)}<span>${esc(n.kind || "")}${nodeStatus[id] && nodeStatus[id] !== "calm" ? " · " + nodeStatus[id] : ""}</span></h5><table>${rows.map(d => `<tr class="${d.level === "deep" ? "d" : ""}"><td>${esc(d.label)}</td><td>${val(d)}</td></tr>`).join("")}</table>`;
+}
+function showNodeTip(id, ev) {
+  const tip = $("#ntip"); if (comp.classList.contains("panning")) { tip.hidden = true; return; }
+  const h = nodeTipHTML(id); if (!h) { tip.hidden = true; return; }
+  if (tip._h !== h) { tip._h = h; tip.innerHTML = h; }
+  tip.hidden = false;
+  tip.style.left = Math.min(ev.clientX + 14, innerWidth - tip.offsetWidth - 8) + "px";
+  tip.style.top = Math.min(ev.clientY + 12, innerHeight - tip.offsetHeight - 8) + "px";
+}
+// node labels wrap (up to three lines) instead of spilling out of the box
+function setLines(t, str, x, y, maxCh) {
+  t.replaceChildren(); if (!str) return;
+  const lines = []; let cur = "";
+  for (const w of String(str).split(" ")) { const nx = cur ? cur + " " + w : w; if (nx.length > maxCh && cur) { lines.push(cur); cur = w; } else cur = nx; }
+  if (cur) lines.push(cur);
+  lines.slice(0, 3).forEach((l, i) => { const ts = el("tspan", { x, y: y + i * 11 }, t); ts.textContent = l; });
+}
+function knobsTo(rect, k, maxO) {
+  const c = col(k.color);
+  if (c && (k.intensity ?? 0.4) > 0) {
+    const o = (k.intensity ?? 0.4) * maxO;
+    rect.setAttribute("fill", c); rect.style.setProperty("--o1", o * 0.45); rect.style.setProperty("--o2", o);
+    rect.setAttribute("opacity", o); rect.classList.toggle("pulse", !!k.pulse);
+  } else { rect.setAttribute("fill", "transparent"); rect.classList.remove("pulse"); }
+}
+function renderComponents(T) {
+  const st = stateAt(T);
+  for (const id in nodeEls) {
+    const n = nodeEls[id], k = st[id] || {}, node = nodes[id], c = col(k.color);
+    knobsTo(n.ov, k, 0.55);
+    n.base.setAttribute("stroke", c && (k.intensity ?? 0.4) >= 0.5 ? c : "var(--line)");
+    if (n.lastSub !== (k.label || "")) { n.lastSub = k.label || ""; setLines(n.sub, n.lastSub, node.x + 10, node.y + 32, Math.floor((node.w - 18) / (compText ? compText.charW : 6.2))); }
+    n.sub.setAttribute("style", c ? `fill:${c}` : "");
+    if (false && k.badge) { // badges repeat the partition colours shown in the topic; not drawn
+      n.badgeG.style.display = ""; n.badgeT.textContent = k.badge;
+      const w = Math.max(30, k.badge.length * 7 + 16), x = node.x + node.w - w - 8;
+      n.badgeR.setAttribute("x", x); n.badgeR.setAttribute("width", w); n.badgeR.setAttribute("stroke", c || "var(--line)"); n.badgeT.setAttribute("x", x + w / 2);
+    } else n.badgeG.style.display = "none";
+    n.g.setAttribute("opacity", k.down ? 0.35 : 1);
+    let worst = null;
+    PB.alerts.filter(a => a.component === id).forEach(a => { const s = alertState[a.id][Math.floor(T)]; if (s === "firing") worst = "firing"; else if (s === "pending" && !worst) worst = "pending"; });
+    n.alertG.style.display = worst ? "" : "none";
+    nodeStatus[id] = k.down || worst === "firing" || (k.color === "red" && (k.intensity ?? 0.4) >= 0.3) ? "failing" : worst === "pending" || k.color === "red" || k.color === "amber" ? "degrading" : "calm";
+    if (worst) n.alertC.setAttribute("fill", worst === "firing" ? "var(--red)" : "var(--amber)");
+  }
+  for (const id in partEls) { const p = partEls[id], k = st[id] || {}; knobsTo(p.pov, k, 0.6); const lab = k.label || "";
+    if (p.lastLab !== lab) { // a status label stacks under the part id instead of drawing over it
+      p.lastLab = lab; const two = lab && p.ph >= 26, cw = compText ? compText.charW * 0.85 : 5.4, maxCh = Math.max(3, Math.floor((p.pw - 12) / cw));
+      const txt = lab.length > maxCh ? lab.slice(0, maxCh - 1) + "…" : lab;
+      p.t1.setAttribute("y", two ? p.y + p.ph / 2 - 2 : p.y + p.ph / 2 + 4);
+      if (two) { p.t2.setAttribute("x", p.x + 8); p.t2.setAttribute("text-anchor", "start"); p.t2.setAttribute("y", p.y + p.ph / 2 + 9); }
+      else { p.t2.setAttribute("x", p.x + p.pw - 8); p.t2.setAttribute("text-anchor", "end"); p.t2.setAttribute("y", p.y + p.ph / 2 + 4); }
+      p.t2.textContent = txt;
+    } }
+  for (const id in edgeEls) {
+    const e = edgeEls[id], k = st[id] || {}, c = col(k.color);
+    e.path.setAttribute("stroke", c || "var(--line)");
+    e.path.setAttribute("stroke-width", 1.5 + (k.width ?? 0) * 4);
+    e.path.setAttribute("stroke-opacity", (k.flow ?? 0) > 0 ? 0.6 : 0.35);
+    e.color = c || "var(--muted)"; e.flow = k.flow ?? 0;
+    const n = Math.round((k.flow ?? 0) * 8), rn = Math.round((k.reverse ?? 0) * 8);
+    if (n !== e.n || rn !== e.rn) {
+      e.dots.replaceChildren(); e.n = n; e.rn = rn;
+      for (let i = 0; i < n; i++) el("circle", { r: 3, "data-dir": 1, "data-i": i / Math.max(1, n) }, e.dots);
+      for (let i = 0; i < rn; i++) el("circle", { r: 3, "data-dir": -1, "data-i": i / Math.max(1, rn), fill: "var(--red)" }, e.dots);
+    }
+  }
+  placeDots(T);
+}
+function placeDots(T) {
+  for (const id in edgeEls) {
+    const e = edgeEls[id]; if (!e.len) e.len = e.path.getTotalLength();
+    for (const c of e.dots.children) {
+      const dir = +c.dataset.dir, off = +c.dataset.i;
+      let f = (T * 0.06 * (dir > 0 ? 0.6 + e.flow : 0.7) + off) % 1; if (dir < 0) f = 1 - f;
+      const p = e.path.getPointAtLength(f * e.len); c.setAttribute("cx", p.x); c.setAttribute("cy", p.y);
+      if (dir > 0) c.setAttribute("fill", e.color);
+    }
+  }
+}
+buildComponents();
+// components text is sized so it reads ~11px (names) and ~9.5px (labels) when the graph is fitted, then scales with the canvas
+let compText = null;
+function fitCompText() {
+  const sc = fitScale();
+  const ct = Math.min(13, Math.max(8.5, 11 / sc)), cs = Math.min(11, Math.max(7.5, 9.5 / sc));
+  if (compText && Math.abs(compText.ct - ct) < 0.05 && Math.abs(compText.cs - cs) < 0.05) return;
+  compText = { ct, cs, charW: cs * 0.62 };
+  comp.style.setProperty("--ct", ct.toFixed(2) + "px"); comp.style.setProperty("--cs", cs.toFixed(2) + "px");
+  for (const id in nodeEls) nodeEls[id].lastSub = null; // re-wrap labels for the new size
+  scheduleRender();
+}
+new ResizeObserver(() => { if (pickLayout() !== layoutKey) { buildComponents(); fitStageAspect(); compText = null; if (activeBeat) applyFocus(activeBeat); scheduleRender(); } applyView(); fitCompText(); }).observe(stageEl);
+
+/* ===================== Dashboard =====================
+   Rules that make it regular:
+   - every chart is the same height and the same width, stacked, sharing ONE time axis (same left gutter, same x mapping);
+   - SVGs are sized to their real pixels, so every axis label is the same 10.5px everywhere;
+   - y axis: 0, half, and a "nice" max (1/2/2.5/5 x 10^n), same number format everywhere;
+   - count metrics (rebalances) are events, not a curve: they become an event lane under the charts,
+     and their steps (plus deploys) are drawn as annotations on every chart;
+   - annotations and the event lane only show what has happened so far (no spoilers). */
+const PL = 40, PR = 10;
+// one colour for data. In a multi-series panel the first series is the reference (e.g. produced) and is drawn quietly;
+// teal/violet/pink stay reserved for partition ownership in the components view
+const seriesColor = (P, i) => `var(--c${(i % 6) + 1})`;   // classic dashboard palette: green, yellow, blue, orange, red, purple
+// the unit shown next to a number: none for plain counts, and none for ms (fmtV already writes "ms" or "s")
+const unitOf = u => !u || u === "count" || u === "ms" ? "" : u;
+const withUnit = (v, u) => { const n = fmtV(v, u), k = unitOf(u); return k === "%" ? n + "%" : k ? `${n} ${k}` : n; };
+const kfmt = v => (v / 1000).toFixed(v >= 100000 ? 0 : 1).replace(/\.0$/, "") + "k";
+const fmtV = (v, unit) => unit === "count" ? String(Math.round(v)) : unit === "ms" ? (v >= 1000 ? (v / 1000).toFixed(2).replace(/0$/, "") + "s" : Math.round(v) + "ms") : v >= 1000 ? kfmt(v) : String(Math.round(v));
+const niceCeil = v => { if (v <= 0) return 1; const e = Math.pow(10, Math.floor(Math.log10(v))), f = v / e; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * e; };
+const isEvent = p => p.metrics.every(m => metricById[m].unit === "count");
+const annos = [
+  ...PB.timeline.filter(e => e.feed && e.feed.kind === "deploy").map(e => ({ t: e.t, kind: "deploy", label: "deploy", title: e.feed.text })),
+  ...PB.timeline.flatMap(e => (e.metrics || []).filter(x => metricById[x.id].unit === "count").map(x => ({ t: e.t, kind: "event", label: "↻" + x.to, title: e.title || "" })))
+].sort((a, b) => a.t - b.t);
+const xOfW = W => t => PL + (t / D) * (W - PL - PR);
+const tOfW = W => x => Math.max(0, Math.min(D, ((x - PL) / (W - PL - PR)) * D));
+const statusOf = (p, v, T) => {
+  let s = ""; PB.alerts.filter(a => p.metrics.includes(a.metric)).forEach(a => { const st = alertState[a.id][Math.floor(T)]; if (st === "firing") s = "bad"; else if (st === "pending" && !s) s = "warn"; });
+  if (!s && p.threshold && v > p.threshold.value) s = "bad";
+  return s;
+};
+const dash = $("#dash"), dashGrid = $("#dashgrid");
+const panels = [...PB.dashboard.filter(p => !isEvent(p)), ...PB.dashboard.filter(isEvent)].map(p => {
+  const kind = isEvent(p) ? "lane" : "chart", units = metricById[p.metrics[0]].unit;
+  const card = document.createElement("div"); card.className = `pn panel ${kind} dimmable`; card.dataset.id = "panel:" + p.id;
+  const whyHTML = "";   // v3: no explanations on the board; the student reads the chart
+  const unitTxt = unitOf(units);
+  const legend = kind === "chart" ? `<div class="legend">${p.metrics.map((m, i) => `<span><i style="background:${seriesColor({ p }, i)}"></i>${esc(metricById[m].label)}<b class="lv"></b></span>`).join("")}</div>` : "";
+  const cnode = p.component && PB.components.nodes.find(n => n.id === p.component);
+  const ctag = cnode ? `<span class="ctag" title="${esc(cnode.label)}"><i></i>${esc(cnode.label)}</span>` : "";
+  const dtag = p.level === "deep" ? `<span class="dtag" title="Hardcore detail">deep</span>` : "";
+  const uchip = kind === "chart" && unitTxt ? `<span class="uchip" title="Unit">${esc(unitTxt)}</span>` : "";
+  card.innerHTML = `<div class="panel-h"><b>${esc(p.title)}</b>${uchip}${ctag}${whyHTML}${dtag}<span class="val"${kind === "chart" ? " hidden" : ""}></span></div><div class="plot"></div>${legend}`;
+  (kind === "lane" ? dash : dashGrid).appendChild(card);
+  const plot = card.querySelector(".plot"), svg = el("svg", {}, plot);
+  const P = { p, kind, units, unitTxt, card, plot, svg, deep: p.level === "deep", ctag: card.querySelector(".ctag"), val: card.querySelector(".val"), lv: [...card.querySelectorAll(".lv")], W: 0, H: 0, xOf: xOfW(600), tOf: tOfW(600), yOf: () => 0, lines: [], dots: [], annoEls: [] };
+  hoverable(svg, x => P.tOf(x));
+  P.note = document.createElement("div"); P.note.className = "note"; P.note.innerHTML = `<svg><line class="ld" stroke="var(--accent)" stroke-width="1"/><circle class="nd" r="4" fill="var(--bg)" stroke="var(--accent)" stroke-width="2"/></svg><div class="nl"></div>`; plot.appendChild(P.note);
+  new ResizeObserver(() => { buildPanel(P); scheduleRender(); }).observe(plot);
+  return P;
+});
+function buildPanel(P) {
+  const W = Math.round(P.plot.clientWidth), H = Math.round(P.plot.clientHeight); if (!W || !H) return;
+  P.W = W; P.H = H; P.xOf = xOfW(W); P.tOf = tOfW(W);
+  const svg = P.svg; svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.replaceChildren(); P.annoEls = [];
+  const xOf = P.xOf;
+  if (P.kind === "lane") {
+    const y = 11;
+    el("line", { x1: PL, x2: W - PR, y1: y, y2: y, class: "grid" }, svg);
+    for (let i = 0; i <= 4; i++) { const m = (D * i) / 4, tx = el("text", { x: xOf(m), y: H - 2, class: "axis", "text-anchor": i === 0 ? "start" : i === 4 ? "end" : "middle" }, svg); tx.textContent = fmtT(m); }
+    annos.forEach(a => {
+      const g = el("g", {}, svg), dep = a.kind === "deploy";
+      el("circle", { cx: xOf(a.t), cy: y, r: dep ? 3 : 3.5, fill: dep ? "var(--faint)" : "var(--red)" }, g);
+      if (!dep) { const tx = el("text", { x: xOf(a.t) + 6, y: y + 4, class: "alab", style: "fill:var(--red)" }, g); tx.textContent = a.label; }
+      const tt = el("title", {}, g); tt.textContent = `${fmtT(a.t)} · ${dep ? "deploy: " : ""}${a.title}`;
+      P.annoEls.push({ t: a.t, g });
+    });
+    P.cur = el("line", { y1: 2, y2: y + 7, stroke: "var(--fg)", "stroke-width": 1, opacity: 0.5 }, svg); P._hot = null;
+    return;
+  }
+  const PT = 6, PBm = 16;   // room for the time axis
+  let max = 0; P.p.metrics.forEach(m => series[m].forEach(v => (max = Math.max(max, v)))); if (P.p.threshold) max = Math.max(max, P.p.threshold.value);
+  const pct = P.p.metrics.every(m => metricById[m].unit === "%");
+  max = P.p.max != null ? P.p.max : pct && max <= 100 ? 100 : niceCeil(max * 1.05);
+  const yOf = v => PT + (1 - v / max) * (H - PT - PBm); P.yOf = yOf;
+  // dashboard frame: horizontal grid with a label on each line, vertical time grid, clock times along the bottom
+  const yl = (v, dy) => { const tx = el("text", { x: PL - 6, y: yOf(v) + dy, class: "axis", "text-anchor": "end" }, svg); tx.textContent = fmtV(v, P.units) + (P.units === "%" ? "%" : ""); };
+  const ny = H >= 120 ? 4 : 2;
+  for (let i = 0; i <= ny; i++) { const v = (max * i) / ny; el("line", { x1: PL, x2: W - PR, y1: yOf(v), y2: yOf(v), class: "grid" }, svg); yl(v, i === 0 ? 0 : 3.5); }
+  const nx = Math.max(1, Math.min(6, Math.floor((W - PL - PR) / (shortT(D).length * 6.4 + 28))));   // as many time labels as fit without touching
+  for (let i = 0; i <= nx; i++) {
+    const t = (D * i) / nx, x = xOf(t);
+    if (i > 0 && i < nx) el("line", { x1: x, x2: x, y1: PT, y2: H - PBm, class: "vgrid" }, svg);
+    const tx = el("text", { x, y: H - 3, class: "axis", "text-anchor": i === 0 ? "start" : i === nx ? "end" : "middle" }, svg); tx.textContent = shortT(t);
+  }
+  const defs = el("defs", {}, svg);
+  P.p.metrics.forEach((m, i) => {
+    const g = el("linearGradient", { id: `fill-${P.p.id}-${i}`, x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+    el("stop", { offset: "0%", "stop-color": seriesColor(P, i), "stop-opacity": P.p.metrics.length > 1 ? 0.16 : 0.28 }, g);
+    el("stop", { offset: "100%", "stop-color": seriesColor(P, i), "stop-opacity": 0 }, g);
+  });
+  annos.forEach(a => { const g = el("g", {}, svg); el("line", { x1: xOf(a.t), x2: xOf(a.t), y1: PT, y2: H - PBm, stroke: a.kind === "deploy" ? "var(--faint)" : "var(--red)", "stroke-dasharray": "2 3", opacity: a.kind === "deploy" ? 0.8 : 0.45 }, g); P.annoEls.push({ t: a.t, g }); });
+  if (P.p.threshold) {
+    // the band past the threshold is tinted: above it, or below it when the alert on this chart fires low (idle < 30%)
+    const ty = yOf(P.p.threshold.value), low = PB.alerts.some(a => P.p.metrics.includes(a.metric) && a.op === "<");
+    el("rect", { x: PL, width: W - PL - PR, y: low ? ty : PT, height: Math.max(0, low ? H - PBm - ty : ty - PT), fill: "var(--red)", opacity: 0.045, class: "th-band" }, svg);
+    el("line", { x1: PL, x2: W - PR, y1: ty, y2: ty, stroke: "var(--red)", "stroke-dasharray": "5 4", opacity: 0.7 }, svg);
+    const t2 = el("text", { x: W - PR - 2, y: yOf(P.p.threshold.value) - 4, class: "alab", "text-anchor": "end", style: "fill:var(--red)" }, svg); t2.textContent = P.p.threshold.label; P.thLab = t2;
+  }
+  P.areas = P.p.metrics.map((m, i) => el("polygon", { fill: `url(#fill-${P.p.id}-${i})`, stroke: "none" }, svg));
+  P.lines = P.p.metrics.map((m, i) => el("polyline", { fill: "none", stroke: seriesColor(P, i), "stroke-width": 1.5, "stroke-linejoin": "round" }, svg));
+  P.cur = el("line", { y1: PT, y2: H - PBm, stroke: "var(--fg)", "stroke-width": 1, opacity: 0.5 }, svg); P._hot = null;
+  P.dots = P.p.metrics.map((m, i) => el("circle", { r: 3, fill: seriesColor(P, i) }, svg));
+}
+// per-chart "why it moved" note, pinned to the curve at the key moment
+function placeNote(P, viewT) {
+  const n = activeBeat && (activeBeat.beat.notes || []).find(x => x.panel === P.p.id), box = P.note;
+  if (P.thLab) P.thLab.style.opacity = n ? "0" : "";   // a note on this chart: its threshold label steps aside (the dashed line stays)
+  if (!n || !$("#caption").classList.contains("expanded")) { box.classList.remove("show"); return; }
+  const lab = box.querySelector(".nl"); if (lab.textContent !== n.text) lab.textContent = n.text;
+  box.style.width = P.W + "px"; box.style.height = P.H + "px";
+  const m = n.metric || P.p.metrics[P.p.metrics.length - 1], t = activeBeat.t;
+  const lane = P.kind === "lane", x = P.xOf(t), y = lane ? 11 : P.yOf(at(m, t));
+  lab.style.whiteSpace = lane ? "nowrap" : ""; lab.style.padding = lane ? "1px 8px" : "";
+  const lo = PL + 4, hi = P.W - PR - 4; // stay right of the y-axis labels and inside the panel
+  lab.style.maxWidth = Math.min(275, hi - lo) + "px";
+  const w = lab.offsetWidth, h = lab.offsetHeight, gap = 14;
+  let lx = x + gap <= hi - w ? x + gap : x - gap - w; lx = Math.max(lo, Math.min(hi - w, lx));
+  let ly = y - h / 2; ly = Math.max(2, Math.min(P.H - h - 20, ly));   // keep clear of the time axis
+  // if the label would cover the dot, move it above or below
+  if (x >= lx - 4 && x <= lx + w + 4 && y >= ly - 4 && y <= ly + h + 4) ly = y > P.H / 2 ? Math.max(2, y - h - gap) : Math.min(P.H - h - 2, y + gap);
+  lab.style.left = lx + "px"; lab.style.top = ly + "px";
+  const ex = Math.max(lx, Math.min(lx + w, x)), ey = Math.max(ly, Math.min(ly + h, y));
+  const ld = box.querySelector(".ld"), nd = box.querySelector(".nd");
+  ld.setAttribute("x1", x); ld.setAttribute("y1", y); ld.setAttribute("x2", ex); ld.setAttribute("y2", ey);
+  nd.setAttribute("cx", x); nd.setAttribute("cy", y);
+  box.classList.add("show");
+}
+// a deep chart is surfaced (drawn full size) while it matters: a note on it at the current key moment, or an alert on its metric
+const surfaced = P => !!(activeBeat && (activeBeat.beat.notes || []).some(n => n.panel === P.p.id))
+  || PB.alerts.some(a => P.p.metrics.includes(a.metric) && alertState[a.id][Math.floor(playT)] !== "ok");
+// a chart joins the board when the story first needs it: the first key moment that notes or focuses it, or the first second an alert
+// on its metric is not ok. Charts the first key moment uses, and charts the story never points at, are there from the start.
+// meta.watch names the 2 to 4 signals to keep an eye on; each is matched to its chart by `panel` (a dashboard id) when given, else by title, else by a series label
+let watchMemo = null;
+function watchList() {
+  if (watchMemo) return watchMemo;
+  const norm = x => String(x || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(), charts = panels.filter(P => P.kind === "chart" && !P.deep);
+  watchMemo = [];
+  (PB.meta.watch || []).forEach(w => {
+    const k = norm(w.label);
+    const P = (w.panel && charts.find(P => P.p.id === w.panel)) || charts.find(P => norm(P.p.title) === k) || charts.find(P => P.p.metrics.some(m => norm(metricById[m].label) === k))
+      || charts.find(P => norm(P.p.title).includes(k) || k.includes(norm(P.p.title)));
+    if (P && !watchMemo.some(o => o.P === P)) watchMemo.push({ P, label: w.label, normal: w.normal });
+  });
+  watchMemo.forEach((w, i) => {
+    const h = w.P.card.querySelector(".panel-h"), n = document.createElement("span"), t = document.createElement("span");
+    n.className = "wnum"; n.textContent = i + 1; n.title = "One of the signals to watch";
+    t.className = "wtag"; t.textContent = w.normal;
+    h.insertBefore(n, h.firstChild); w.P.plot.appendChild(t);
+  });
+  return watchMemo;
+}
+let revealAt = null;
+function revealTime(P) {
+  if (!revealAt) {
+    revealAt = new Map();
+    const put = (id, t) => { if (!revealAt.has(id) || t < revealAt.get(id)) revealAt.set(id, t); };
+    watchList().forEach(w => put(w.P.p.id, 0));   // the charts to watch are on the board from the start
+    beats.forEach((e, i) => [...(e.beat.notes || []).map(n => n.panel), ...(e.beat.focus || []).filter(id => id.startsWith("panel:")).map(id => id.slice(6))]
+      .forEach(id => put(id, i === 0 ? 0 : e.t)));
+    panels.forEach(Q => PB.alerts.forEach(a => {
+      if (!Q.p.metrics.includes(a.metric)) return;
+      const k = (alertState[a.id] || []).findIndex(x => x && x !== "ok");
+      if (k >= 0) put(Q.p.id, k);
+    }));
+  }
+  return revealAt.has(P.p.id) ? revealAt.get(P.p.id) : 0;
+}
+const reached = P => P.kind !== "chart" || revealTime(P) <= playT + 0.5 || (!!activeBeat && revealTime(P) <= activeBeat.t);
+// v3: a fixed board, so nothing jumps while the student is reading it; the component filter (chips above the charts) narrows it on request
+let compFilter = null;
+const panelShown = P => (P.deep ? HC : true) && (compFilter == null || P.kind !== "chart" || (P.p.component || "") === compFilter);
+const quietPanels = () => [];
+function renderPanels(playT, viewT) {
+  panels.forEach(P => {
+    if (P.ctag && P.p.component) { const st = nodeStatus[P.p.component] || "calm"; if (P._st !== st) { P._st = st; P.ctag.className = "ctag " + st; P.ctag.title = `${P.ctag.textContent}: ${st}`; } }
+    if (!P.W) return;
+    const xOf = P.xOf;
+    P.annoEls.forEach(a => (a.g.style.display = a.t <= playT ? "" : "none"));
+    P.cur.setAttribute("x1", xOf(viewT)); P.cur.setAttribute("x2", xOf(viewT));
+    // at a key moment the time cursor itself is the indicator: amber (never the curve's blue) and a little thicker on every chart
+    const hot = !!activeBeat && hoverT == null;
+    if (P._hot !== hot) { P._hot = hot; P.cur.setAttribute("stroke", hot ? "var(--amber)" : "var(--fg)"); P.cur.setAttribute("stroke-width", hot ? 1.5 : 1); P.cur.setAttribute("opacity", hot ? 0.95 : 0.5); }
+    if (P.kind === "lane") { placeNote(P, viewT); P.val.textContent = fmtV(at(P.p.metrics[0], viewT), "count"); return; }
+    const step = Math.max(1, Math.round(D / (P.W - PL - PR) * 1.5));
+    P.p.metrics.forEach((m, i) => {
+      const pts = []; for (let s = 0; s <= playT; s += step) pts.push(`${xOf(s).toFixed(1)},${P.yOf(series[m][s]).toFixed(1)}`);
+      pts.push(`${xOf(playT).toFixed(1)},${P.yOf(at(m, playT)).toFixed(1)}`);
+      P.lines[i].setAttribute("points", pts.join(" "));
+      if (P.areas) P.areas[i].setAttribute("points", pts.join(" ") + ` ${xOf(playT).toFixed(1)},${P.yOf(0).toFixed(1)} ${xOf(0).toFixed(1)},${P.yOf(0).toFixed(1)}`);
+      P.dots[i].setAttribute("cx", xOf(viewT)); P.dots[i].setAttribute("cy", P.yOf(at(m, viewT)));
+    });
+    const v0 = at(P.p.metrics[0], viewT), st = statusOf(P.p, v0, viewT);
+    P.val.className = "val " + st;
+    placeNote(P, viewT);
+    P.lv.forEach((x, i) => { const t = withUnit(at(P.p.metrics[i], viewT), metricById[P.p.metrics[i]].unit); if (x.textContent !== t) x.textContent = t; x.className = "lv " + (i === 0 ? st : ""); });
+  });
+}
+
+// quiet deep signals (Hardcore): one line each, a tiny sparkline and the value; they grow into a full chart when they matter
+const quietEl = document.createElement("div"); quietEl.className = "pn quiet"; quietEl.hidden = true;
+quietEl.innerHTML = `<div class="qh">Quiet signals<span>deep detail · a signal becomes a full chart when it matters</span></div><div class="qrows"></div>`;
+dashGrid.appendChild(quietEl);
+let quietKey = "";
+function buildQuiet(list) {
+  quietEl.querySelector(".qrows").innerHTML = list.map(P => {
+    const cn = P.p.component && PB.components.nodes.find(n => n.id === P.p.component);
+    return `<div class="qrow" data-p="${esc(P.p.id)}" title="${esc(P.p.why || "")}"><span class="ql"><b>${esc(P.p.title)}</b>${cn ? `<span class="ctag" data-c="${esc(cn.id)}"><i></i>${esc(cn.label)}</span>` : ""}</span><svg viewBox="0 0 72 16" preserveAspectRatio="none"><polyline fill="none" stroke="var(--muted)" stroke-width="1.2" vector-effect="non-scaling-stroke"/></svg><span class="qv"></span></div>`;
+  }).join("");
+}
+function renderQuiet(playT, viewT) {
+  if (quietEl.hidden) return;
+  quietEl.querySelectorAll(".qrow").forEach(row => {
+    const P = panels.find(x => x.p.id === row.dataset.p), m = P.p.metrics[P.p.metrics.length - 1];
+    let max = 0; series[m].forEach(v => (max = Math.max(max, v))); max = max || 1;
+    const pts = []; for (let i = 0; i <= 36; i++) { const t = (D * i) / 36; if (t > playT) break; pts.push(`${(t / D * 72).toFixed(1)},${(15 - (at(m, t) / max) * 14).toFixed(1)}`); }
+    row.querySelector("polyline").setAttribute("points", pts.join(" "));
+    row.querySelector(".qv").innerHTML = fmtV(at(m, viewT), P.units) + (P.unitTxt ? ` <small>${P.unitTxt}</small>` : "");
+    const tg = row.querySelector(".ctag"); if (tg) tg.className = "ctag " + (nodeStatus[tg.dataset.c] || "calm");
+  });
+}
+
+/* ===================== Feed: always visible, one line per entry, linked to the shared cursor ===================== */
+const feedEl = $("#feed"); let feedShown = -1, feedNear = null, feedHoverLi = null;
+const liHTML = (f, fresh) => `<li class="k-${f.kind}${f.key ? " key" : ""}${f.tone ? " tone-" + f.tone : ""}${f.level === "deep" ? " lv-deep" : ""}${fresh ? " fresh" : ""}" data-i="${feedItems.indexOf(f)}" data-t="${f.t}"><time>${fmtT(f.t)}</time><span class="msg"><span class="who">${esc(f.from)}</span><span class="txt">${esc(f.text)}</span></span></li>`;
+function feedScrollTo(top, smooth) { if (!smooth) feedEl.style.scrollBehavior = "auto"; feedEl.scrollTop = top; if (!smooth) feedEl.style.scrollBehavior = ""; }
+function renderFeed(playT, viewT) {
+  const vis = feedItems.filter(f => f.t <= playT && shownFeed(f));
+  if (vis.length !== feedShown) {
+    const atBottom = feedEl.scrollHeight - feedEl.scrollTop - feedEl.clientHeight < 24;
+    if (playing && feedShown >= 0 && vis.length > feedShown && vis.length - feedShown <= 3) {
+      // new entries arrive one by one: appended, faded in, and the list glides down only if you were already at the bottom
+      if (feedShown === 0) feedEl.replaceChildren();
+      feedEl.insertAdjacentHTML("beforeend", vis.slice(feedShown).map(f => liHTML(f, true)).join(""));
+      if (atBottom) feedScrollTo(feedEl.scrollHeight, true);
+    } else {
+      feedEl.innerHTML = vis.length ? vis.map(f => liHTML(f, false)).join("") : `<li class="empty">Chat, logs and alerts appear here as the story plays.</li>`;
+      feedScrollTo(feedEl.scrollHeight, false);
+    }
+    feedShown = vis.length; feedNear = null;
+  }
+  let near = null; vis.forEach(f => { if (f.t <= viewT) near = f.t; }); // current entry: at the playhead, or at the hovered time
+  if (near !== feedNear) {
+    feedNear = near;
+    let first = null;
+    feedEl.querySelectorAll("li[data-t]").forEach(li => { const on = near != null && +li.dataset.t === near; li.classList.toggle("near", on); if (on && !first) first = li; });
+    // hovering a chart or the scrubber brings the matching entry into view (not when the pointer is in the feed itself)
+    if (first && !feedHoverLi) setTimeout(() => { if (!first.isConnected) return; const top = first.offsetTop, bottom = top + first.offsetHeight * (feedEl.querySelectorAll(`li[data-t="${near}"]`).length); if (top < feedEl.scrollTop || bottom > feedEl.scrollTop + feedEl.clientHeight) feedScrollTo(Math.max(0, top - feedEl.clientHeight / 2), true); }, 260)
+  }
+}
+feedEl.addEventListener("mouseover", e => { const li = e.target.closest("li[data-t]"); if (li && li !== feedHoverLi) { feedHoverLi = li; hoverT = +li.dataset.t; } });
+feedEl.addEventListener("mouseleave", () => { feedHoverLi = null; hoverT = null; });
+feedEl.addEventListener("click", e => { const li = e.target.closest("li[data-t]"); if (li) seek(+li.dataset.t); });
+
+/* ===================== Caption (key moments only) ===================== */
+function fitAboveSheet(on) {
+  comp.style.transform = ""; // the sheet overlays the components; they keep their size
+}
+/* v3: the explanation and the chart notes always show */ function setExpanded(on) { on = true; $("#caption").classList.toggle("expanded", on); $("#capMore").textContent = on ? "hide" : "explain"; $("#capMore").setAttribute("aria-expanded", String(on)); if (activeBeat) { fitAboveSheet(true); render(); } }
+$("#capMore").onclick = () => setExpanded(!$("#caption").classList.contains("expanded"));
+function renderNarr(v) {
+  const i = chapterAt(v), ch = chapters[i], started = typeof introStarted !== "undefined" && introStarted;
+  const nextB = beats.find(b => b.t > v + 0.01);
+  const head = !started ? "Ready when you are" : v < beats[0].t ? "Getting started" : `Chapter ${i + 1} of ${chapters.length} · ${esc(ch.title)}`;
+  const hint = !started ? "Press play. The run pauses at each key moment to tell you what just happened."
+    : playT >= D ? "That is the whole run. The result is below the player."
+    : nextB ? `Watch the numbered charts. The next key moment is ${nextB === beats[0] ? "the first one" : "number " + (beats.indexOf(nextB) + 1)} of ${beats.length}.` : "No more key moments. Watch how it ends.";
+  const h = `<span class="st-k">${head}</span><span class="st-h">${hint}</span>`;
+  if ($("#sheetStrip")._h !== h) { $("#sheetStrip")._h = h; $("#sheetStrip").innerHTML = h; }
+}
+function placeCallout() {}
+
+/* ===================== Popups: one family, one enter/exit animation ===================== */
+function showPop(el) { clearTimeout(el._t); el.classList.remove("leaving"); el.hidden = false; el.classList.remove("pop-in"); void el.offsetWidth; el.classList.add("pop-in"); }
+function hidePop(el, done) {
+  if (el.hidden) { if (done) done(); return; }
+  clearTimeout(el._t); el.classList.add("leaving");
+  el._t = setTimeout(() => { el.hidden = true; el.classList.remove("leaving"); if (done) done(); }, 160);
+}
+const showModal = scrim => { showPop(scrim); showPop(scrim.querySelector(".pop")); };
+const hideModal = (scrim, done) => { hidePop(scrim.querySelector(".pop")); hidePop(scrim, done); };
+const isOpen = el => !el.hidden && !el.classList.contains("leaving");
+
+/* ===================== Gauges: one tile per watched signal, at the top of the dashboard =====================
+   The live value, big, coloured by its alert (firing red, pending amber, else green), its normal range, and a small trend so far. */
+const gauges = (() => {
+  const norm = x => String(x || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(), box = $("#gauges");
+  const list = [].map((w, i) => {   // v3: no gauges; the numbered charts carry the watched signals
+    const ms = w.P.p.metrics, k = ms.findIndex(m => norm(metricById[m].label) === norm(w.label)), m = ms[k >= 0 ? k : 0];
+    const tile = document.createElement("div"); tile.className = "pn gauge"; tile.dataset.id = "panel:" + w.P.p.id;
+    tile.innerHTML = `<div class="g-h"><span class="wnum">${i + 1}</span><b>${esc(w.label)}</b></div><div class="g-row"><span class="g-v"></span><svg class="g-s" viewBox="0 0 120 30" preserveAspectRatio="none"><polygon class="g-a"/><polyline class="g-l"/></svg></div><div class="g-n">${esc(w.normal)}</div>`;
+    box.appendChild(tile);
+    let max = 0; series[m].forEach(v => (max = Math.max(max, v))); max = max || 1;
+    return { w, m, tile, v: tile.querySelector(".g-v"), a: tile.querySelector(".g-a"), l: tile.querySelector(".g-l"), max, unit: metricById[m].unit };
+  });
+  box.hidden = !list.length;
+  return list;
+})();
+function renderGauges(v) {
+  gauges.forEach(g => {
+    const val = at(g.m, v), t = withUnit(val, g.unit);
+    if (g.v.textContent !== t) g.v.textContent = t;
+    let st = "ok"; PB.alerts.filter(a => a.metric === g.m).forEach(a => { const x = alertState[a.id][Math.floor(v)]; if (x === "firing") st = "bad"; else if (x === "pending" && st !== "bad") st = "warn"; });
+    if (g._st !== st) { g._st = st; g.tile.classList.remove("ok", "warn", "bad"); g.tile.classList.add(st); }
+    const step = Math.max(1, Math.round(D / 60)), pts = [];
+    for (let s = 0; s <= v; s += step) pts.push(`${(s / D * 120).toFixed(1)},${(29 - series[g.m][s] / g.max * 27).toFixed(1)}`);
+    pts.push(`${(v / D * 120).toFixed(1)},${(29 - at(g.m, v) / g.max * 27).toFixed(1)}`);
+    g.l.setAttribute("points", pts.join(" ")); g.a.setAttribute("points", pts.join(" ") + ` ${(v / D * 120).toFixed(1)},30 0,30`);
+  });
+}
+
+/* ===================== Video bar: chapters on the scrubber, the time, the chapter, speed, full screen =====================
+   Video time is playback at 1x (4 story-seconds of the run per second), so the clock reads like a video's whatever the speed. */
+const VT = t => t / 4, mss = x => { x = Math.max(0, Math.round(x)); return `${Math.floor(x / 60)}:${p2(x % 60)}`; };
+const chapEls = (() => {
+  const box = $("#chaps"), segs = chapters.length ? chapters.map(c => ({ from: c.from, to: c.to, title: c.title, tone: c.beat && c.beat.beat && c.beat.beat.tone })) : [{ from: 0, to: D, title: "" }];
+  if (segs.length && segs[0].from > 0) segs.unshift({ from: 0, to: segs[0].from, title: "Intro" });
+  return segs.map(sg => {
+    const d = document.createElement("div"); d.className = "chap" + (sg.tone === "bad" ? " bad" : ""); d.style.flex = String(Math.max(0.001, sg.to - sg.from));
+    d.innerHTML = `<i class="hv"></i><i class="pl"></i>`; box.appendChild(d);
+    return { ...sg, el: d, pl: d.firstChild.nextSibling, hv: d.firstChild };
+  });
+})();
+const scrub = $("#scrub"), sttip = $("#sttip");
+const tAtX = x => { const r = scrub.getBoundingClientRect(); return Math.max(0, Math.min(D, ((x - r.left) / r.width) * D)); };
+const fillTo = (key, t) => chapEls.forEach(c => { const f = t <= c.from ? 0 : t >= c.to ? 1 : (t - c.from) / (c.to - c.from); c[key].style.width = (f * 100).toFixed(2) + "%"; });
+function renderBar() {
+  fillTo("pl", playT); markFeedNews();
+  $("#knob").style.left = (playT / D * 100).toFixed(3) + "%";
+  const tt = `${mss(VT(playT))} <small>/ ${mss(VT(D))}</small>`; if ($("#vtime")._h !== tt) { $("#vtime")._h = tt; $("#vtime").innerHTML = tt; }
+  const ch = chapEls.find(c => playT >= c.from && playT < c.to) || chapEls[chapEls.length - 1], ct = ch ? ch.title : "";
+  if ($("#vchap").textContent !== ct) $("#vchap").textContent = ct;
+  const ended = playT >= D, ic = ended ? "↺" : playing ? "❚❚" : "▶";
+  if ($("#vPlay").textContent !== ic) { $("#vPlay").textContent = ic; $("#vPlay").title = ended ? "Replay" : playing ? "Pause (k)" : "Play (k)"; $("#vPlay").setAttribute("aria-label", $("#vPlay").title); }
+  $("#vResult").hidden = !(ended && resultOpen);
+  scrub.setAttribute("aria-valuemax", String(Math.round(VT(D)))); scrub.setAttribute("aria-valuenow", String(Math.round(VT(playT))));
+}
+function vflash(ic) { const f = $("#vflash"); f.textContent = ic; f.classList.remove("go"); void f.offsetWidth; f.classList.add("go"); }
+function startPlaying() { $("#poster").hidden = true; if (!introStarted) { introStarted = true; seek(0); $("#start").textContent = "Back to the simulation ▼"; } }
+let scrubbing = false;
+scrub.addEventListener("pointerdown", e => { e.preventDefault(); scrub.setPointerCapture(e.pointerId); scrubbing = true; scrub.classList.add("drag"); startPlaying(); const was = playing; scrub._was = was; setPlaying(false); seek(tAtX(e.clientX)); });
+scrub.addEventListener("pointermove", e => {
+  const t = tAtX(e.clientX), r = scrub.getBoundingClientRect(), ch = chapEls.find(c => t >= c.from && t < c.to) || chapEls[chapEls.length - 1];
+  fillTo("hv", t); sttip.hidden = false; sttip.style.left = Math.max(60, Math.min(r.width - 60, e.clientX - r.left)) + "px";
+  sttip.innerHTML = `<b>${esc(ch ? ch.title : "")}</b><span>${mss(VT(t))} · ${fmtT(t)}</span>`;
+  if (scrubbing) seek(t);
+});
+scrub.addEventListener("pointerup", () => { if (!scrubbing) return; scrubbing = false; scrub.classList.remove("drag"); if (scrub._was) setPlaying(true); });
+scrub.addEventListener("pointerleave", () => { if (!scrubbing) { sttip.hidden = true; fillTo("hv", 0); } });
+scrub.addEventListener("keydown", e => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); e.stopPropagation(); seek(playT + (e.key === "ArrowRight" ? 20 : -20)); } });
+$("#vPlay").onclick = () => primaryAction(true);
+$("#vNext").onclick = () => { startPlaying(); jumpBeat(1); };
+$("#vResult").onclick = () => openReport();
+$("#poster").onclick = () => { startPlaying(); setPlaying(true); vflash("▶"); };
+const FEED_KEY = "sim-xp.feed";
+let feedOn = false; try { feedOn = localStorage.getItem(FEED_KEY) === "on"; } catch (e) { /* storage blocked */ }
+function setFeed(on, persist) {
+  feedOn = on; $("#app").classList.toggle("feed-off", !on); $("#vFeed").setAttribute("aria-pressed", String(on));
+  $("#vFeed").title = on ? "Hide the event feed (e)" : "Show the event feed: logs, alerts and chat (e)";
+  if (on) $("#vFeed").classList.remove("news");
+  if (persist) try { localStorage.setItem(FEED_KEY, on ? "on" : "off"); } catch (e) { /* storage blocked */ }
+}   // the board's ResizeObserver re-lays the charts when the column appears or goes
+setFeed(feedOn, false);
+$("#vFeed").onclick = () => setFeed(!feedOn, true);
+let lastAlertSeen = 0;
+function markFeedNews() {   // a new alert while the feed is hidden: a small red dot on Events, nothing more
+  if (feedOn) return;
+  const a = feedItems.filter(f => f.kind === "alert" && f.t <= playT).length;
+  if (a > lastAlertSeen) $("#vFeed").classList.add("news");
+  lastAlertSeen = a;
+}
+$("#vSpeed").onclick = () => { const i = SPEEDS.indexOf(speed); setSpeed(SPEEDS[(i + 1) % SPEEDS.length]); flash(`speed ${speedLabel(speed)}`); };
+const canFull = !!(document.fullscreenEnabled && $("#simSec").requestFullscreen);
+$("#vFull").hidden = !canFull;
+function toggleFull() { if (!canFull) return; try { document.fullscreenElement ? document.exitFullscreen() : $("#simSec").requestFullscreen(); } catch (e) { /* not allowed here */ } }
+$("#vFull").onclick = toggleFull;
+document.addEventListener("fullscreenchange", () => { $("#vFull").textContent = document.fullscreenElement ? "⤡" : "⛶"; renderLayout(); });
+// while it plays, the bar fades after 2.5 s without the mouse, like a video player
+let idleT = 0; const wake = () => { $("#app").classList.remove("idle"); clearTimeout(idleT); idleT = setTimeout(() => $("#app").classList.add("idle"), 2500); };
+addEventListener("pointermove", wake, { passive: true }); wake();
+
+/* ===================== Playback (implicit: Space, the status chip, or the keys) ===================== */
+let playT = 0, hoverT = null, playing = false, lastFrame = 0, speed = 16, activeBeat = null, reportSeen = false, ready = false, hudFlash = null;
+const SPEEDS = [2, 4, 8, 16], speedLabel = v => ({ 2: "0.5×", 4: "1×", 8: "2×", 16: "4×" })[v];
+const wantT = () => hoverT == null ? playT : Math.min(hoverT, playT);
+let shownT = 0, lastNow = 0; // the cursor eases toward the hovered time instead of jumping
+const viewT = () => shownT;
+function render() {
+  if (!ready) return;
+  const v = viewT();
+  renderComponents(v);
+  const key = HC + "|" + panels.filter(panelShown).map(P => P.p.id).join(",");
+  if (key !== quietKey) { quietKey = key; renderLayout(); }
+  renderPanels(playT, v); renderQuiet(playT, v); renderFeed(playT, v); renderGauges(v);
+  if (tipNode) { const tip = $("#ntip"); const h = nodeTipHTML(tipNode); if (h && tip._h !== h) { tip._h = h; tip.innerHTML = h; } } renderNarr(v); renderHud(v); placeCallout(); if (typeof renderBar === "function" && ready) renderBar();
+}
+// progress hairline + status chip: the only playback chrome
+function renderHud(v) {
+  $("#progress i").style.width = (playT / D * 100).toFixed(2) + "%";
+  const st = $("#status"), ch = esc(chapters[chapterAt(v)].title);
+  $("#app").classList.toggle("hovering", hoverT != null);
+  let html;
+  if (hudFlash && hudFlash.until > performance.now()) html = `<span class="ic">•</span>${hudFlash.text}`;
+  else if (isOpen($("#intro")) || briefing) html = "";
+  else if (hoverT != null && hoverT < playT - 0.5) html = `<span class="ic">◷</span>viewing <b>${fmtT(v)}</b><span class="ch">${ch}</span>`;
+  else if (activeBeat) html = ""; else if (false) html = `<span class="ic" style="color:${{ good: "var(--green)", bad: "var(--red)", neutral: "var(--muted)" }[beatTone(activeBeat)] || "var(--accent)"}">◆</span>key moment ${beats.indexOf(activeBeat) + 1}/${beats.length}`;
+  else if (playT >= D) html = `<span class="ic">↓</span>Read the result <kbd>Space</kbd>`;
+  else html = `<span class="ic">${playing ? "❚❚" : "▶"}</span><b>${fmtT(v)} / ${fmtT(D)}</b><span class="ch">${ch}</span>${speed !== 4 ? `<span>${speedLabel(speed)}</span>` : ""}<kbd>Space</kbd>${playing ? "pause" : "play"}`;
+  if (st._h !== html) { st._h = html; st.innerHTML = html; }
+  st.hidden = !html;
+  st.classList.toggle("flash", !!(hudFlash && hudFlash.until > performance.now()));
+}
+function flash(text) { hudFlash = { text, until: performance.now() + 1400 }; renderHud(viewT()); setTimeout(() => renderHud(viewT()), 1450); }
+function setPlaying(p) {
+  playing = p && playT < D;
+  $("#app").classList.toggle("playing", playing);
+  if (playing && $("#poster")) $("#poster").hidden = true;
+  lastFrame = performance.now();
+  if (ready) renderHud(viewT());
+}
+function seek(t) { hideBeat(); playT = Math.max(0, Math.min(D, t)); hoverT = null; shownT = playT; render(); }
+/* ===================== Component filter: All, or the charts of one component ===================== */
+const cfilterEl = $("#cfilter");
+function buildFilter() {
+  const comps = [];
+  panels.filter(P => P.kind === "chart" && (!P.deep || HC)).forEach(P => { const k = P.p.component || ""; if (!comps.includes(k)) comps.push(k); });
+  cfilterEl.hidden = comps.length < 2;
+  const label = k => k ? (PB.components.nodes.find(n => n.id === k) || { label: k }).label : "other";
+  const count = k => panels.filter(P => P.kind === "chart" && (!P.deep || HC) && (P.p.component || "") === k).length;
+  cfilterEl.innerHTML = `<span class="cf-l">Charts</span>` + [null, ...comps].map(k => `<button class="chip" data-c="${k == null ? "*" : esc(k)}" aria-pressed="${compFilter === k}">${k == null ? "All" : esc(label(k))}<small>${k == null ? panels.filter(P => P.kind === "chart" && (!P.deep || HC)).length : count(k)}</small></button>`).join("");
+  markFilter();
+}
+function markFilter() {   // a key moment pointing at charts the filter hides: a pulsing dot on their component's chip
+  const want = new Set(activeBeat ? [...(activeBeat.beat.notes || []).map(n => n.panel), ...(activeBeat.beat.focus || []).filter(id => id.startsWith("panel:")).map(id => id.slice(6))] : []);
+  cfilterEl.querySelectorAll(".chip").forEach(b => {
+    const k = b.dataset.c === "*" ? null : b.dataset.c;
+    b.setAttribute("aria-pressed", String(compFilter === k));
+    const hiddenHere = k != null && compFilter !== k && compFilter != null && panels.some(P => P.kind === "chart" && want.has(P.p.id) && (P.p.component || "") === k);
+    b.classList.toggle("attn", hiddenHere || (k == null && compFilter != null && panels.some(P => want.has(P.p.id) && !panelShown(P))));
+  });
+}
+cfilterEl.addEventListener("click", e => { const b = e.target.closest(".chip"); if (!b) return; compFilter = b.dataset.c === "*" ? null : b.dataset.c; markFilter(); render(); if (activeBeat) applyFocus(activeBeat); });
+buildFilter();
+
+function applyFocus(e) {
+  document.querySelectorAll(".dimmable").forEach(d => d.classList.remove("focused"));
+  $("#compCard").classList.add("focused");
+  const noted = (e.beat.notes || []).map(n => "panel:" + n.panel);
+  const f = new Set(noted.length ? [...e.beat.focus.filter(id => !id.startsWith("panel:")), ...noted] : e.beat.focus);
+  document.querySelectorAll("[data-id]").forEach(d => { if (f.has(d.dataset.id)) d.classList.add("focused"); });
+  PB.components.edges.forEach(ed => { if (f.has(ed.from) && f.has(ed.to)) edgeEls[ed.id].g.classList.add("focused"); });
+}
+const emit = (type, data) => { try { host && host.onPlayerEvent && host.onPlayerEvent(type, data); } catch (err) { /* host gone */ } };
+function showBeat(e) {
+  activeBeat = e; setPlaying(false); emit("key_moment", { n: beats.indexOf(e) + 1, t: e.t });
+  $("#capK").textContent = `Key moment ${beats.indexOf(e) + 1} of ${beats.length} · ${fmtT(e.t)}`;
+  { const tn = beatTone(e), cap = $("#caption"), chip = $("#capTone"); TONES.forEach(t => cap.classList.toggle("tone-" + t, t === tn)); chip.hidden = !tn; if (tn) chip.querySelector("b").textContent = TONE_LABEL[tn]; } $("#capT").textContent = e.title || ""; setCapHint(e);
+  setExpanded(false); $("#caption").classList.add("open"); $("#beatGo").tabIndex = 0; fitAboveSheet(true);
+  $("#app").classList.add("focus-mode");
+  applyFocus(e);
+  render();
+  revealFocusedPanels(e);
+  renderHud(viewT()); markFilter();
+  const b = $("#caption"); b.classList.remove("arrive"); void b.offsetWidth; b.classList.add("arrive");   // slide in with a glow, once
+}
+
+// the explanation as points: one per sentence (a full stop, ! or ? followed by a space and a capital, digit or quote)
+const toPoints = t => String(t || "").split(/(?<=[.!?])\s+(?=[A-Z0-9'"(“‘])/).map(x => x.trim()).filter(Boolean);
+function setCapHint(e) {
+  const h = $("#capH"), pts = toPoints(e.beat.hint);
+  h.innerHTML = pts.length > 1 ? `<ul class="kpts">${pts.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : esc(e.beat.hint || "");
+  if (HC && e.beat.deep) { const d = document.createElement("span"); d.className = "dh"; d.textContent = e.beat.deep; h.appendChild(d); }
+}
+// the banner is as tall as this playbook's longest key moment needs, measured once (and again when the width changes),
+// so it never overflows and never changes height during the run
+function fitBanner() {
+  const cap = $("#caption"), p = $("#capH"), row = cap.closest(".kmrow"); if (!row || !beats.length) return;
+  const keep = p.innerHTML, wasOpen = cap.classList.contains("open");
+  cap.style.height = "auto"; cap.classList.add("open"); p.style.overflow = "visible";
+  let need = 0;
+  beats.forEach(e => { setCapHint(e); need = Math.max(need, cap.scrollHeight); });
+  p.innerHTML = keep; p.style.overflow = ""; if (!wasOpen) cap.classList.remove("open");
+  const h = Math.max(106, Math.ceil(need) + 4) + "px";
+  cap.style.height = h; cap.querySelector(".strip").style.height = `calc(${h} - 2px)`;
+  // the frame grows by what the banner needs beyond its base height, so the charts keep their size
+
+}
+// a focused panel that is scrolled out of the dashboard pane is brought into view
+function revealFocusedPanels(e) {
+  if (dashGrid.scrollHeight <= dashGrid.clientHeight + 1) return;
+  const cards = ((e.beat.notes || []).length ? e.beat.notes.map(n => "panel:" + n.panel) : e.beat.focus.filter(id => id.startsWith("panel:"))).map(id => dashGrid.querySelector(`[data-id="${id}"]`)).filter(Boolean);
+  if (!cards.length) return;
+  const top = Math.min(...cards.map(c => c.offsetTop)), bottom = Math.max(...cards.map(c => c.offsetTop + c.offsetHeight));
+  const vt = dashGrid.scrollTop, vb = vt + dashGrid.clientHeight;
+  if (top >= vt && bottom <= vb) return;
+  dashGrid.scrollTo({ top: bottom - top <= dashGrid.clientHeight ? top - 4 - Math.max(0, (dashGrid.clientHeight - (bottom - top)) / 2) : top - 4 });
+}
+let briefing = false;
+function showBrief() {
+  const W = watchList();
+  if (!W.length) { setPlaying(true); return; }
+  briefing = true; setPlaying(false); document.body.classList.add("briefing");
+  $("#capK").textContent = "Before you start"; $("#capTone").hidden = true; $("#capMore").hidden = true; $("#capH").textContent = "";
+  $("#capT").textContent = `Keep an eye on ${W.length === 1 ? "this chart" : "these " + W.length + " charts"}`;
+  $("#capList").innerHTML = W.map(w => `<li><b>${esc(w.label)}</b><em>${esc(w.normal)}</em></li>`).join(""); $("#capList").hidden = false;
+  $("#beatGo").textContent = "Run ▶";
+  document.querySelectorAll(".dimmable").forEach(d => d.classList.remove("focused"));
+  W.forEach(w => w.P.card.classList.add("focused")); $("#compCard").classList.add("focused");
+  $("#app").classList.add("focus-mode"); $("#caption").classList.add("open"); $("#beatGo").tabIndex = 0;
+  render(); renderHud(viewT());
+}
+function endBrief() {
+  if (!briefing) return;
+  briefing = false; document.body.classList.remove("briefing");
+  $("#capList").hidden = true; $("#capMore").hidden = false; $("#beatGo").textContent = "Continue ▶";
+  $("#app").classList.remove("focus-mode"); $("#caption").classList.remove("open"); $("#beatGo").tabIndex = -1;
+}
+function hideBeat() {
+  endBrief(); $("#caption").classList.remove("arrive");   // the arrival glow plays once, on the way in only
+  if (!activeBeat) return;
+  setTimeout(markFilter, 0);
+  activeBeat = null; panels.forEach(P => P.note && P.note.classList.remove("show")); $("#app").classList.remove("focus-mode"); $("#caption").classList.remove("open"); $("#beatGo").tabIndex = -1; fitAboveSheet(false);
+}
+function frame(now) {
+  const dt = Math.min(0.1, Math.max(0, (now - (lastNow || now)) / 1000)); lastNow = now;
+  const before = shownT, want = wantT();
+  if (playing && hoverT == null) shownT = want;
+  else if (Math.abs(want - shownT) > 0.02) shownT += (want - shownT) * (1 - Math.exp(-dt / 0.085));
+  else shownT = want;
+  const eased = shownT !== before;
+  if (playing) {
+    const prev = playT; playT = Math.min(D, playT + Math.max(0, (now - lastFrame) / 1000) * speed); lastFrame = Math.max(lastFrame, now);
+    const b = beats.find(e => e.t > prev && e.t <= playT);
+    if (playing && hoverT == null) shownT = playT;
+    if (b) { playT = b.t; shownT = playT; render(); showBeat(b); } else render();
+    if (playT >= D) { setPlaying(false); render(); emit("end", { t: D }); if (!reportSeen) { reportSeen = true; unlockResult(); } }
+  } else if (eased) render();
+  requestAnimationFrame(frame);
+}
+const simInView = () => { const r = $("#simSec").getBoundingClientRect(); return r.top < innerHeight * 0.5 && r.bottom > innerHeight * 0.5; };
+// Space does the one obvious thing for the current state
+function primaryAction(fromBar) {
+  closeMenus();
+  if (!introStarted) { startPlaying(); setPlaying(true); vflash("▶"); render(); return; }
+  if (playT >= D) { if (fromBar || !resultOpen) { seek(0); setPlaying(true); vflash("↺"); return; } return openReport(); }
+  if (!activeBeat && !briefing) { setPlaying(!playing); vflash(playing ? "▶" : "❚❚"); render(); return; }
+  if (isOpen($("#intro"))) return startRun();
+  if (isOpen($("#scrim"))) return watchAgain();
+  if (activeBeat || briefing) { hideBeat(); setPlaying(true); render(); return; }
+  if (playT >= D) { seek(0); setPlaying(true); return; }
+  setPlaying(!playing); render();
+}
+function jumpBeat(dir) {
+  const b = dir > 0 ? beats.find(x => x.t > playT + 0.01) : [...beats].reverse().find(x => x.t < playT - 0.01);
+  if (!b) {
+    if (dir < 0) { seek(0); setPlaying(false); flash("start"); return; }
+    // past the last key moment: skip to the end of the run, which unlocks the result
+    if (playT < D) { seek(D); setPlaying(false); emit("end", { t: D }); if (!reportSeen) { reportSeen = true; unlockResult(); } render(); flash("end of the run"); }
+    else flash("that is the end");
+    return;
+  }
+  seek(b.t); showBeat(b);
+}
+function setSpeed(v) { speed = v; if ($("#vSpeed")) $("#vSpeed").textContent = speedLabel(v); document.querySelectorAll("#speedSeg button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.speed === v))); }
+function stepSpeed(d) { const i = Math.max(0, Math.min(SPEEDS.length - 1, SPEEDS.indexOf(speed) + d)); setSpeed(SPEEDS[i]); flash(`speed ${speedLabel(speed)}`); }
+$("#beatGo").onclick = () => primaryAction();
+dashGrid.addEventListener("scroll", () => placeCallout(), { passive: true });
+$("#status").onclick = () => primaryAction();
+$("#speedSeg").onclick = e => { const b = e.target.closest("[data-speed]"); if (b) { setSpeed(+b.dataset.speed); flash(`speed ${speedLabel(speed)}`); } };
+// corner menus
+function toggleMenu(id, on) { const m = $("#" + id), btn = $(id === "menu" ? "#menuBtn" : "#helpBtn"); on = on ?? m.hidden; closeMenus(id); if (on) showPop(m); else hidePop(m); btn.setAttribute("aria-expanded", String(on)); }
+function closeMenus(except) { let any = false; ["menu", "help"].forEach(id => { if (id !== except && isOpen($("#" + id))) { hidePop($("#" + id)); $(id === "menu" ? "#menuBtn" : "#helpBtn").setAttribute("aria-expanded", "false"); any = true; } }); return any; }
+$("#menuBtn").onclick = e => { e.stopPropagation(); toggleMenu("menu"); };
+$("#helpBtn").onclick = e => { e.stopPropagation(); toggleMenu("help"); };
+document.addEventListener("pointerdown", e => { if (!e.target.closest(".hud")) closeMenus(); });
+document.addEventListener("keydown", e => {
+  if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.target.matches && e.target.matches("input,select,textarea")) return;
+  if (e.key === "Escape") { if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); if (closeMenus()) return; if (isOpen($("#scrim"))) closeReport(); else if (introStarted && isOpen($("#intro"))) startRun(); return; }
+  if (e.key === "i" || e.key === "I") { if (!isOpen($("#scrim"))) showIntro(); return; }
+  if ((e.key === "k" || e.key === "K") && simInView()) { primaryAction(true); return; }
+  if ((e.key === "j" || e.key === "J" || e.key === "l" || e.key === "L") && simInView()) { startPlaying(); seek(playT + (/l/i.test(e.key) ? 40 : -40)); return; }
+  if ((e.key === "f" || e.key === "F") && simInView()) { toggleFull(); return; }
+  if ((e.key === "e" || e.key === "E") && simInView()) { setFeed(!feedOn, true); return; }
+  if (e.code === "Space" && !simInView()) return;   // reading the brief or the result: Space scrolls as usual
+  if (e.code === "Space") { e.preventDefault(); if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); primaryAction(); return; }
+  if (e.key === "?") { toggleMenu("help"); return; }
+  if (isOpen($("#intro"))) return;
+  if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && resultInView()) { e.preventDefault(); showSlide(slideAt + (e.key === "ArrowRight" ? 1 : -1)); return; }
+  if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); if (isOpen($("#scrim"))) closeReport(); jumpBeat(e.key === "ArrowLeft" ? -1 : 1); return; }
+  if ((e.key === "h" || e.key === "H") && hasDeep) { setDetail(!HC); return; }
+  if (e.key === "r" || e.key === "R") { if (isOpen($("#scrim"))) closeReport(); else openReport(); return; }
+  if (e.key === "+" || e.key === "=") { stepSpeed(1); return; }
+  if (e.key === "-" || e.key === "_" || e.key === "−") { stepSpeed(-1); return; }
+});
+function hoverable(svg, toTime) {
+  const toT = ev => { const r = svg.getBoundingClientRect(); const vb = svg.viewBox.baseVal; return toTime(((ev.clientX - r.left) / r.width) * (vb && vb.width ? vb.width : r.width)); };
+  svg.addEventListener("pointermove", ev => { if (ev.pointerType === "mouse") { hoverT = toT(ev); } });
+  svg.addEventListener("pointerleave", () => { hoverT = null; });
+  svg.addEventListener("click", ev => { const t = toT(ev); if (t <= playT) seek(t); });
+}
+
+/* ===================== Report (opens itself at the end; R or the menu reopen it) ===================== */
+$("#pbTitle").textContent = PB.meta.title;
+const R = PB.report;
+function statVals(st) {
+  // whole run: peak (or low) vs the end; delta = how much it moved before vs after the fix
+  const s = clean[st.metric], f = Number.isInteger(R.fix_t) ? R.fix_t : D;
+  if (st.agg === "delta") return [s[f] - s[0], s[D] - s[f]];
+  if (st.agg === "min") return [Math.min(...s), s[D]];
+  return [Math.max(...s), s[D]];
+}
+const TAGS = { cause: "cause", effect: "effect", amp: "amplifies", fix: "fix" };
+const chainHTML = () => {
+  const items = R.chain.map(c => `<li class="k-${c.kind}"><span class="tag">${TAGS[c.kind]}</span><span>${esc(c.text)}</span></li>`).join("");
+  const byId = Object.fromEntries(R.chain.map(c => [c.id, c]));
+  const loop = R.loop ? `<p class="rp-loop"><b>↻ A loop.</b> ${byId[R.loop.from] && byId[R.loop.to] ? `“${esc(byId[R.loop.from].text)}” keeps feeding “${esc(byId[R.loop.to].text)}”. ` : ""}<span>(${esc(R.loop.label)})</span></p>` : "";
+  return `<ol class="rp-chain">${items}</ol>${loop}`;
+};
+const safeUrl = u => /^https?:\/\//i.test(u) ? u : "#";
+const sec = (title, body) => body ? `<section><h4>${title}</h4>${body}</section>` : "";
+// the result as a short deck: one idea per slide, ‹ › or the dots (or ←/→ while the result is on screen) to move
+const SLIDES = [
+  { k: "What happened", h: `<p class="sl-big">${esc(R.tldr)}</p>` },
+  R.stats.length ? { k: "The numbers", h: `<table class="rp-num"><tr><th></th><th>Worst</th><th>At the end</th></tr>${R.stats.map(st => { const [b, a] = statVals(st); return `<tr><td>${esc(st.label)}</td><td class="bf">${withUnit(b, st.unit)}</td><td class="af">${withUnit(a, st.unit)}</td></tr>`; }).join("")}</table>` } : null,
+  ...R.learnings.map((l, i) => ({ k: `Takeaway ${i + 1} of ${R.learnings.length}`, h: `<h3 class="sl-t">${esc(l.title)}</h3><p class="sl-p">${esc(l.body)}</p>` })),
+  (R.chain || []).length ? { k: "How it happened", h: chainHTML() } : null,
+  R.math ? { k: esc(R.math.title || "The arithmetic"), h: `<pre class="rp-math">${esc(R.math.lines.join("\n"))}</pre>` } : null,
+  (R.myths || []).length ? { k: "Common myths", h: R.myths.map(m => `<div class="rp-myth"><q>${esc(m.myth)}</q><p>${esc(m.truth)}</p></div>`).join("") } : null,
+  HC && R.deep && ((R.deep.config || []).length || (R.deep.runbook || []).length) ? { k: "Deep dive", h: `${(R.deep.config || []).length ? `<h5>Config involved</h5><pre class="rp-math">${esc(R.deep.config.join("\n"))}</pre>` : ""}${(R.deep.runbook || []).length ? `<h5>What to check next time</h5><ol class="sl-ol">${R.deep.runbook.map(x => `<li>${esc(x)}</li>`).join("")}</ol>` : ""}` } : null,
+  (R.links || []).length ? { k: "Read more", h: `<div class="rp-links">${R.links.map(l => `<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener noreferrer">${esc(l.label)} ↗</a>`).join("")}</div>` } : null,
+].filter(Boolean);
+$("#report").innerHTML = `
+  <div class="deck" id="deck" aria-roledescription="slides" aria-label="The result">
+    <div class="deck-top"><span class="eb"><b class="res-k">The result</b> · ${humanDur(TOTAL)} of story · ${beats.length} key moments</span><span class="deck-n" id="deckN"></span></div>
+    <div class="deck-stage">${SLIDES.map((sl, i) => `<section class="slide" data-i="${i}" aria-roledescription="slide" aria-label="${i + 1} of ${SLIDES.length}" ${i ? "hidden" : ""}><span class="sl-k">${sl.k}</span><div class="sl-body">${sl.h}</div></section>`).join("")}</div>
+    <div class="deck-nav">
+      <button class="dnav" id="deckPrev" aria-label="Previous slide">‹</button>
+      <div class="dots">${SLIDES.map((sl, i) => `<button class="dot" data-i="${i}" aria-label="Slide ${i + 1}: ${sl.k.replace(/<[^>]+>/g, "")}"></button>`).join("")}</div>
+      <button class="dnav" id="deckNext" aria-label="Next slide">›</button>
+    </div>
+  </div>
+  <div class="foot"><button class="ghost" id="repClose">▲ Back to the dashboard</button><span class="spacer"></span><button class="primary" id="repAgain">↺ Watch again</button></div>`;
+let slideAt = 0;
+function showSlide(i) {
+  slideAt = Math.max(0, Math.min(SLIDES.length - 1, i));
+  document.querySelectorAll("#deck .slide").forEach(el => (el.hidden = +el.dataset.i !== slideAt));
+  document.querySelectorAll("#deck .dot").forEach(el => el.setAttribute("aria-current", String(+el.dataset.i === slideAt)));
+  $("#deckN").textContent = `${slideAt + 1} / ${SLIDES.length}`;
+  $("#deckPrev").disabled = slideAt === 0; $("#deckNext").disabled = slideAt === SLIDES.length - 1;
+}
+$("#deckPrev").onclick = () => showSlide(slideAt - 1);
+$("#deckNext").onclick = () => showSlide(slideAt + 1);
+document.querySelectorAll("#deck .dot").forEach(b => (b.onclick = () => showSlide(+b.dataset.i)));
+const resultInView = () => { const r = $("#resultSec").getBoundingClientRect(); return !$("#report").hidden && r.top < innerHeight * 0.6 && r.bottom > innerHeight * 0.4; };
+showSlide(0);
+function fitDeck() {   // the slide area takes the tallest slide's height, so the controls never move between slides
+  const st = $("#deck .deck-stage") || document.querySelector("#deck .deck-stage"); if (!st || $("#report").hidden) return;
+  st.style.minHeight = ""; let hMax = 0;
+  document.querySelectorAll("#deck .slide").forEach(el => { const was = el.hidden; el.hidden = false; el.style.animation = "none"; hMax = Math.max(hMax, el.offsetHeight); el.hidden = was; el.style.animation = ""; });
+  const pad = parseFloat(getComputedStyle(st).paddingTop) + parseFloat(getComputedStyle(st).paddingBottom);
+  st.style.minHeight = Math.max(300, Math.ceil(hMax + pad)) + "px";
+}
+new ResizeObserver(() => fitDeck()).observe($("#resultSec"));
+let resultOpen = false;
+function unlockResult() { if (resultOpen) return; resultOpen = true; $("#resLock").hidden = true; $("#report").hidden = false; renderHud(viewT()); renderBar(); fitDeck(); }
+function openReport() {   // R, the menu, or Space at the end: scroll down to the result (it stays locked until the run has ended once)
+  closeMenus();
+  if (!resultOpen) { flash("finish the run to see the result"); return; }
+  setPlaying(false); goTo("resultSec");
+}
+function closeReport(done) { if (done) done(); }
+function watchAgain() { goTo("simSec"); seek(0); setTimeout(() => setPlaying(true), 450); }
+$("#reportBtn").onclick = () => openReport();
+$("#report").addEventListener("click", e => {
+  if (e.target.closest("#repClose")) return goTo("simSec");
+  if (e.target.closest("#repAgain")) return watchAgain();
+});
+
+
+
+
+/* ===================== Layout: computed, nothing to adjust =====================
+   v3, one screen: the dashboard column holds the gauges and a grid of same-size charts (3 columns when there is room, else 2),
+   rows share the height that is left (at least 130px; more charts than fit and the grid scrolls). The system map and the feed
+   sit in the right column. Charts keep their place for the whole run. */
+const GAP = 6, CH_MIN = 130, MIN_CHART_W = 250;
+const board = dashGrid, allCharts = panels.filter(P => P.kind === "chart");
+function renderLayout() {
+  // charts of one component sit together (groups in order of first appearance; a chart with no component stays where the author put it)
+  const groups = new Map();
+  allCharts.filter(panelShown).forEach(P => { const k = P.p.component || "#" + P.p.id; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(P); });
+  const charts = [...groups.values()].flat();
+  panels.forEach(P => { P.card.hidden = !panelShown(P); });
+  quietEl.hidden = true;
+  if (!ONE_SCREEN.matches) { board.style.gridTemplateRows = ""; board.style.gridTemplateColumns = ""; charts.forEach(P => (P.card.style.gridArea = "")); return; }
+  // size the cells for the whole board (as if "All" were picked), so a filtered view keeps the same chart size and columns
+  const H = board.clientHeight, W = board.clientWidth, n = allCharts.filter(P => P.deep ? HC : true).length;
+  const cols = Math.max(1, Math.min(3, Math.floor((W + GAP) / (MIN_CHART_W + GAP))));
+  const R = Math.max(1, Math.ceil(n / cols)), rh = Math.min(9999, Math.max(CH_MIN, Math.floor((H - (R - 1) * GAP) / R)));   // a filtered few stay chart-shaped
+  board.style.gridTemplateRows = `repeat(${Math.max(1, Math.ceil(charts.length / cols))}, ${rh}px)`; board.style.alignContent = "start";
+  board.style.gridTemplateColumns = `repeat(${cols}, minmax(0,1fr))`;
+  charts.forEach((P, i) => { const r = Math.floor(i / cols) + 1, c = 1 + (i % cols); P.card.style.gridArea = `${r} / ${c} / ${r + 1} / ${c + 1}`; });
+}
+// Standard / Hardcore: the same run, with or without the deep layer
+function setDetail(on) {
+  HC = hasDeep && on; document.body.classList.toggle("hc", HC);
+  try { HC ? localStorage.setItem(DETAIL_KEY, "hardcore") : localStorage.removeItem(DETAIL_KEY); } catch (e) { /* storage blocked */ }
+  document.querySelectorAll("#detailSeg [data-detail]").forEach(b => b.setAttribute("aria-pressed", String((b.dataset.detail === "hardcore") === HC)));
+  feedShown = -1; if (activeBeat) setCapHint(activeBeat); buildFilter();
+  render(); if (activeBeat) revealFocusedPanels(activeBeat); if (ready) flash(HC ? "Hardcore: deeper detail on" : "Standard detail");
+}
+$("#detailRow").hidden = !hasDeep;
+document.querySelectorAll("#detailSeg [data-detail]").forEach(b => (b.onclick = () => setDetail(b.dataset.detail === "hardcore")));
+document.querySelectorAll("#detailSeg [data-detail]").forEach(b => b.setAttribute("aria-pressed", String((b.dataset.detail === "hardcore") === HC)));
+new ResizeObserver(() => renderLayout()).observe(board);
+ONE_SCREEN.addEventListener("change", () => renderLayout());
+document.querySelectorAll("#themeSeg [data-theme-set]").forEach(b => (b.onclick = () => applyTheme(b.dataset.themeSet, true)));
+$("#themeBtn").onclick = () => applyTheme($("#themeBtn").dataset.next || "light", true);
+applyTheme((() => { try { return localStorage.getItem(THEME_KEY); } catch (e) { return null; } })(), false);
+renderLayout();
+// the brief's system diagram takes the graph's own proportions, so the box fits the drawing (no empty band under it)
+fitStageAspect();
+fitBanner(); { let bw = 0; new ResizeObserver(() => { const w = $("#caption").clientWidth; if (Math.abs(w - bw) > 2) { bw = w; fitBanner(); } }).observe($("#caption").closest(".kmrow")); }
+
+ready = true; setSpeed(speed);
+render();
+// the brief: story, background and what to watch, read before anything plays
+const M = PB.meta;
+$("#introT").textContent = M.title; $("#introStory").textContent = M.story;
+{
+  const bg = (M.background || []).map(b => typeof b === "string" ? { body: b } : b);
+  const story = bg.map(b => `<div>${b.title ? `<h4>${esc(b.title)}</h4>` : ""}<p>${esc(b.body)}</p></div>`).join("");
+  $("#introBody").innerHTML = story;
+  {   // the dashboard, explained: one card per component, its charts in board order, each with its unit, threshold and why it matters
+    const W = watchList(), num = P => { const i = W.findIndex(w => w.P === P); return i < 0 ? `<span class="wnum blank" aria-hidden="true">0</span>` : `<span class="wnum">${i + 1}</span>`; };
+    const groups = new Map();
+    panels.filter(P => P.kind === "chart" && !P.deep).forEach(P => { const k = P.p.component || ""; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(P); });
+    const node = k => PB.components.nodes.find(n => n.id === k);
+    const role = n => { if (!n) return ""; const c = (M.cast || []).find(c => c.name === n.label || String(c.name).split(/[ ,]+/)[0] === n.label); return c ? c.role : n.kind || ""; };
+    // hovering a component name: what it is (its role in the cast, its kind) and its standing facts (the text details, not the live metrics)
+    const compTip = n => {
+      if (!n) return "Other";
+      const facts = (n.details || []).filter(d => d.text && d.level !== "deep");
+      const body = `${role(n) && role(n) !== n.kind ? `<p>${esc(role(n))}</p>` : ""}${n.kind ? `<span class="ck">${esc(n.kind)}</span>` : ""}${facts.length ? `<dl>${facts.map(d => `<dt>${esc(d.label)}</dt><dd>${esc(d.text)}</dd>`).join("")}</dl>` : ""}`;
+      return `<span class="chost" tabindex="0">${esc(n.label)}${body ? `<span class="ctip" role="tooltip"><b>${esc(n.label)}</b>${body}</span>` : ""}</span>`;
+    };
+    // one compact table: component (once per group), chart, what it tells you
+    $("#mgrid").innerHTML = `<table class="mtable"><thead><tr><th>Component</th><th>Chart</th><th>What it tells you</th></tr></thead><tbody>${[...groups].map(([k, list]) => { const n = node(k);
+      return list.map((P, i) => { const why = P.p.why || metricById[P.p.metrics[0]].why || "";
+        return `<tr class="${i === 0 ? "g0" : ""}">${i === 0 ? `<th scope="rowgroup" rowspan="${list.length}">${compTip(n)}</th>` : ""}<td class="mc">${num(P)}${esc(P.p.title)}</td><td class="mw"><div>${esc(why)}</div></td></tr>`; }).join(""); }).join("")}</tbody></table>`;
+    $("#metricsSec").hidden = !groups.size;
+  }
+  const W = watchList();
+  $("#briefWatch").innerHTML = W.length ? `<h4>Keep an eye on</h4><ol>${W.map((w, i) => `<li><span class="wnum">${i + 1}</span><b>${esc(w.label)}</b><em>${esc(w.normal)}</em></li>`).join("")}</ol><p class="small">They are the numbered charts on the dashboard.</p>` : "";
+}
+$("#introMeta").textContent = `${TOTAL > D * 1.5 ? humanDur(TOTAL) + " run, plays in ~" + Math.max(1, Math.round(D / 4 / 60)) + " min" : humanDur(TOTAL)} · ${beats.length} key moments${(M.tags || []).length ? " · " + M.tags.slice(0, 3).join(" · ") : ""}`;
+var introStarted = false, introWasPlaying = false;   // var: the banner reads it during the first render, before this line runs
+const goTo = id => { if (id === "simSec") id = "simWrap"; try { $("#" + id).scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion:reduce)").matches ? "auto" : "smooth", block: "start" }); } catch (e) { $("#" + id).scrollIntoView(); } };
+function startRun() {   // Run in the brief: bring the dashboard up, then play
+  closeMenus(); goTo("simSec");
+  startPlaying();
+  setTimeout(() => { if (!activeBeat && playT < D) setPlaying(true); }, 450);
+}
+function showIntro() { closeMenus(); setPlaying(false); goTo("briefSec"); }   // the brief stays on the page; I scrolls back to it
+$("#introBtn").onclick = showIntro; $("#introBtn").firstChild.textContent = "Back to the brief ";
+$("#start").onclick = startRun;
+$("#pbTitle").textContent = PB.meta.title; document.title = PB.meta.title;
+$("#libraryBtn").onclick = () => {   // toggles the playbooks panel; the host keeps aria-pressed in step, even when the panel closes itself
+  closeMenus(); if (!host) return;
+  const open = host.toggleLibrary ? host.toggleLibrary() : (host.showLibrary && (host.showLibrary(), true));
+  $("#libraryBtn").setAttribute("aria-pressed", String(!!open));
+};
+$("#libraryBtn").setAttribute("aria-pressed", "false");
+requestAnimationFrame(frame);
+
+// Playback API for the host page. Speeds are multipliers: 0.5, 1, 2, 4.
+const SPEED_X = { 0.5: 2, 1: 4, 2: 8, 4: 16 };
+window.player = {
+  status: () => ({
+    t: Math.round(playT * 10) / 10, playing, speed: speed / 4,
+    key_moment: activeBeat ? beats.indexOf(activeBeat) + 1 : null,
+    intro_open: isOpen($("#intro")), report_open: isOpen($("#scrim")), ended: playT >= D,
+    detail: HC ? "hardcore" : "standard", has_deep: hasDeep,
+  }),
+  start() { if (isOpen($("#intro"))) startRun(); else { if (isOpen($("#scrim"))) closeReport(); hideBeat(); setPlaying(true); } },
+  pause() { setPlaying(false); render(); },
+  seek(t) { if (isOpen($("#intro"))) hideModal($("#intro")); if (isOpen($("#scrim"))) closeReport(); setPlaying(false); seek(t); },
+  keyMoment(n) {
+    const b = beats[n - 1]; if (!b) throw new Error(`key moment ${n} does not exist; this playbook has ${beats.length}`);
+    if (isOpen($("#intro"))) hideModal($("#intro")); if (isOpen($("#scrim"))) closeReport();
+    seek(b.t); showBeat(b);
+  },
+  step(dir) { if (isOpen($("#intro"))) hideModal($("#intro")); if (isOpen($("#scrim"))) closeReport(); jumpBeat(dir); },
+  report(open) { if (open) openReport(); else if (isOpen($("#scrim"))) closeReport(); },
+  restart() { if (isOpen($("#intro"))) hideModal($("#intro")); if (isOpen($("#scrim"))) closeReport(); reportSeen = false; seek(0); setPlaying(true); },
+  detail(mode) { if (!["standard", "hardcore"].includes(mode)) throw new Error('detail must be "standard" or "hardcore"'); if (mode === "hardcore" && !hasDeep) throw new Error("this playbook has no deep layer"); setDetail(mode === "hardcore"); },
+  speed(x) { if (!SPEED_X[x]) throw new Error("speed must be 0.5, 1, 2 or 4"); setSpeed(SPEED_X[x]); flash(`speed ${speedLabel(speed)}`); },
+};
+emit("ready", {});
+</script>
+</body>
+</html>

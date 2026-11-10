@@ -1,0 +1,63 @@
+[
+ {
+  "id": "postgres-queue-load-test",
+  "file": "postgres-queue-load-test.json",
+  "title": "Postgres as a queue: the load test that found the wall",
+  "story": "A team runs its job queue on a Postgres table with SKIP LOCKED and ramps a load test to see where it breaks. The first two stages pass easily, then something quiet starts piling up. Compressed: 1 s ≈ 4 s.",
+  "duration_s": 330,
+  "tags": [
+   "postgres",
+   "queue",
+   "load-test",
+   "vacuum",
+   "dramatized"
+  ],
+  "key_moments": 6
+ },
+ {
+  "id": "kafka-rebalance-storm",
+  "file": "kafka-rebalance-storm.json",
+  "title": "The rebalance storm: when slow looks dead",
+  "story": "A payments team consumes an orders topic with three workers. A database migration makes each record slower to process. Nobody's consumer crashes, yet within minutes the group is stuck in a loop of rebalances and lag is climbing.",
+  "duration_s": 420,
+  "tags": [
+   "kafka",
+   "consumer-groups",
+   "rebalancing",
+   "backpressure"
+  ],
+  "key_moments": 6
+ },
+ {
+  "id": "zerodha-seven-million-tables",
+  "file": "zerodha-seven-million-tables.json",
+  "title": "7 million tables a day: Zerodha's report cache",
+  "story": "Every report a Zerodha user pulls becomes its own Postgres table, about 7 million by midnight, all thrown away at 02:00. Follow tax-deadline day, compressed (≈6 min per second by day, 1 min per second in the evening rush).",
+  "duration_s": 450,
+  "tags": [
+   "postgres",
+   "zerodha",
+   "dungbeetle",
+   "async-jobs",
+   "reporting",
+   "dramatized"
+  ],
+  "key_moments": 7
+ },
+ {
+  "id": "kafka-load-test-until-it-breaks",
+  "file": "kafka-load-test-until-it-breaks.json",
+  "title": "Load test until it breaks: the three walls of a Kafka cluster",
+  "story": "A team ramps a healthy 3-broker Kafka cluster from 20 to 270 MB/s with the abort guard switched off, to learn exactly how it fails. Compressed: 1 s of playback ≈ 10 s of test time.",
+  "duration_s": 480,
+  "tags": [
+   "kafka",
+   "load-test",
+   "capacity",
+   "isr",
+   "replication",
+   "dramatized"
+  ],
+  "key_moments": 7
+ }
+]

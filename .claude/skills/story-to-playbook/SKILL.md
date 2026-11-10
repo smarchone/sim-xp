@@ -59,7 +59,7 @@ Top level: `schema`, `meta`, `components`, `metrics`, `dashboard`, `alerts`, `in
 - The rest is the **intro**: it is how a viewer who has never seen this system gets the context. Write for an engineer who knows software but not this stack.
   - `background`: 2–4 `{ title, body }` paragraphs, each ≤ ~400 chars, plain words. A good set is "The system" (what it is, rough scale, why it is built this way), "How it normally works" (the mechanism, in the normal state), "Today" (what is about to happen). Do not spoil the cause.
   - `cast`: `[{ name, role }]`, one per component the viewer will see (use the component labels), role in a few words.
-  - `watch`: `[{ label, normal }]`, 2–3 things to keep an eye on with the normal value (`{ "label": "Replica replay lag", "normal": "normal < 1 s" }`).
+  - `watch`: `[{ label, normal, panel? }]`, 2–3 things to keep an eye on with the normal value (`{ "label": "Replica replay lag", "normal": "normal < 1 s", "panel": "replay_lag" }`). The v3 player opens the run with a brief that lights these charts; `panel` (a `dashboard` id) names the chart, otherwise it is matched by the chart's title or a series label.
   - `learn`: 2–4 short "you'll come away knowing…" lines. No spoilers; name the question, not the answer.
 
 ### components
@@ -165,7 +165,7 @@ and reveals extra items you tag `"level": "deep"`. Standard must tell the whole 
 for an engineer who wants the next level down. The toggle only appears when the playbook has a deep layer.
 
 - `dashboard[].component` (any level): the node id this chart belongs to. The chart shows a small tag with that
-  node's name, coloured by its live status (calm, degrading, failing). Tag every chart that clearly belongs to one node: charts of the same component are shown together, in the order the components first appear in `dashboard`, so the viewer can find a component's signals in one place. A chart with no `component` stays where you put it.
+  node's name, coloured by its live status (calm, degrading, failing). Tag every chart that clearly belongs to one node: charts of the same component are shown together, in the order the components first appear in `dashboard`, so the viewer can find a component's signals in one place. A chart with no `component` stays where you put it. Charts join the board as the story reaches them: a chart appears at the first key moment that notes or focuses it, or when an alert on its metric first fires. Charts the first key moment uses, and charts no key moment or alert ever points at, are on screen from the start. So point the first key moment at the 2 to 4 charts that set the baseline.
 - `dashboard[]` with `"level": "deep"`: 3–6 second-order signals (pool usage, GC, join/sync time, commit failures,
   rows scanned). In Hardcore a deep chart is drawn full size only while it matters (a key-moment note sits on it, or an
   alert on its metric is pending or firing) and is otherwise a one-line row under "Quiet signals". So put a note on a

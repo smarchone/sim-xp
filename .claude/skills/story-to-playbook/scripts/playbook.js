@@ -81,7 +81,7 @@ export function validate(PB) {
     }
   } else warn("meta.background is missing: the intro will only show the story line");
   if (m.cast != null) { if (!Array.isArray(m.cast)) err("meta.cast must be a list of { name, role }"); else m.cast.forEach((c, i) => { if (!c || !str(c.name) || !str(c.role)) err(`meta.cast[${i}] needs name and role`); }); }
-  if (m.watch != null) { if (!Array.isArray(m.watch)) err("meta.watch must be a list of { label, normal }"); else m.watch.forEach((w, i) => { if (!w || !str(w.label) || !str(w.normal)) err(`meta.watch[${i}] needs label and normal (e.g. "normal < 1 s")`); }); }
+  if (m.watch != null) { if (!Array.isArray(m.watch)) err("meta.watch must be a list of { label, normal }"); else m.watch.forEach((w, i) => { if (!w || !str(w.label) || !str(w.normal)) err(`meta.watch[${i}] needs label and normal (e.g. "normal < 1 s")`); else if (w.panel != null && !(Array.isArray(PB.dashboard) ? PB.dashboard : []).some((d) => d && d.id === w.panel)) err(`meta.watch[${i}].panel "${w.panel}" is not a dashboard id`); }); }
   if (m.learn != null) { if (!Array.isArray(m.learn) || m.learn.some((x) => !str(x))) err("meta.learn must be a list of short strings"); else if (m.learn.length > 4) warn("meta.learn has more than 4 items"); }
 
   // components
