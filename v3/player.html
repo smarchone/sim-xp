@@ -975,7 +975,7 @@ const DETAIL_KEY = "sim-xp.detail";
 const hasDeep = PB.dashboard.some(p => p.level === "deep") || PB.timeline.some(e => (e.feed && e.feed.level === "deep") || (e.beat && e.beat.deep))
   || PB.components.nodes.some(n => (n.details || []).some(d => d.level === "deep")) || !!(PB.report && PB.report.deep);
 let HC = false;
-try { HC = hasDeep && localStorage.getItem(DETAIL_KEY) === "hardcore"; } catch (e) { /* storage blocked */ }
+// v3 always opens in Standard, even for a playbook with a Hardcore layer and whatever was picked last time (H or the ⚙ switch it for this visit)
 document.body.classList.toggle("hc", HC);
 const shownFeed = f => HC || f.level !== "deep";
 const titled = PB.timeline.filter(e => e.title);
@@ -1951,7 +1951,7 @@ function renderLayout() {
 // Standard / Hardcore: the same run, with or without the deep layer
 function setDetail(on) {
   HC = hasDeep && on; document.body.classList.toggle("hc", HC);
-  try { HC ? localStorage.setItem(DETAIL_KEY, "hardcore") : localStorage.removeItem(DETAIL_KEY); } catch (e) { /* storage blocked */ }
+  // not remembered: the next visit starts in Standard again
   document.querySelectorAll("#detailSeg [data-detail]").forEach(b => b.setAttribute("aria-pressed", String((b.dataset.detail === "hardcore") === HC)));
   feedShown = -1; if (activeBeat) setCapHint(activeBeat); buildFilter();
   render(); if (activeBeat) revealFocusedPanels(activeBeat); if (ready) flash(HC ? "Hardcore: deeper detail on" : "Standard detail");
