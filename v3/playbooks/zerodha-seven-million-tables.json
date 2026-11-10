@@ -1,0 +1,2877 @@
+{
+  "schema": "sim-xp/playbook@2",
+  "meta": {
+    "id": "zerodha-seven-million-tables",
+    "title": "7 million tables a day: Zerodha's report cache",
+    "story": "Every report a Zerodha user pulls becomes its own Postgres table, about 7 million by midnight, all thrown away at 02:00. Follow tax-deadline day, compressed (≈6 min per second by day, 1 min per second in the evening rush).",
+    "duration_s": 450,
+    "clock": {
+      "start": "2024-07-31T08:00:00Z",
+      "scale": 360,
+      "changes": [
+        {
+          "t": 100,
+          "scale": 60
+        },
+        {
+          "t": 280,
+          "scale": 300
+        },
+        {
+          "t": 340,
+          "scale": 4
+        },
+        {
+          "t": 370,
+          "scale": 340
+        }
+      ]
+    },
+    "tags": [
+      "postgres",
+      "zerodha",
+      "dungbeetle",
+      "async-jobs",
+      "reporting",
+      "dramatized"
+    ],
+    "background": [
+      {
+        "title": "The system",
+        "body": "Zerodha's Console serves P&L, tradebooks and tax reports to millions of users, from databases holding hundreds of billions of rows. Some reports are a one-line SELECT; others are hundreds of lines of JOINs. One finishes in 10 ms, the next takes 10 s or more. Users pull millions of them a day."
+      },
+      {
+        "title": "How it normally works",
+        "body": "Console never queries the big database directly. It hands each report to DungBeetle (formerly sql-jobber) as a job. A fixed pool of workers runs at most M queries at a time on the big DB, and writes each result into a brand-new table, named after the job, in a separate Postgres 'results DB'. Console polls, then reads that table."
+      },
+      {
+        "title": "Today",
+        "body": "31 July: the income-tax filing deadline in India. Millions of users want last year's tax P&L, most of them in the evening. The clock shows India time (IST)."
+      }
+    ],
+    "cast": [
+      {
+        "name": "console",
+        "role": "the app users pull reports from"
+      },
+      {
+        "name": "dungbeetle",
+        "role": "queues report jobs, 200 workers"
+      },
+      {
+        "name": "ledger-db",
+        "role": "the huge, slow source database"
+      },
+      {
+        "name": "results-db",
+        "role": "Postgres holding one table per job"
+      },
+      {
+        "name": "vol-a, vol-b",
+        "role": "2 TB EBS volumes under results-db"
+      },
+      {
+        "name": "nightly-wipe",
+        "role": "02:00 cron job"
+      }
+    ],
+    "watch": [
+      {
+        "label": "Tables in results-db",
+        "normal": "0 at dawn, millions by night"
+      },
+      {
+        "label": "ledger-db CPU",
+        "normal": "normal: below ~75%"
+      },
+      {
+        "label": "Report wait p95",
+        "normal": "normal: a few seconds"
+      }
+    ],
+    "learn": [
+      "why a queue in front of a big database beats more read replicas",
+      "what happens to Postgres with millions of tables",
+      "why adding workers in a rush can slow everything down",
+      "how to delete 7 million tables in a minute"
+    ]
+  },
+  "components": {
+    "nodes": [
+      {
+        "id": "console",
+        "label": "console",
+        "kind": "web app · users",
+        "details": [
+          {
+            "label": "Report requests",
+            "metric": "req"
+          },
+          {
+            "label": "Wait p95",
+            "metric": "wait"
+          },
+          {
+            "label": "Flow",
+            "text": "POST job → poll → SELECT *"
+          },
+          {
+            "label": "Poll",
+            "text": "GET /jobs/{jobID}",
+            "level": "deep"
+          }
+        ]
+      },
+      {
+        "id": "dungbeetle",
+        "label": "dungbeetle",
+        "kind": "job server (Go)",
+        "details": [
+          {
+            "label": "Queued",
+            "metric": "queue"
+          },
+          {
+            "label": "Completed",
+            "metric": "done"
+          },
+          {
+            "label": "Workers",
+            "text": "5 nodes × (30 heavy + 10 light)"
+          },
+          {
+            "label": "Broker",
+            "text": "Redis",
+            "level": "deep"
+          },
+          {
+            "label": "Code",
+            "text": "~1,700 lines of Go",
+            "level": "deep"
+          }
+        ]
+      },
+      {
+        "id": "ledger",
+        "label": "ledger-db",
+        "kind": "postgres · warehouse",
+        "details": [
+          {
+            "label": "CPU",
+            "metric": "ledger_cpu"
+          },
+          {
+            "label": "Queries in flight",
+            "metric": "ledger_active"
+          },
+          {
+            "label": "Rows",
+            "text": "~100s of billions"
+          },
+          {
+            "label": "Query p99",
+            "metric": "ledger_p99",
+            "level": "deep"
+          },
+          {
+            "label": "work_mem",
+            "text": "600 MB",
+            "level": "deep"
+          }
+        ]
+      },
+      {
+        "id": "results",
+        "label": "results-db",
+        "kind": "postgres · ephemeral",
+        "details": [
+          {
+            "label": "Tables",
+            "metric": "tables"
+          },
+          {
+            "label": "Catalog",
+            "metric": "catalog"
+          },
+          {
+            "label": "Fetch p99",
+            "metric": "fetch_ms"
+          },
+          {
+            "label": "Box",
+            "text": "EC2 64 vCPU · 128 GB"
+          },
+          {
+            "label": "pg_class rows",
+            "metric": "pgclass",
+            "level": "deep"
+          },
+          {
+            "label": "Durability",
+            "text": "fsync off, no replica",
+            "level": "deep"
+          }
+        ]
+      },
+      {
+        "id": "wipe",
+        "label": "nightly-wipe",
+        "kind": "cron · 02:00",
+        "details": [
+          {
+            "label": "Steps",
+            "text": "stop → detach → attach → start"
+          },
+          {
+            "label": "Runs",
+            "text": "every night, 02:00 IST"
+          },
+          {
+            "label": "Command",
+            "text": "pg_ctl stop -m fast",
+            "level": "deep"
+          }
+        ]
+      },
+      {
+        "id": "vola",
+        "label": "vol-a",
+        "kind": "ebs · 2 TB",
+        "part_cols": 4,
+        "parts": [
+          {
+            "id": "s1"
+          },
+          {
+            "id": "s2"
+          },
+          {
+            "id": "s3"
+          },
+          {
+            "id": "s4"
+          },
+          {
+            "id": "s5"
+          },
+          {
+            "id": "s6"
+          },
+          {
+            "id": "s7"
+          },
+          {
+            "id": "s8"
+          }
+        ],
+        "details": [
+          {
+            "label": "Used",
+            "metric": "disk"
+          },
+          {
+            "label": "Cell",
+            "text": "each cell ≈ 250 GB"
+          }
+        ]
+      },
+      {
+        "id": "volb",
+        "label": "vol-b",
+        "kind": "ebs · 2 TB spare",
+        "part_cols": 4,
+        "parts": [
+          {
+            "id": "s1"
+          },
+          {
+            "id": "s2"
+          },
+          {
+            "id": "s3"
+          },
+          {
+            "id": "s4"
+          },
+          {
+            "id": "s5"
+          },
+          {
+            "id": "s6"
+          },
+          {
+            "id": "s7"
+          },
+          {
+            "id": "s8"
+          }
+        ],
+        "details": [
+          {
+            "label": "Holds",
+            "text": "empty, pre-initialised cluster"
+          },
+          {
+            "label": "Prepared by",
+            "text": "initdb + config, at boot",
+            "level": "deep"
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-job",
+        "to": "dungbeetle",
+        "from": "console"
+      },
+      {
+        "id": "e-query",
+        "to": "ledger",
+        "from": "dungbeetle"
+      },
+      {
+        "id": "e-write",
+        "to": "results",
+        "from": "dungbeetle"
+      },
+      {
+        "id": "e-read",
+        "to": "console",
+        "from": "results"
+      },
+      {
+        "id": "e-wipe",
+        "to": "results",
+        "from": "wipe"
+      },
+      {
+        "id": "e-vola",
+        "to": "vola",
+        "from": "results"
+      },
+      {
+        "id": "e-volb",
+        "to": "volb",
+        "from": "results"
+      }
+    ],
+    "layout": {
+      "rows": [
+        [
+          "console",
+          "dungbeetle",
+          "ledger"
+        ],
+        [
+          null,
+          "results",
+          "wipe"
+        ],
+        [
+          null,
+          "vola",
+          "volb"
+        ]
+      ]
+    }
+  },
+  "metrics": [
+    {
+      "id": "req",
+      "label": "Report requests",
+      "unit": "jobs/s",
+      "start": 30,
+      "noise": 0.05
+    },
+    {
+      "id": "done",
+      "label": "Jobs completed",
+      "unit": "jobs/s",
+      "start": 30,
+      "noise": 0.04
+    },
+    {
+      "id": "queue",
+      "label": "Jobs queued",
+      "unit": "jobs",
+      "start": 0,
+      "noise": 0.03,
+      "normal": [
+        0,
+        5000
+      ]
+    },
+    {
+      "id": "wait",
+      "label": "Report wait p95",
+      "unit": "min",
+      "start": 0.05,
+      "noise": 0.05,
+      "normal": [
+        0,
+        1
+      ]
+    },
+    {
+      "id": "ledger_cpu",
+      "label": "ledger-db CPU",
+      "unit": "%",
+      "start": 28,
+      "noise": 0.04,
+      "normal": [
+        0,
+        85
+      ]
+    },
+    {
+      "id": "ledger_active",
+      "label": "ledger-db queries in flight",
+      "unit": "queries",
+      "start": 15,
+      "noise": 0.04
+    },
+    {
+      "id": "tables",
+      "label": "Tables in results-db",
+      "unit": "M tables",
+      "start": 0,
+      "noise": 0
+    },
+    {
+      "id": "disk",
+      "label": "Results volume used",
+      "unit": "GB",
+      "start": 0,
+      "noise": 0
+    },
+    {
+      "id": "catalog",
+      "label": "System catalog size",
+      "unit": "GB",
+      "start": 0.01,
+      "noise": 0
+    },
+    {
+      "id": "fetch_ms",
+      "label": "Report fetch p99",
+      "unit": "ms",
+      "start": 2,
+      "noise": 0.08,
+      "normal": [
+        0,
+        10
+      ]
+    },
+    {
+      "id": "pgclass",
+      "label": "pg_class rows",
+      "unit": "M rows",
+      "start": 0,
+      "noise": 0
+    },
+    {
+      "id": "ledger_p99",
+      "label": "ledger-db query p99",
+      "unit": "s",
+      "start": 0.9,
+      "noise": 0.06
+    },
+    {
+      "id": "spill",
+      "label": "ledger-db temp-file spill",
+      "unit": "GB/min",
+      "start": 0,
+      "noise": 0.08
+    },
+    {
+      "id": "create_ms",
+      "label": "CREATE TABLE + COPY time",
+      "unit": "ms",
+      "start": 9,
+      "noise": 0.06
+    },
+    {
+      "id": "results_cpu",
+      "label": "results-db CPU",
+      "unit": "%",
+      "start": 4,
+      "noise": 0.05
+    }
+  ],
+  "dashboard": [
+    {
+      "id": "flow",
+      "title": "Requests vs completions",
+      "metrics": [
+        "req",
+        "done"
+      ],
+      "component": "dungbeetle",
+      "why": "N in, M out. When requests outrun completions, the gap goes into the queue instead of onto the big DB."
+    },
+    {
+      "id": "queue",
+      "title": "Jobs queued",
+      "metrics": [
+        "queue"
+      ],
+      "component": "dungbeetle",
+      "why": "Where a rush waits. A growing queue is the system saying 'later', not failing."
+    },
+    {
+      "id": "wait",
+      "title": "Report wait p95",
+      "metrics": [
+        "wait"
+      ],
+      "component": "console",
+      "threshold": {
+        "value": 15,
+        "label": "15 min"
+      },
+      "why": "What users feel: how long 'your report is being generated' lasts."
+    },
+    {
+      "id": "ledger_cpu",
+      "title": "ledger-db CPU",
+      "metrics": [
+        "ledger_cpu"
+      ],
+      "component": "ledger",
+      "max": 100,
+      "threshold": {
+        "value": 85,
+        "label": "85%"
+      },
+      "why": "The expensive DB. If it stays flat during a rush, the queue is doing its job."
+    },
+    {
+      "id": "ledger_active",
+      "title": "ledger-db queries in flight",
+      "metrics": [
+        "ledger_active"
+      ],
+      "component": "ledger",
+      "threshold": {
+        "value": 200,
+        "label": "M = 200 workers"
+      },
+      "why": "The M in 'N requests, M queries'. It should never pass the worker cap."
+    },
+    {
+      "id": "tables",
+      "title": "Tables in results-db",
+      "metrics": [
+        "tables"
+      ],
+      "component": "results",
+      "why": "One brand-new table per finished job. Climbs all day, never shrinks until the nightly wipe."
+    },
+    {
+      "id": "catalog",
+      "title": "System catalog size",
+      "metrics": [
+        "catalog"
+      ],
+      "component": "results",
+      "why": "Postgres's own bookkeeping (pg_attribute, pg_class, pg_index) for millions of tables."
+    },
+    {
+      "id": "disk",
+      "title": "Results volume used",
+      "metrics": [
+        "disk"
+      ],
+      "component": "vola",
+      "max": 2100,
+      "threshold": {
+        "value": 2000,
+        "label": "2 TB EBS"
+      },
+      "why": "The day's results on one EBS volume. It only has to last until 02:00."
+    },
+    {
+      "id": "fetch_ms",
+      "title": "Report fetch p99",
+      "metrics": [
+        "fetch_ms"
+      ],
+      "component": "results",
+      "why": "SELECT * from a job's own table. If millions of tables hurt Postgres, it would show here first."
+    },
+    {
+      "id": "pgclass",
+      "title": "pg_class rows",
+      "metrics": [
+        "pgclass"
+      ],
+      "component": "results",
+      "level": "deep",
+      "why": "About three relations per result table: the heap, its TOAST table and the TOAST index."
+    },
+    {
+      "id": "ledger_p99",
+      "title": "ledger-db query p99",
+      "metrics": [
+        "ledger_p99"
+      ],
+      "component": "ledger",
+      "level": "deep",
+      "why": "Per-query time on the big DB. Past the core count, more concurrency makes every query slower."
+    },
+    {
+      "id": "spill",
+      "title": "ledger-db temp-file spill",
+      "metrics": [
+        "spill"
+      ],
+      "component": "ledger",
+      "level": "deep",
+      "why": "Sorts and hashes that no longer fit in work_mem write to disk: the sign of too many big queries at once."
+    },
+    {
+      "id": "create_ms",
+      "title": "CREATE TABLE + COPY time",
+      "metrics": [
+        "create_ms"
+      ],
+      "component": "results",
+      "level": "deep",
+      "why": "The cost of writing one job's result as a new table. Stays in milliseconds even at 7 M tables."
+    },
+    {
+      "id": "results_cpu",
+      "title": "results-db CPU",
+      "metrics": [
+        "results_cpu"
+      ],
+      "component": "results",
+      "level": "deep",
+      "why": "Rules out the results DB as the bottleneck: 64 vCPUs mostly idle even in the rush."
+    }
+  ],
+  "alerts": [
+    {
+      "id": "queue-high",
+      "metric": "queue",
+      "op": ">",
+      "value": 200000,
+      "for_s": 10,
+      "severity": "warning",
+      "component": "dungbeetle",
+      "summary": "dungbeetle heavy queue > 200k jobs"
+    },
+    {
+      "id": "ledger-cpu",
+      "metric": "ledger_cpu",
+      "op": ">",
+      "value": 90,
+      "for_s": 5,
+      "severity": "critical",
+      "component": "ledger",
+      "summary": "ledger-db CPU > 90%"
+    },
+    {
+      "id": "wait-high",
+      "metric": "wait",
+      "op": ">",
+      "value": 15,
+      "for_s": 10,
+      "severity": "warning",
+      "component": "console",
+      "summary": "Console report wait p95 > 15 min"
+    }
+  ],
+  "initial": {
+    "effects": [
+      {
+        "target": "console",
+        "label": "tax deadline day"
+      },
+      {
+        "target": "dungbeetle",
+        "badge": "M=200"
+      },
+      {
+        "target": "results",
+        "label": "0 tables"
+      },
+      {
+        "target": "wipe",
+        "color": "grey",
+        "intensity": 0.2,
+        "label": "next run 02:00"
+      },
+      {
+        "target": "volb",
+        "color": "blue",
+        "intensity": 0.2,
+        "label": "idle spare"
+      },
+      {
+        "target": "vola",
+        "label": "attached"
+      },
+      {
+        "target": "e-job",
+        "flow": 0.2
+      },
+      {
+        "target": "e-query",
+        "flow": 0.2
+      },
+      {
+        "target": "e-write",
+        "flow": 0.2
+      },
+      {
+        "target": "e-read",
+        "flow": 0.2
+      },
+      {
+        "target": "e-vola",
+        "flow": 0.15
+      },
+      {
+        "target": "e-volb",
+        "flow": 0
+      },
+      {
+        "target": "e-wipe",
+        "flow": 0
+      },
+      {
+        "target": "vola/s1",
+        "color": "grey",
+        "intensity": 0.1,
+        "label": null
+      },
+      {
+        "target": "vola/s2",
+        "color": "grey",
+        "intensity": 0.1,
+        "label": null
+      },
+      {
+        "target": "vola/s3",
+        "color": "grey",
+        "intensity": 0.1,
+        "label": null
+      },
+      {
+        "target": "vola/s4",
+        "color": "grey",
+        "intensity": 0.1,
+        "label": null
+      },
+      {
+        "target": "vola/s5",
+        "color": "grey",
+        "intensity": 0.1,
+        "label": null
+      },
+      {
+        "target": "vola/s6",
+        "color": "grey",
+        "intensity": 0.1,
+        "label": null
+      },
+      {
+        "target": "vola/s7",
+        "color": "grey",
+        "intensity": 0.1,
+        "label": null
+      },
+      {
+        "target": "vola/s8",
+        "color": "grey",
+        "intensity": 0.1,
+        "label": null
+      },
+      {
+        "target": "volb/s1",
+        "color": "grey",
+        "intensity": 0.1,
+        "label": null
+      },
+      {
+        "target": "volb/s2",
+        "color": "grey",
+        "intensity": 0.1,
+        "label": null
+      },
+      {
+        "target": "volb/s3",
+        "color": "grey",
+        "intensity": 0.1,
+        "label": null
+      },
+      {
+        "target": "volb/s4",
+        "color": "grey",
+        "intensity": 0.1,
+        "label": null
+      },
+      {
+        "target": "volb/s5",
+        "color": "grey",
+        "intensity": 0.1,
+        "label": null
+      },
+      {
+        "target": "volb/s6",
+        "color": "grey",
+        "intensity": 0.1,
+        "label": null
+      },
+      {
+        "target": "volb/s7",
+        "color": "grey",
+        "intensity": 0.1,
+        "label": null
+      },
+      {
+        "target": "volb/s8",
+        "color": "grey",
+        "intensity": 0.1,
+        "label": null
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "t": 0,
+      "metrics": [
+        {
+          "id": "req",
+          "to": 70,
+          "shape": "ease",
+          "over_s": 20
+        },
+        {
+          "id": "done",
+          "to": 70,
+          "shape": "ease",
+          "over_s": 20
+        },
+        {
+          "id": "ledger_cpu",
+          "to": 40,
+          "shape": "ease",
+          "over_s": 20
+        },
+        {
+          "id": "ledger_active",
+          "to": 35,
+          "shape": "ease",
+          "over_s": 20
+        },
+        {
+          "id": "results_cpu",
+          "to": 8,
+          "shape": "ease",
+          "over_s": 20
+        },
+        {
+          "id": "tables",
+          "to": 0.36,
+          "shape": "linear",
+          "over_s": 20
+        },
+        {
+          "id": "disk",
+          "to": 53,
+          "shape": "linear",
+          "over_s": 20
+        },
+        {
+          "id": "catalog",
+          "to": 3,
+          "shape": "linear",
+          "over_s": 20
+        },
+        {
+          "id": "pgclass",
+          "to": 1.08,
+          "shape": "linear",
+          "over_s": 20
+        }
+      ]
+    },
+    {
+      "t": 3,
+      "title": "Meet the system",
+      "beat": {
+        "tone": "neutral",
+        "focus": [
+          "console",
+          "dungbeetle",
+          "results",
+          "ledger"
+        ],
+        "hint": "Console never queries the big ledger-db itself. It asks dungbeetle to run a named SQL report as a job. A worker runs it on ledger-db and writes the rows into a brand-new table in results-db, named after the job. Console then just reads that table. It is 08:00 on 31 July and results-db is empty.",
+        "deep": "Tasks are named queries in a .sql file (-- name: get_tax_pnl, -- db: ledger-db). A job is one run of a task with args: POST /tasks/get_tax_pnl/jobs.",
+        "notes": [
+          {
+            "panel": "flow",
+            "text": "Requests ≈ completions: every job runs straight away"
+          },
+          {
+            "panel": "tables",
+            "text": "results-db starts the day empty: 0 tables"
+          }
+        ]
+      }
+    },
+    {
+      "t": 6,
+      "feed": {
+        "from": "Meera · #console-oncall",
+        "kind": "chat",
+        "text": "morning. 31 July, ITR filing deadline. expect a big evening on tax P&L reports"
+      }
+    },
+    {
+      "t": 18,
+      "feed": {
+        "from": "console",
+        "kind": "log",
+        "text": "09:48 IST GET /reports/tax-pnl?fy=2023-24 → job tax_pnl_ZX4821_fy24 queued (202 Accepted)"
+      }
+    },
+    {
+      "t": 20,
+      "metrics": [
+        {
+          "id": "req",
+          "to": 80,
+          "shape": "linear",
+          "over_s": 80
+        },
+        {
+          "id": "done",
+          "to": 80,
+          "shape": "linear",
+          "over_s": 80
+        },
+        {
+          "id": "tables",
+          "to": 2.43,
+          "shape": "linear",
+          "over_s": 80
+        },
+        {
+          "id": "disk",
+          "to": 357,
+          "shape": "linear",
+          "over_s": 80
+        },
+        {
+          "id": "catalog",
+          "to": 20.2,
+          "shape": "linear",
+          "over_s": 80
+        },
+        {
+          "id": "pgclass",
+          "to": 7.29,
+          "shape": "linear",
+          "over_s": 80
+        }
+      ]
+    },
+    {
+      "t": 25,
+      "effects": [
+        {
+          "target": "e-job",
+          "flow": 0.4
+        },
+        {
+          "target": "e-query",
+          "flow": 0.35
+        },
+        {
+          "target": "e-write",
+          "flow": 0.35
+        },
+        {
+          "target": "e-read",
+          "flow": 0.4
+        },
+        {
+          "target": "e-vola",
+          "flow": 0.3
+        }
+      ]
+    },
+    {
+      "t": 28,
+      "feed": {
+        "from": "dungbeetle",
+        "kind": "log",
+        "text": "job tax_pnl_ZX4821_fy24 SUCCESS rows=2,184 in 412ms → CREATE TABLE \"tax_pnl_ZX4821_fy24\" (7 cols)"
+      }
+    },
+    {
+      "t": 34,
+      "feed": {
+        "from": "results-db",
+        "kind": "log",
+        "text": "LOG: statement: SELECT * FROM \"tax_pnl_ZX4821_fy24\" ORDER BY trade_date  (2,184 rows, 1.8 ms)",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 40,
+      "effects": [
+        {
+          "target": "results",
+          "label": "filling up"
+        },
+        {
+          "target": "vola/s1",
+          "color": "teal",
+          "intensity": 0.6,
+          "label": null
+        },
+        {
+          "target": "vola/s2",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s3",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s4",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s5",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s6",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s7",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s8",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        }
+      ]
+    },
+    {
+      "t": 52,
+      "feed": {
+        "from": "Meera · terminal",
+        "kind": "chat",
+        "text": "$ psql results -c \"SELECT count(*) FROM pg_class WHERE relkind='r'\"  → 1,288,410",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 60,
+      "title": "A table per report",
+      "beat": {
+        "tone": "neutral",
+        "focus": [
+          "results",
+          "vola",
+          "panel:tables",
+          "panel:fetch_ms"
+        ],
+        "hint": "By 2 pm about 1.4 million reports have run, and each became its own table, sized 1,000 to 5,000 rows. Reading a report is a SELECT * from that small table: no index, no JOIN, no other user's rows in the way. Columns come straight from the query's result.",
+        "deep": "Column types are mapped from the result set (INT8→BIGINT, NUMERIC→DECIMAL, TIMESTAMP, DATE, BOOLEAN, everything else TEXT). TEXT columns give each table a TOAST table + index too.",
+        "notes": [
+          {
+            "panel": "tables",
+            "text": "~1.4 M tables by 2 pm, one per finished job"
+          },
+          {
+            "panel": "fetch_ms",
+            "text": "Fetch stays ~2 ms: each report is its own small table"
+          },
+          {
+            "panel": "ledger_active",
+            "text": "Only ~35 queries in flight on the big DB"
+          },
+          {
+            "panel": "pgclass",
+            "text": "≈3 relations per table: heap + TOAST table + index"
+          }
+        ]
+      }
+    },
+    {
+      "t": 70,
+      "effects": [
+        {
+          "target": "vola/s1",
+          "color": "teal",
+          "intensity": 0.6,
+          "label": null
+        },
+        {
+          "target": "vola/s2",
+          "color": "teal",
+          "intensity": 0.6,
+          "label": null
+        },
+        {
+          "target": "vola/s3",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s4",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s5",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s6",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s7",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s8",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        }
+      ]
+    },
+    {
+      "t": 76,
+      "feed": {
+        "from": "Meera · #console-oncall",
+        "kind": "chat",
+        "text": "15:30 market closed. ~1.9M report tables so far, ledger-db at 40%. calm before the evening"
+      }
+    },
+    {
+      "t": 100,
+      "metrics": [
+        {
+          "id": "req",
+          "to": 520,
+          "shape": "ease",
+          "over_s": 40
+        },
+        {
+          "id": "done",
+          "to": 400,
+          "shape": "ease",
+          "over_s": 30
+        },
+        {
+          "id": "ledger_cpu",
+          "to": 72,
+          "shape": "ease",
+          "over_s": 30
+        },
+        {
+          "id": "ledger_active",
+          "to": 200,
+          "shape": "ease",
+          "over_s": 30
+        },
+        {
+          "id": "ledger_p99",
+          "to": 1.4,
+          "shape": "ease",
+          "over_s": 30
+        },
+        {
+          "id": "results_cpu",
+          "to": 26,
+          "shape": "ease",
+          "over_s": 30
+        },
+        {
+          "id": "tables",
+          "to": 2.92,
+          "shape": "linear",
+          "over_s": 30
+        },
+        {
+          "id": "disk",
+          "to": 429,
+          "shape": "linear",
+          "over_s": 30
+        },
+        {
+          "id": "catalog",
+          "to": 24.3,
+          "shape": "linear",
+          "over_s": 30
+        },
+        {
+          "id": "pgclass",
+          "to": 8.76,
+          "shape": "linear",
+          "over_s": 30
+        }
+      ],
+      "title": "Evening: everyone files at once",
+      "effects": [
+        {
+          "target": "console",
+          "label": "tax-filing rush",
+          "color": "amber",
+          "intensity": 0.3
+        },
+        {
+          "target": "e-job",
+          "flow": 0.7
+        }
+      ]
+    },
+    {
+      "t": 102,
+      "feed": {
+        "from": "console",
+        "kind": "log",
+        "text": "18:02 IST tax-pnl requests 3× the 17:00 rate (pre-deadline filing)"
+      }
+    },
+    {
+      "t": 115,
+      "effects": [
+        {
+          "target": "e-query",
+          "flow": 0.7
+        },
+        {
+          "target": "e-write",
+          "flow": 0.6
+        },
+        {
+          "target": "e-read",
+          "flow": 0.6
+        },
+        {
+          "target": "e-vola",
+          "flow": 0.5
+        },
+        {
+          "target": "vola/s1",
+          "color": "teal",
+          "intensity": 0.6,
+          "label": null
+        },
+        {
+          "target": "vola/s2",
+          "color": "teal",
+          "intensity": 0.6,
+          "label": null
+        },
+        {
+          "target": "vola/s3",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s4",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s5",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s6",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s7",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s8",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        }
+      ]
+    },
+    {
+      "t": 128,
+      "metrics": [
+        {
+          "id": "queue",
+          "to": 36000,
+          "shape": "linear",
+          "over_s": 12
+        },
+        {
+          "id": "wait",
+          "to": 1.5,
+          "shape": "linear",
+          "over_s": 12
+        }
+      ]
+    },
+    {
+      "t": 130,
+      "metrics": [
+        {
+          "id": "fetch_ms",
+          "to": 3,
+          "shape": "ease",
+          "over_s": 20
+        },
+        {
+          "id": "create_ms",
+          "to": 14,
+          "shape": "ease",
+          "over_s": 20
+        },
+        {
+          "id": "tables",
+          "to": 4.12,
+          "shape": "linear",
+          "over_s": 50
+        },
+        {
+          "id": "disk",
+          "to": 606,
+          "shape": "linear",
+          "over_s": 50
+        },
+        {
+          "id": "catalog",
+          "to": 34.3,
+          "shape": "linear",
+          "over_s": 50
+        },
+        {
+          "id": "pgclass",
+          "to": 12.36,
+          "shape": "linear",
+          "over_s": 50
+        }
+      ],
+      "effects": [
+        {
+          "target": "dungbeetle",
+          "color": "amber",
+          "intensity": 0.4,
+          "label": "all 200 workers busy"
+        },
+        {
+          "target": "e-job",
+          "flow": 0.95
+        }
+      ]
+    },
+    {
+      "t": 131,
+      "feed": {
+        "from": "dungbeetle",
+        "kind": "log",
+        "text": "heavy queue: 150/150 workers busy, light 50/50, pending=12,406"
+      }
+    },
+    {
+      "t": 140,
+      "metrics": [
+        {
+          "id": "queue",
+          "to": 324000,
+          "shape": "linear",
+          "over_s": 40
+        },
+        {
+          "id": "wait",
+          "to": 13.5,
+          "shape": "linear",
+          "over_s": 40
+        }
+      ],
+      "feed": {
+        "from": "Meera · terminal",
+        "kind": "chat",
+        "text": "$ curl -s localhost:6060/jobs/queue/heavy | jq length  → 58,213",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 150,
+      "title": "N requests, M queries",
+      "effects": [
+        {
+          "target": "dungbeetle",
+          "label": "queueing",
+          "pulse": true
+        },
+        {
+          "target": "ledger",
+          "label": "at cap: 200 queries"
+        }
+      ],
+      "beat": {
+        "tone": "bad",
+        "focus": [
+          "dungbeetle",
+          "ledger",
+          "panel:flow",
+          "panel:queue",
+          "panel:ledger_cpu"
+        ],
+        "hint": "Requests hit 520 a second, but 200 workers can only finish about 400. The rest wait in the queue, and users see 'Your report is being generated'. ledger-db does not notice: it never runs more than 200 queries. This is the design working. The rush lands on a queue, not on the database.",
+        "deep": "Throughput ceiling ≈ workers ÷ mean job time = 200 ÷ ~0.5 s ≈ 400 jobs/s. Queue grows at (520 − 400) × 60 s ≈ 7,200 jobs per minute of story time.",
+        "notes": [
+          {
+            "panel": "flow",
+            "metric": "req",
+            "text": "520/s in vs ~400/s that 200 workers can finish"
+          },
+          {
+            "panel": "queue",
+            "text": "The excess piles up here: ~106k jobs waiting"
+          },
+          {
+            "panel": "ledger_cpu",
+            "text": "Flat at ~72%: the big DB never sees the rush"
+          },
+          {
+            "panel": "wait",
+            "text": "Users wait ~4–5 min instead of timing out"
+          }
+        ]
+      }
+    },
+    {
+      "t": 162,
+      "feed": {
+        "from": "Support · #console-oncall",
+        "kind": "chat",
+        "text": "tickets coming in: 'tax P&L stuck on being generated for 10 mins'. filing deadline is tonight"
+      }
+    },
+    {
+      "t": 176,
+      "feed": {
+        "from": "Ravi · #console-oncall",
+        "kind": "chat",
+        "text": "queue is past 200k and it's deadline day. bumping heavy worker concurrency 30 → 90 on all 5 nodes, ledger-db has headroom",
+        "key": true
+      }
+    },
+    {
+      "t": 180,
+      "metrics": [
+        {
+          "id": "done",
+          "to": 290,
+          "shape": "ease",
+          "over_s": 8
+        },
+        {
+          "id": "queue",
+          "to": 408000,
+          "shape": "linear",
+          "over_s": 8
+        },
+        {
+          "id": "wait",
+          "to": 23,
+          "shape": "linear",
+          "over_s": 8
+        },
+        {
+          "id": "ledger_cpu",
+          "to": 99,
+          "shape": "ease",
+          "over_s": 6
+        },
+        {
+          "id": "ledger_active",
+          "to": 500,
+          "shape": "ease",
+          "over_s": 4
+        },
+        {
+          "id": "ledger_p99",
+          "to": 9,
+          "shape": "ease",
+          "over_s": 10
+        },
+        {
+          "id": "spill",
+          "to": 40,
+          "shape": "ease",
+          "over_s": 6
+        },
+        {
+          "id": "tables",
+          "to": 4.68,
+          "shape": "linear",
+          "over_s": 31
+        },
+        {
+          "id": "disk",
+          "to": 688,
+          "shape": "linear",
+          "over_s": 31
+        },
+        {
+          "id": "catalog",
+          "to": 39,
+          "shape": "linear",
+          "over_s": 31
+        },
+        {
+          "id": "pgclass",
+          "to": 14.04,
+          "shape": "linear",
+          "over_s": 31
+        }
+      ],
+      "title": "More workers",
+      "feed": {
+        "from": "deploy-bot",
+        "kind": "deploy",
+        "text": "dungbeetle: --worker-concurrency 30 → 90 (heavy queue), rolling restart"
+      },
+      "effects": [
+        {
+          "target": "dungbeetle",
+          "badge": "M=500"
+        },
+        {
+          "target": "ledger",
+          "color": "red",
+          "intensity": 0.6,
+          "pulse": true,
+          "label": "500 queries, 64 cores"
+        },
+        {
+          "target": "e-query",
+          "flow": 1,
+          "color": "red"
+        }
+      ]
+    },
+    {
+      "t": 184,
+      "feed": {
+        "from": "ledger-db",
+        "kind": "log",
+        "text": "LOG: temporary file: path \"base/pgsql_tmp/pgsql_tmp41822.17\", size 1342177280",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 188,
+      "metrics": [
+        {
+          "id": "queue",
+          "to": 632000,
+          "shape": "linear",
+          "over_s": 17
+        },
+        {
+          "id": "wait",
+          "to": 36,
+          "shape": "linear",
+          "over_s": 17
+        }
+      ]
+    },
+    {
+      "t": 192,
+      "title": "More workers, fewer reports",
+      "beat": {
+        "tone": "bad",
+        "focus": [
+          "ledger",
+          "dungbeetle",
+          "panel:ledger_cpu",
+          "panel:flow",
+          "panel:queue"
+        ],
+        "hint": "Tripling the workers sent 500 heavy reports at ledger-db at once. Its 64 cores are pinned, queries trip over each other, and completions fall from 400 to about 290 a second. The queue now grows faster than before. Past the database's limit, more concurrency means less throughput.",
+        "deep": "ledger-db runs work_mem=600MB. At 200 queries that is fine; at 500 the sorts and hashes no longer fit in 128 GB RAM and spill to pgsql_tmp. Query p99 goes from ~1.4 s to ~9 s.",
+        "notes": [
+          {
+            "panel": "ledger_cpu",
+            "text": "Pinned near 100%: 500 heavy queries on 64 cores"
+          },
+          {
+            "panel": "flow",
+            "metric": "done",
+            "text": "Completions fall to ~290/s: more workers, less done"
+          },
+          {
+            "panel": "queue",
+            "text": "Queue grows faster: ~450k"
+          },
+          {
+            "panel": "spill",
+            "text": "600 MB work_mem × 500 queries: sorts spill to disk"
+          },
+          {
+            "panel": "ledger_p99",
+            "text": "p99 ~1.4 s → ~9 s"
+          }
+        ]
+      }
+    },
+    {
+      "t": 195,
+      "metrics": [
+        {
+          "id": "req",
+          "to": 220,
+          "shape": "ease",
+          "over_s": 60
+        }
+      ]
+    },
+    {
+      "t": 199,
+      "feed": {
+        "from": "Ravi · #console-oncall",
+        "kind": "chat",
+        "text": "ledger-db at 100% and completions went *down*. reverting to 30",
+        "key": true
+      }
+    },
+    {
+      "t": 205,
+      "metrics": [
+        {
+          "id": "done",
+          "to": 400,
+          "shape": "ease",
+          "over_s": 6
+        },
+        {
+          "id": "queue",
+          "to": 672000,
+          "shape": "linear",
+          "over_s": 6
+        },
+        {
+          "id": "wait",
+          "to": 28,
+          "shape": "ease",
+          "over_s": 6
+        },
+        {
+          "id": "ledger_cpu",
+          "to": 72,
+          "shape": "ease",
+          "over_s": 8
+        },
+        {
+          "id": "ledger_active",
+          "to": 200,
+          "shape": "ease",
+          "over_s": 4
+        },
+        {
+          "id": "ledger_p99",
+          "to": 1.4,
+          "shape": "ease",
+          "over_s": 10
+        },
+        {
+          "id": "spill",
+          "to": 0,
+          "shape": "ease",
+          "over_s": 8
+        }
+      ],
+      "feed": {
+        "from": "deploy-bot",
+        "kind": "deploy",
+        "text": "dungbeetle: --worker-concurrency 90 → 30 (heavy queue), rolling restart"
+      },
+      "effects": [
+        {
+          "target": "dungbeetle",
+          "badge": "M=200"
+        },
+        {
+          "target": "ledger",
+          "color": "amber",
+          "intensity": 0.3,
+          "pulse": false,
+          "label": "at cap: 200 queries"
+        },
+        {
+          "target": "e-query",
+          "flow": 0.7,
+          "color": null
+        }
+      ]
+    },
+    {
+      "t": 211,
+      "metrics": [
+        {
+          "id": "queue",
+          "to": 680000,
+          "shape": "linear",
+          "over_s": 7
+        },
+        {
+          "id": "wait",
+          "to": 28.5,
+          "shape": "linear",
+          "over_s": 7
+        },
+        {
+          "id": "tables",
+          "to": 6.38,
+          "shape": "linear",
+          "over_s": 71
+        },
+        {
+          "id": "disk",
+          "to": 938,
+          "shape": "linear",
+          "over_s": 71
+        },
+        {
+          "id": "catalog",
+          "to": 53.1,
+          "shape": "linear",
+          "over_s": 71
+        },
+        {
+          "id": "pgclass",
+          "to": 19.14,
+          "shape": "linear",
+          "over_s": 71
+        }
+      ]
+    },
+    {
+      "t": 214,
+      "feed": {
+        "from": "ledger-db",
+        "kind": "log",
+        "text": "LOG: checkpoint complete; temp files 0 B in last 60 s",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 218,
+      "metrics": [
+        {
+          "id": "queue",
+          "to": 436000,
+          "shape": "linear",
+          "over_s": 37
+        },
+        {
+          "id": "wait",
+          "to": 18,
+          "shape": "linear",
+          "over_s": 37
+        }
+      ]
+    },
+    {
+      "t": 225,
+      "feed": {
+        "from": "console",
+        "kind": "log",
+        "text": "20:05 IST tax-pnl request rate falling: 330/s (from 520/s peak)"
+      }
+    },
+    {
+      "t": 235,
+      "title": "Back to M: the queue drains",
+      "effects": [
+        {
+          "target": "ledger",
+          "color": null,
+          "intensity": 0,
+          "label": "200 queries"
+        },
+        {
+          "target": "e-job",
+          "flow": 0.6
+        }
+      ],
+      "beat": {
+        "tone": "good",
+        "focus": [
+          "dungbeetle",
+          "ledger",
+          "panel:queue",
+          "panel:flow"
+        ],
+        "hint": "Back at 200 workers, ledger-db finishes ~400 reports a second again, and the rush is fading. Requests now arrive slower than they finish, so the queue shrinks by roughly 100 jobs a second. Nothing was lost: every queued job will still get its own table.",
+        "deep": "Queue peaked near 680k at ~19:58. With requests at ~300/s and completions at 400/s, the backlog drains in about an hour of story time.",
+        "notes": [
+          {
+            "panel": "queue",
+            "text": "Past the peak (~680k) and shrinking"
+          },
+          {
+            "panel": "flow",
+            "metric": "done",
+            "text": "Completions back at ~400/s, requests now below"
+          },
+          {
+            "panel": "ledger_cpu",
+            "text": "Back to ~72%: the cap protects the big DB again"
+          },
+          {
+            "panel": "ledger_p99",
+            "text": "p99 back to ~1.4 s once spills stop"
+          }
+        ]
+      }
+    },
+    {
+      "t": 250,
+      "feed": {
+        "from": "Meera · terminal",
+        "kind": "chat",
+        "text": "$ curl -s localhost:6060/jobs/queue/heavy | jq length  → 468,571",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 255,
+      "metrics": [
+        {
+          "id": "req",
+          "to": 180,
+          "shape": "linear",
+          "over_s": 25
+        },
+        {
+          "id": "queue",
+          "to": 136000,
+          "shape": "linear",
+          "over_s": 25
+        },
+        {
+          "id": "wait",
+          "to": 5.7,
+          "shape": "linear",
+          "over_s": 25
+        }
+      ]
+    },
+    {
+      "t": 268,
+      "feed": {
+        "from": "Ravi · #console-oncall",
+        "kind": "chat",
+        "text": "wait is under 15 min again. lesson learned: the cap is the feature"
+      }
+    },
+    {
+      "t": 280,
+      "metrics": [
+        {
+          "id": "queue",
+          "to": 0,
+          "shape": "linear",
+          "over_s": 2
+        },
+        {
+          "id": "wait",
+          "to": 0.05,
+          "shape": "linear",
+          "over_s": 3
+        }
+      ]
+    },
+    {
+      "t": 282,
+      "metrics": [
+        {
+          "id": "req",
+          "to": 20,
+          "shape": "ease",
+          "over_s": 28
+        },
+        {
+          "id": "done",
+          "to": 175,
+          "shape": "linear",
+          "over_s": 2
+        },
+        {
+          "id": "ledger_cpu",
+          "to": 35,
+          "shape": "ease",
+          "over_s": 20
+        },
+        {
+          "id": "ledger_active",
+          "to": 90,
+          "shape": "ease",
+          "over_s": 3
+        },
+        {
+          "id": "ledger_p99",
+          "to": 0.9,
+          "shape": "ease",
+          "over_s": 20
+        },
+        {
+          "id": "fetch_ms",
+          "to": 2,
+          "shape": "ease",
+          "over_s": 20
+        },
+        {
+          "id": "create_ms",
+          "to": 9,
+          "shape": "ease",
+          "over_s": 20
+        },
+        {
+          "id": "results_cpu",
+          "to": 6,
+          "shape": "ease",
+          "over_s": 28
+        },
+        {
+          "id": "tables",
+          "to": 7.15,
+          "shape": "linear",
+          "over_s": 28
+        },
+        {
+          "id": "disk",
+          "to": 1051,
+          "shape": "linear",
+          "over_s": 28
+        },
+        {
+          "id": "catalog",
+          "to": 59.6,
+          "shape": "linear",
+          "over_s": 28
+        },
+        {
+          "id": "pgclass",
+          "to": 21.45,
+          "shape": "linear",
+          "over_s": 28
+        }
+      ]
+    },
+    {
+      "t": 283,
+      "title": "Queue empty",
+      "feed": {
+        "from": "dungbeetle",
+        "kind": "log",
+        "text": "21:15 IST heavy queue drained (pending=0); 6.4M jobs completed today"
+      },
+      "effects": [
+        {
+          "target": "dungbeetle",
+          "color": null,
+          "intensity": 0,
+          "pulse": false,
+          "label": null
+        },
+        {
+          "target": "console",
+          "color": null,
+          "intensity": 0,
+          "label": null
+        },
+        {
+          "target": "e-job",
+          "flow": 0.3
+        },
+        {
+          "target": "e-query",
+          "flow": 0.3
+        },
+        {
+          "target": "e-write",
+          "flow": 0.3
+        },
+        {
+          "target": "e-read",
+          "flow": 0.3
+        },
+        {
+          "target": "e-vola",
+          "flow": 0.2
+        },
+        {
+          "target": "vola/s1",
+          "color": "teal",
+          "intensity": 0.6,
+          "label": null
+        },
+        {
+          "target": "vola/s2",
+          "color": "teal",
+          "intensity": 0.6,
+          "label": null
+        },
+        {
+          "target": "vola/s3",
+          "color": "teal",
+          "intensity": 0.6,
+          "label": null
+        },
+        {
+          "target": "vola/s4",
+          "color": "teal",
+          "intensity": 0.6,
+          "label": null
+        },
+        {
+          "target": "vola/s5",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s6",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s7",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s8",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        }
+      ]
+    },
+    {
+      "t": 284,
+      "metrics": [
+        {
+          "id": "done",
+          "to": 20,
+          "shape": "ease",
+          "over_s": 26
+        }
+      ]
+    },
+    {
+      "t": 285,
+      "metrics": [
+        {
+          "id": "ledger_active",
+          "to": 10,
+          "shape": "ease",
+          "over_s": 25
+        }
+      ]
+    },
+    {
+      "t": 292,
+      "feed": {
+        "from": "Meera · terminal",
+        "kind": "chat",
+        "text": "$ psql results -c \"SELECT relname, pg_size_pretty(pg_total_relation_size(oid)) FROM pg_class WHERE relname IN ('pg_attribute','pg_class','pg_index')\"  → 47 GB · 9 GB · 2.4 GB",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 305,
+      "title": "7 million tables, 60 GB of catalog",
+      "effects": [
+        {
+          "target": "results",
+          "label": "~7 M tables"
+        },
+        {
+          "target": "vola/s1",
+          "color": "teal",
+          "intensity": 0.6,
+          "label": null
+        },
+        {
+          "target": "vola/s2",
+          "color": "teal",
+          "intensity": 0.6,
+          "label": null
+        },
+        {
+          "target": "vola/s3",
+          "color": "teal",
+          "intensity": 0.6,
+          "label": null
+        },
+        {
+          "target": "vola/s4",
+          "color": "teal",
+          "intensity": 0.6,
+          "label": null
+        },
+        {
+          "target": "vola/s5",
+          "color": "teal",
+          "intensity": 0.6,
+          "label": null
+        },
+        {
+          "target": "vola/s6",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s7",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s8",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        }
+      ],
+      "beat": {
+        "tone": "neutral",
+        "focus": [
+          "results",
+          "vola",
+          "panel:tables",
+          "panel:catalog",
+          "panel:fetch_ms"
+        ],
+        "hint": "Near midnight results-db holds about 7 million tables and 60 GB of catalog: Postgres's own records of every table and column. Report fetches are still about 2 ms. Postgres finds a table by name through an index on its catalog, so 7 million of them cost disk space, not speed.",
+        "deep": "pg_attribute ~48 GB (one row per column, system columns included), pg_class ~9 GB (~21 M relations), pg_index ~2.5 GB though DungBeetle makes no indexes: likely the TOAST indexes. Each backend caches only the relations it touches.",
+        "notes": [
+          {
+            "panel": "tables",
+            "text": "~7 M tables, each one finished report"
+          },
+          {
+            "panel": "catalog",
+            "text": "~60 GB of catalog, mostly pg_attribute"
+          },
+          {
+            "panel": "fetch_ms",
+            "text": "Fetch still ~2 ms: lookups go by name, through an index"
+          },
+          {
+            "panel": "pgclass",
+            "text": "~21 M relations: 3 per table"
+          }
+        ]
+      }
+    },
+    {
+      "t": 310,
+      "metrics": [
+        {
+          "id": "req",
+          "to": 4,
+          "shape": "ease",
+          "over_s": 30
+        },
+        {
+          "id": "done",
+          "to": 4,
+          "shape": "ease",
+          "over_s": 30
+        },
+        {
+          "id": "ledger_cpu",
+          "to": 55,
+          "shape": "ease",
+          "over_s": 25
+        },
+        {
+          "id": "tables",
+          "to": 7.2,
+          "shape": "linear",
+          "over_s": 30
+        },
+        {
+          "id": "disk",
+          "to": 1058,
+          "shape": "linear",
+          "over_s": 30
+        },
+        {
+          "id": "catalog",
+          "to": 60,
+          "shape": "linear",
+          "over_s": 30
+        },
+        {
+          "id": "pgclass",
+          "to": 21.6,
+          "shape": "linear",
+          "over_s": 30
+        }
+      ]
+    },
+    {
+      "t": 311,
+      "feed": {
+        "from": "ledger-db",
+        "kind": "log",
+        "text": "23:35 IST EOD exchange import started (bulk COPY into tradebook_2024_07)",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 318,
+      "feed": {
+        "from": "Meera · #console-oncall",
+        "kind": "chat",
+        "text": "midnight. deadline passed. 7.2M report tables today, a record. wipe runs at 02:00 as usual"
+      }
+    },
+    {
+      "t": 341,
+      "title": "02:00 nightly wipe",
+      "feed": {
+        "from": "nightly-wipe",
+        "kind": "deploy",
+        "text": "02:00:04 IST nightly-wipe started on results-db (vol-a → vol-b)"
+      },
+      "effects": [
+        {
+          "target": "wipe",
+          "color": "violet",
+          "intensity": 0.6,
+          "pulse": true,
+          "label": "running"
+        },
+        {
+          "target": "e-wipe",
+          "flow": 0.8,
+          "color": "violet"
+        }
+      ]
+    },
+    {
+      "t": 343,
+      "metrics": [
+        {
+          "id": "done",
+          "to": 0,
+          "shape": "step"
+        },
+        {
+          "id": "queue",
+          "to": 200,
+          "shape": "linear",
+          "over_s": 12
+        },
+        {
+          "id": "wait",
+          "to": 0.8,
+          "shape": "linear",
+          "over_s": 12
+        },
+        {
+          "id": "results_cpu",
+          "to": 0,
+          "shape": "step"
+        }
+      ],
+      "feed": {
+        "from": "nightly-wipe",
+        "kind": "log",
+        "text": "02:00:12 $ pg_ctl -D /data/pg stop -m fast  → server stopped"
+      },
+      "effects": [
+        {
+          "target": "results",
+          "down": true,
+          "label": "stopped"
+        },
+        {
+          "target": "e-write",
+          "flow": 0
+        },
+        {
+          "target": "e-read",
+          "flow": 0
+        },
+        {
+          "target": "e-vola",
+          "flow": 0
+        },
+        {
+          "target": "dungbeetle",
+          "label": "results-db down: holding jobs",
+          "color": "amber",
+          "intensity": 0.3
+        }
+      ]
+    },
+    {
+      "t": 347,
+      "feed": {
+        "from": "nightly-wipe",
+        "kind": "log",
+        "text": "02:00:28 $ umount /data && aws ec2 detach-volume --volume-id vol-a  → detached"
+      },
+      "effects": [
+        {
+          "target": "vola",
+          "down": true,
+          "label": "detached"
+        }
+      ]
+    },
+    {
+      "t": 351,
+      "metrics": [
+        {
+          "id": "tables",
+          "to": 0,
+          "shape": "step"
+        },
+        {
+          "id": "disk",
+          "to": 0,
+          "shape": "step"
+        },
+        {
+          "id": "catalog",
+          "to": 0.01,
+          "shape": "step"
+        },
+        {
+          "id": "pgclass",
+          "to": 0,
+          "shape": "step"
+        }
+      ],
+      "feed": {
+        "from": "nightly-wipe",
+        "kind": "log",
+        "text": "02:00:44 $ aws ec2 attach-volume --volume-id vol-b --device /dev/sdf && mount /data  → ok"
+      },
+      "effects": [
+        {
+          "target": "volb",
+          "color": "teal",
+          "intensity": 0.3,
+          "label": "attached"
+        },
+        {
+          "target": "e-volb",
+          "flow": 0.3
+        }
+      ]
+    },
+    {
+      "t": 355,
+      "metrics": [
+        {
+          "id": "done",
+          "to": 4,
+          "shape": "ease",
+          "over_s": 2
+        },
+        {
+          "id": "queue",
+          "to": 0,
+          "shape": "linear",
+          "over_s": 2
+        },
+        {
+          "id": "wait",
+          "to": 0.05,
+          "shape": "linear",
+          "over_s": 3
+        },
+        {
+          "id": "results_cpu",
+          "to": 2,
+          "shape": "ease",
+          "over_s": 3
+        }
+      ],
+      "feed": {
+        "from": "nightly-wipe",
+        "kind": "log",
+        "text": "02:01:00 $ pg_ctl -D /data/pg start  → database system is ready to accept connections"
+      },
+      "effects": [
+        {
+          "target": "results",
+          "down": false,
+          "label": "0 tables"
+        },
+        {
+          "target": "e-write",
+          "flow": 0.15
+        },
+        {
+          "target": "e-read",
+          "flow": 0.15
+        },
+        {
+          "target": "dungbeetle",
+          "label": null,
+          "color": null,
+          "intensity": 0
+        },
+        {
+          "target": "wipe",
+          "color": "green",
+          "intensity": 0.4,
+          "pulse": false,
+          "label": "done in 56 s"
+        },
+        {
+          "target": "e-wipe",
+          "flow": 0
+        }
+      ]
+    },
+    {
+      "t": 358,
+      "title": "Wiped in a minute",
+      "beat": {
+        "tone": "good",
+        "focus": [
+          "wipe",
+          "results",
+          "vola",
+          "volb",
+          "panel:tables",
+          "panel:catalog"
+        ],
+        "hint": "Deleting 7 million tables one by one would take hours and leave a bloated catalog to vacuum. Instead the cron job stops Postgres, detaches the full volume, attaches an empty one and starts again, in about a minute. The few jobs that arrived meanwhile waited in the queue.",
+        "deep": "DROP TABLE × 7.2 M deletes ~21 M pg_class and ~200 M pg_attribute rows, all dead tuples needing VACUUM, plus ~21 M file unlinks. A volume swap touches none of it. This only works because results are disposable: fsync=off, no replica.",
+        "notes": [
+          {
+            "panel": "tables",
+            "text": "7.2 M tables gone in one volume swap"
+          },
+          {
+            "panel": "catalog",
+            "text": "60 GB of catalog gone, no VACUUM needed"
+          },
+          {
+            "panel": "queue",
+            "text": "~200 jobs waited out the 48 s restart"
+          },
+          {
+            "panel": "disk",
+            "text": "Fresh 2 TB volume, empty"
+          }
+        ]
+      }
+    },
+    {
+      "t": 370,
+      "metrics": [
+        {
+          "id": "req",
+          "to": 40,
+          "shape": "ease",
+          "over_s": 80
+        },
+        {
+          "id": "done",
+          "to": 40,
+          "shape": "ease",
+          "over_s": 80
+        },
+        {
+          "id": "ledger_cpu",
+          "to": 30,
+          "shape": "ease",
+          "over_s": 60
+        },
+        {
+          "id": "ledger_active",
+          "to": 20,
+          "shape": "ease",
+          "over_s": 80
+        },
+        {
+          "id": "tables",
+          "to": 0.12,
+          "shape": "linear",
+          "over_s": 80
+        },
+        {
+          "id": "disk",
+          "to": 18,
+          "shape": "linear",
+          "over_s": 80
+        },
+        {
+          "id": "catalog",
+          "to": 1,
+          "shape": "linear",
+          "over_s": 80
+        },
+        {
+          "id": "pgclass",
+          "to": 0.36,
+          "shape": "linear",
+          "over_s": 80
+        }
+      ]
+    },
+    {
+      "t": 380,
+      "feed": {
+        "from": "nightly-wipe",
+        "kind": "log",
+        "text": "02:58 IST vol-a reformatted; empty cluster restored; kept as tomorrow's spare",
+        "level": "deep"
+      }
+    },
+    {
+      "t": 385,
+      "effects": [
+        {
+          "target": "wipe",
+          "color": "grey",
+          "intensity": 0.2,
+          "label": "next run 02:00"
+        },
+        {
+          "target": "vola",
+          "down": false,
+          "color": "blue",
+          "intensity": 0.2,
+          "label": "idle spare"
+        },
+        {
+          "target": "volb",
+          "color": null,
+          "intensity": 0
+        },
+        {
+          "target": "vola/s1",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s2",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s3",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s4",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s5",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s6",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s7",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "vola/s8",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        }
+      ]
+    },
+    {
+      "t": 420,
+      "effects": [
+        {
+          "target": "e-job",
+          "flow": 0.3
+        },
+        {
+          "target": "e-query",
+          "flow": 0.25
+        },
+        {
+          "target": "e-write",
+          "flow": 0.25
+        },
+        {
+          "target": "e-read",
+          "flow": 0.3
+        },
+        {
+          "target": "e-volb",
+          "flow": 0.2
+        },
+        {
+          "target": "volb/s1",
+          "color": "teal",
+          "intensity": 0.6,
+          "label": null
+        },
+        {
+          "target": "volb/s2",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "volb/s3",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "volb/s4",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "volb/s5",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "volb/s6",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "volb/s7",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        },
+        {
+          "target": "volb/s8",
+          "color": "grey",
+          "intensity": 0.1,
+          "label": null
+        }
+      ]
+    },
+    {
+      "t": 440,
+      "feed": {
+        "from": "Meera · #console-oncall",
+        "kind": "chat",
+        "text": "08:40, Aug 1. results-db at ~120k tables, vol-a on standby. market opens 09:15"
+      }
+    }
+  ],
+  "report": {
+    "tldr": "Zerodha queues every report and lets only M queries reach the big DB, writing each result into its own throwaway Postgres table. ~7 M tables a day are cheap to read and free to delete: the whole volume is swapped out every night.",
+    "fix_t": 205,
+    "chain": [
+      {
+        "id": "rush",
+        "kind": "cause",
+        "text": "Tax-deadline rush: 520 report requests a second at peak"
+      },
+      {
+        "id": "queue",
+        "kind": "effect",
+        "text": "DungBeetle queues the excess; only 200 queries reach ledger-db"
+      },
+      {
+        "id": "bump",
+        "kind": "amp",
+        "text": "Workers raised to 500: ledger-db saturates, throughput drops to ~290/s"
+      },
+      {
+        "id": "revert",
+        "kind": "fix",
+        "text": "Back to 200 workers: ~400/s again, the queue drains"
+      },
+      {
+        "id": "tables",
+        "kind": "effect",
+        "text": "Each finished job becomes a table: 7.2 M tables, 60 GB of catalog"
+      },
+      {
+        "id": "wipe",
+        "kind": "fix",
+        "text": "02:00: stop, swap the EBS volume, start. Empty in about a minute"
+      }
+    ],
+    "stats": [
+      {
+        "label": "Tables created in a day",
+        "metric": "tables",
+        "unit": "M tables",
+        "agg": "max"
+      },
+      {
+        "label": "Peak queue",
+        "metric": "queue",
+        "unit": "jobs",
+        "agg": "max"
+      },
+      {
+        "label": "Worst report wait p95",
+        "metric": "wait",
+        "unit": "min",
+        "agg": "max"
+      },
+      {
+        "label": "Report fetch p99 (worst)",
+        "metric": "fetch_ms",
+        "unit": "ms",
+        "agg": "max"
+      }
+    ],
+    "learnings": [
+      {
+        "glyph": "⇥",
+        "title": "Put a queue in front of big DBs",
+        "body": "Users are N and unbounded; the database is M. Accept every request, but send at most M queries and let the rest wait."
+      },
+      {
+        "glyph": "✕",
+        "title": "Past the cap, more workers is less",
+        "body": "Once the DB's cores and memory are full, extra concurrency adds contention and disk spills. Throughput falls."
+      },
+      {
+        "glyph": "▦",
+        "title": "Shape the cache like the read",
+        "body": "One small table per report makes reads a plain SELECT *, with sorting and filtering on a few thousand rows."
+      },
+      {
+        "glyph": "⟲",
+        "title": "Delete disposable data in bulk",
+        "body": "Don't drop 7 M tables; throw away the volume. Treat the results DB like a cache: fsync off, no replica, rebuilt nightly."
+      }
+    ],
+    "math": {
+      "title": "Back of the envelope",
+      "lines": [
+        "7.2 M jobs ÷ ~14 busy hours      ≈ 140 jobs/s average; evening peak 520/s",
+        "200 workers ÷ ~0.5 s per job       ≈ 400 jobs/s ceiling (M)",
+        "(520 − 400) jobs/s × 40 min        ≈ 290k jobs queued, not 290k extra queries",
+        "60 GB catalog ÷ 7.2 M tables       ≈ 8 KB of metadata per table",
+        "DROP TABLE × 7.2 M at ~2 ms (rough) ≈ 4 h + VACUUM; volume swap ≈ 1 min"
+      ]
+    },
+    "myths": [
+      {
+        "myth": "Millions of tables will melt Postgres.",
+        "truth": "A table is found by name through an index on pg_class, and each backend caches only what it touches. The cost is disk (60 GB of catalog), not query speed."
+      },
+      {
+        "myth": "Deadline day needs more workers or read replicas.",
+        "truth": "The big DB's capacity is the limit. More concurrency past it slows every query; the queue already absorbs the rush."
+      },
+      {
+        "myth": "One big results table with a job_id column would be cleaner.",
+        "truth": "Every report has different columns, and deleting rows leaves bloat to vacuum. Separate tables get their schema for free and disappear with the volume."
+      }
+    ],
+    "links": [
+      {
+        "label": "DungBeetle on GitHub",
+        "url": "https://github.com/zerodha/dungbeetle"
+      },
+      {
+        "label": "Kailash Nadh: 7+ million Postgres tables (IndiaFOSS 2024 slides)",
+        "url": "https://nadh.in/files/indiafoss-2024-dungbeetle.pdf"
+      },
+      {
+        "label": "Zerodha Tech: Working with PostgreSQL",
+        "url": "https://zerodha.tech/blog/working-with-postgresql/"
+      }
+    ],
+    "deep": {
+      "config": [
+        "dungbeetle --worker-concurrency=30 (heavy) / 10 (light) × 5 nodes   # M = 200",
+        "-- name: get_tax_pnl  /  -- db: ledger-db  /  -- queue: heavy      # task header in reports.sql",
+        "ledger-db: work_mem = 600MB          # fine at 200 queries, spills at 500",
+        "results-db: fsync = off, synchronous_commit = off, no replication  # data is disposable",
+        "results-db: work_mem = a few MB      # no JOINs, just SELECT * on small tables",
+        "results-db: shared_buffers sized to the tables created in the peak hour"
+      ],
+      "runbook": [
+        "Queue growing but ledger-db flat? That is the design working; watch report wait, not the queue size.",
+        "Never raise worker concurrency without checking ledger-db CPU, temp-file spill and query p99.",
+        "Check catalog growth: SELECT pg_size_pretty(pg_total_relation_size('pg_attribute')).",
+        "Keep the volume well under 2 TB on peak days; size from the record day, not the average.",
+        "If the wipe fails, dungbeetle holds jobs in Redis: fix the mount, then start Postgres."
+      ]
+    }
+  }
+}

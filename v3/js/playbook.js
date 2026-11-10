@@ -1,0 +1,1 @@
+../../.claude/skills/story-to-playbook/scripts/playbook.js

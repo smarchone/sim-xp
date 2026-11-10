@@ -59,7 +59,7 @@ Top level: `schema`, `meta`, `components`, `metrics`, `dashboard`, `alerts`, `in
 - The rest is the **intro**: it is how a viewer who has never seen this system gets the context. Write for an engineer who knows software but not this stack.
   - `background`: 2–4 `{ title, body }` paragraphs, each ≤ ~400 chars, plain words. A good set is "The system" (what it is, rough scale, why it is built this way), "How it normally works" (the mechanism, in the normal state), "Today" (what is about to happen). Do not spoil the cause.
   - `cast`: `[{ name, role }]`, one per component the viewer will see (use the component labels), role in a few words.
-  - `watch`: `[{ label, normal }]`, 2–3 things to keep an eye on with the normal value (`{ "label": "Replica replay lag", "normal": "normal < 1 s" }`).
+  - `watch`: `[{ label, normal, panel? }]`, 2–3 things to keep an eye on with the normal value (`{ "label": "Replica replay lag", "normal": "normal < 1 s", "panel": "replay_lag" }`). The v3 player opens the run with a brief that lights these charts; `panel` (a `dashboard` id) names the chart, otherwise it is matched by the chart's title or a series label.
   - `learn`: 2–4 short "you'll come away knowing…" lines. No spoilers; name the question, not the answer.
 
 ### components
