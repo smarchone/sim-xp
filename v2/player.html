@@ -141,6 +141,7 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--p
 
 /* focus mode: one focal point */
 .dimmable{transition:opacity .45s ease}
+@media (prefers-reduced-motion:no-preference){.panel.arrive{animation:popIn .45s ease-out}}
 .focus-mode .dimmable{opacity:.28}
 .focus-mode .dimmable.focused{opacity:1}
 /* key moments: the focused things glow, so they read around the edges of the centred card */
@@ -275,6 +276,12 @@ kbd{font:500 var(--s) var(--mono);color:var(--muted);border:1px solid var(--line
 .intro .watch li em{font:normal 12.5px var(--mono);color:var(--green);white-space:nowrap}
 .intro .learn li{padding-left:16px;position:relative}
 .intro .learn li::before{content:"→";position:absolute;left:0;color:var(--accent)}
+.intro{overflow:hidden}
+.intro .imore{min-height:0;display:flex;flex-direction:column;border-top:1px solid var(--line);padding-top:8px}
+.intro .imore summary{cursor:pointer;font-size:var(--s);color:var(--muted);user-select:none;flex:none}
+.intro .imore summary:hover{color:var(--accent)}
+.intro .imore[open]{overflow-y:auto}
+.intro .imore[open] summary{margin-bottom:10px}
 .rp{display:flex;flex-direction:column;gap:20px;padding:4px 2px 6px}
 .rp h4{margin:0 0 6px;font-size:var(--s);font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .modal.report h2{font:500 26px/1.15 var(--serif);letter-spacing:-.01em}
@@ -384,8 +391,9 @@ pre{font:var(--s)/1.5 var(--mono);background:var(--sunk);border-radius:8px;paddi
     <span class="eb" id="introMeta"></span>
     <h2 id="introT"></h2>
     <p class="hook" id="introStory"></p>
-    <div class="icols" id="introBody"></div>
-    <div class="foot"><span class="small">Pauses at each key moment. <kbd>←</kbd> <kbd>→</kbd> jump between them. <kbd>?</kbd> lists the keys.</span><span class="spacer"></span><kbd>Space</kbd><button class="primary" id="start">Start ▶</button></div>
+    <div id="introLearn"></div>
+    <details class="imore" id="introMore"><summary>The system, the cast and what to watch</summary><div class="icols" id="introBody"></div></details>
+    <div class="foot"><span class="small">It pauses at each key moment.</span><span class="spacer"></span><kbd>Space</kbd><button class="primary" id="start">Start ▶</button></div>
   </div>
 </div>
 <div class="scrim" id="scrim" hidden>
@@ -874,7 +882,25 @@ function placeNote(P, viewT) {
 // a deep chart is surfaced (drawn full size) while it matters: a note on it at the current key moment, or an alert on its metric
 const surfaced = P => !!(activeBeat && (activeBeat.beat.notes || []).some(n => n.panel === P.p.id))
   || PB.alerts.some(a => P.p.metrics.includes(a.metric) && alertState[a.id][Math.floor(playT)] !== "ok");
-const panelShown = P => !P.deep || (HC && (P.kind === "lane" || surfaced(P)));
+// a chart joins the board when the story first needs it: the first key moment that notes or focuses it, or the first second an alert
+// on its metric is not ok. Charts the first key moment uses, and charts the story never points at, are there from the start.
+let revealAt = null;
+function revealTime(P) {
+  if (!revealAt) {
+    revealAt = new Map();
+    const put = (id, t) => { if (!revealAt.has(id) || t < revealAt.get(id)) revealAt.set(id, t); };
+    beats.forEach((e, i) => [...(e.beat.notes || []).map(n => n.panel), ...(e.beat.focus || []).filter(id => id.startsWith("panel:")).map(id => id.slice(6))]
+      .forEach(id => put(id, i === 0 ? 0 : e.t)));
+    panels.forEach(Q => PB.alerts.forEach(a => {
+      if (!Q.p.metrics.includes(a.metric)) return;
+      const k = (alertState[a.id] || []).findIndex(x => x && x !== "ok");
+      if (k >= 0) put(Q.p.id, k);
+    }));
+  }
+  return revealAt.has(P.p.id) ? revealAt.get(P.p.id) : 0;
+}
+const reached = P => P.kind !== "chart" || revealTime(P) <= playT + 0.5 || (!!activeBeat && revealTime(P) <= activeBeat.t);
+const panelShown = P => P.deep ? (HC && (P.kind === "lane" || surfaced(P))) : reached(P);
 const quietPanels = () => HC ? panels.filter(P => P.deep && P.kind === "chart" && !surfaced(P)) : [];
 function renderPanels(playT, viewT) {
   panels.forEach(P => {
@@ -998,12 +1024,13 @@ function renderHud(v) {
   $("#app").classList.toggle("hovering", hoverT != null);
   let html;
   if (hudFlash && hudFlash.until > performance.now()) html = `<span class="ic">•</span>${hudFlash.text}`;
-  else if (isOpen($("#intro"))) html = `<span class="ic">▶</span><kbd>Space</kbd> to start`;
+  else if (isOpen($("#intro"))) html = "";
   else if (hoverT != null && hoverT < playT - 0.5) html = `<span class="ic">◷</span>viewing <b>${fmtT(v)}</b><span class="ch">${ch}</span>`;
-  else if (activeBeat) html = `<span class="ic" style="color:${{ good: "var(--green)", bad: "var(--red)", neutral: "var(--muted)" }[beatTone(activeBeat)] || "var(--accent)"}">◆</span>key moment ${beats.indexOf(activeBeat) + 1}/${beats.length}${beatTone(activeBeat) ? " · " + TONE_LABEL[beatTone(activeBeat)].toLowerCase() : ""} · <kbd>Space</kbd> continue`;
+  else if (activeBeat) html = `<span class="ic" style="color:${{ good: "var(--green)", bad: "var(--red)", neutral: "var(--muted)" }[beatTone(activeBeat)] || "var(--accent)"}">◆</span>key moment ${beats.indexOf(activeBeat) + 1}/${beats.length}`;
   else if (playT >= D) html = `<span class="ic">↺</span><b>${fmtT(D)}</b> · <kbd>Space</kbd> replay`;
   else html = `<span class="ic">${playing ? "❚❚" : "▶"}</span><b>${fmtT(v)} / ${fmtT(D)}</b><span class="ch">${ch}</span>${speed !== 4 ? `<span>${speedLabel(speed)}</span>` : ""}<kbd>Space</kbd>${playing ? "pause" : "play"}`;
   if (st._h !== html) { st._h = html; st.innerHTML = html; }
+  st.hidden = !html;
   st.classList.toggle("flash", !!(hudFlash && hudFlash.until > performance.now()));
 }
 function flash(text) { hudFlash = { text, until: performance.now() + 1400 }; renderHud(viewT()); setTimeout(() => renderHud(viewT()), 1450); }
@@ -1162,18 +1189,19 @@ $("#schema").innerHTML = `<p>The agent writes one JSON file; the app only plays 
 
 /* ===================== Layout: computed, nothing to adjust =====================
    Two columns. Left (about 40%): components on top, the feed below, both fixed while the charts scroll. Right: the charts, same size,
-   3 columns when there is room and 2 otherwise, rows sized to the screen (150 to 220px); more charts than fit: the board scrolls. */
+   3 columns when there is room and 2 otherwise, rows sized to the screen (150 to 220px); more charts than fit: the board scrolls.
+   Only the charts the story has reached are placed (see revealTime), so the board fills in as the run goes. */
 const GAP = 4, LEFT = 0.4, CH_MIN = 150, CH_MAX = 220, MIN_CHART_W = 260, COMP_SHARE = 0.5;
 const board = dashGrid, allCharts = panels.filter(P => P.kind === "chart");
 const tiles = [$("#compCard"), $("#feedCard")];
 function renderLayout() {
   // charts of one component sit together (groups in order of first appearance; a chart with no component stays where the author put it);
   // a surfaced deep chart joins its component's group
-  const base = [...allCharts.filter(P => !P.deep), ...allCharts.filter(P => P.deep && panelShown(P))], groups = new Map();
+  const base = [...allCharts.filter(P => !P.deep && panelShown(P)), ...allCharts.filter(P => P.deep && panelShown(P))], groups = new Map();
   base.forEach(P => { const k = P.p.component || "#" + P.p.id; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(P); });
   const charts = [...groups.values()].flat();
   const quiet = quietPanels();
-  panels.forEach(P => (P.card.hidden = !panelShown(P)));
+  panels.forEach(P => { const show = panelShown(P); if (show && P.card.hidden && ready) { P.card.classList.remove("arrive"); void P.card.offsetWidth; P.card.classList.add("arrive"); } P.card.hidden = !show; });
   const qk = quiet.map(P => P.p.id).join(",");
   if (quietEl._k !== qk) { quietEl._k = qk; buildQuiet(quiet); }
   quietEl.hidden = !quiet.length;
@@ -1225,14 +1253,16 @@ $("#introT").textContent = M.title; $("#introStory").textContent = M.story;
   const bg = (M.background || []).map(b => typeof b === "string" ? { body: b } : b);
   const story = bg.map(b => `<div>${b.title ? `<h4>${esc(b.title)}</h4>` : ""}<p>${esc(b.body)}</p></div>`).join("");
   const list = (title, cls, items) => items.length ? `<div><h4>${title}</h4><ul class="${cls}">${items.join("")}</ul></div>` : "";
+  // up front: the title, the one-line story and what you will learn; the background, cast and what to watch are one click away
   const side = list("The cast", "cast", (M.cast || []).map(c => `<li><b>${esc(c.name)}</b> <span>${esc(c.role)}</span></li>`))
     + list("Keep an eye on", "watch", (M.watch || []).map(w => `<li>${esc(w.label)}<em>${esc(w.normal)}</em></li>`))
-    + list("You’ll come away knowing", "learn", (M.learn || []).map(x => `<li>${esc(x)}</li>`));
+    + (hasDeep ? `<p class="small">This playbook has a Hardcore layer: more charts, raw logs and a deep dive. Press <kbd>H</kbd> to switch.</p>` : "");
+  $("#introLearn").innerHTML = list("You’ll come away knowing", "learn", (M.learn || []).map(x => `<li>${esc(x)}</li>`));
   const box = $("#introBody");
   box.innerHTML = (story ? `<div class="story">${story}</div>` : "") + (side ? `<div class="side">${side}</div>` : "");
-  box.classList.toggle("one", !story || !side); box.hidden = !story && !side;
+  box.classList.toggle("one", !story || !side); $("#introMore").hidden = !story && !side;
 }
-$("#introMeta").textContent = `${hasDeep ? "Hardcore detail available (H) · " : ""}Story · ${humanDur(TOTAL)}${TOTAL > D * 1.5 ? " (plays in ~" + Math.max(1, Math.round(D / 4 / 60)) + " min)" : ""} · ${beats.length} key moments${(M.tags || []).length ? " · " + M.tags.slice(0, 3).join(" · ") : ""}`;
+$("#introMeta").textContent = `${TOTAL > D * 1.5 ? humanDur(TOTAL) + " run, plays in ~" + Math.max(1, Math.round(D / 4 / 60)) + " min" : humanDur(TOTAL)} · ${beats.length} key moments${(M.tags || []).length ? " · " + M.tags.slice(0, 3).join(" · ") : ""}`;
 let introStarted = false, introWasPlaying = false;
 function startRun() {
   hideModal($("#intro"), () => renderHud(viewT()));

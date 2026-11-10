@@ -11,7 +11,7 @@ const askEl = $("ask"), sendBtn = $("send"), stopBtn = $("stop"), runBtn = $("ru
 const simxp = (window.simxp = {
   current: null,
   source: null,
-  showLibrary() { setOpen(true); pbBox.focus(); },
+  showLibrary() { setOpen(true); $("repo").open = true; $("repo").querySelector("summary").focus(); },
   onPlayerEvent(type) { if (type === "ready") stage.contentWindow.focus(); },
 });
 const LAST = "sim-xp.last";   // the playbook played last, reopened on the next visit
@@ -29,12 +29,18 @@ function track(pb) {
   try { if (typeof window.gtag === "function") window.gtag("event", "playbook_run", { playbook_id: id, playbook_title: pb.meta.title }); } catch (e) { /* analytics blocked */ }
 }
 
-// ---------- the side panel: open while writing, a thin rail while watching ----------
+// ---------- the side panel: a thin rail while watching (the start), open to pick or make a playbook ----------
 const panelIn = $("panelIn"), rail = $("rail");
-function setOpen(open) { panelIn.hidden = !open; rail.hidden = open; }
+function setOpen(open) {
+  panelIn.hidden = !open; rail.hidden = open;
+  if (open) { const src = sources.get(openSrc); if (repoEl.open && src && src.state === "idle") loadIndex(src); }
+}
 $("collapse").onclick = () => setOpen(false);
-rail.onclick = () => { setOpen(true); askEl.focus(); };
-// starts open; Collapse gives the player the room back
+rail.onclick = () => setOpen(true);
+// the JSON is out of the way until asked for; problems with it show either way
+const editBtn = $("editBtn");
+function setEditing(on) { pbBox.hidden = !on; $("panel").classList.toggle("editing", on); editBtn.setAttribute("aria-expanded", String(on)); editBtn.textContent = on ? "Hide JSON ▾" : "Edit JSON ▸"; }
+editBtn.onclick = () => { setEditing(pbBox.hidden); if (!pbBox.hidden) pbBox.focus(); };
 const panel = $("panel"), WIDTH = "sim-xp.panelWidth";
 const setWidth = (w) => panel.style.setProperty("--pw", Math.max(300, Math.min(760, Math.round(w))) + "px");
 try { const w = Number(localStorage.getItem(WIDTH)); if (w) setWidth(w); } catch (e) { /* storage blocked */ }
@@ -127,16 +133,14 @@ function renderLibrary() {
   $("savedCount").textContent = library.size ? `(${library.size} of ${MAX_SAVED})` : "";
   if (!library.size) { const li = document.createElement("li"); li.className = "empty"; li.textContent = "Playbooks Claude writes, and files you run, are kept here, in this browser only."; savedList.append(li); return; }
   for (const [id, x] of library) {
-    const li = document.createElement("li"), open = document.createElement("button"), play_ = document.createElement("button"), del = document.createElement("button");
+    const li = document.createElement("li"), open = document.createElement("button"), del = document.createElement("button");
     open.className = "pick"; open.title = x.story || "";
     const b = document.createElement("b"), s = document.createElement("span");
     b.textContent = x.title || id; s.textContent = `${Math.round((x.duration_s || 0) / 60)} min · ${x.beats || 0} key moments · ${new Date(x.updated).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
     open.append(b, s);
     const load = () => { try { setBox(JSON.stringify(JSON.parse(x.json), null, 2)); return true; } catch (e) { say("note", "That saved playbook could not be read."); return false; } };
-    open.onclick = load;
-    play_.textContent = "▶"; play_.title = "Load and run"; play_.setAttribute("aria-label", "Load and run " + (x.title || id));
-    play_.onclick = () => { if (load()) run(); };
-    li.append(open, play_);
+    open.onclick = () => { if (load()) run(); }; open.setAttribute("aria-label", "Play " + (x.title || id));
+    li.append(open);
     if (downloads) {
       const ex = document.createElement("button");
       ex.textContent = "⤓"; ex.title = "Export as a .json file"; ex.setAttribute("aria-label", "Export " + (x.title || id));
@@ -255,18 +259,17 @@ function renderRepos() {
     repoList.append(head);
     if (!open) continue;
     for (const item of src.items) {
-      const li = document.createElement("li"), pick = document.createElement("button"), go = document.createElement("button");
+      const li = document.createElement("li"), pick = document.createElement("button");
       pick.className = "pick"; pick.title = item.story || "";
       const b = document.createElement("b"), s = document.createElement("span");
       b.textContent = item.title; s.textContent = Array.isArray(item.tags) ? item.tags.slice(0, 3).join(" · ") : "";
-      pick.append(b); if (s.textContent) pick.append(s); pick.onclick = () => openFromRepo(src, item, false);
-      go.textContent = "▶"; go.title = "Load and run"; go.setAttribute("aria-label", "Load and run " + item.title); go.onclick = () => openFromRepo(src, item, true);
-      li.append(pick, go); repoList.append(li);
+      pick.append(b); if (s.textContent) pick.append(s); pick.onclick = () => openFromRepo(src, item, true); pick.setAttribute("aria-label", "Play " + item.title);
+      li.append(pick); repoList.append(li);
     }
   }
 }
 renderRepos();
-repoEl.addEventListener("toggle", () => { const src = sources.get(openSrc); if (repoEl.open && src && src.state === "idle") loadIndex(src); });
+repoEl.addEventListener("toggle", () => { const src = sources.get(openSrc); if (repoEl.open && !panelIn.hidden && src && src.state === "idle") loadIndex(src); });
 function addRepoFromInput() {
   const src = addSource(repoIn.value);
   if (!src) { say("note", "That is not a repo. Write it as owner/repo, owner/repo@branch/folder, or paste its github.com link."); setOpen(true); return; }
@@ -279,7 +282,7 @@ repoIn.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isCompos
 async function openText(text, name) {
   setBox(text);
   say("note", `Loaded ${name} into the box. ${last.errors.length ? "It has problems, see the box." : "Press Run to play it."}`);
-  setOpen(true);
+  setOpen(true); if (last.errors.length) setEditing(true);
 }
 $("file").onchange = async (e) => { const f = e.target.files[0]; if (f) openText(await f.text(), f.name); e.target.value = ""; };
 let depth = 0;
@@ -307,7 +310,7 @@ function say(kind, text) {
 }
 const HELLO = say("claude", "");
 HELLO.classList.add("hello");
-HELLO.innerHTML = "<b>Ask for a playbook.</b> Give me a story, a postmortem, a concept, or just a system and what goes wrong. I write it into the box, and you press Run. You can also ask me to change what is in the box. It starts with an example you can run.";
+HELLO.innerHTML = "<b>Ask Claude for a playbook:</b> a story, a postmortem, or a system and what goes wrong. Then press Run.";
 
 const PREAMBLE = `You write playbooks for sim-xp, a player that animates a scripted, deterministic run of a small system: components light up, charts move, a feed scrolls, and playback pauses at key moments. A person chats with you. Each playbook you write goes straight into a box on the page, is checked by a validator, and the person presses Run to watch it.
 
@@ -451,6 +454,9 @@ if (!last.errors.length) play(last.pb);
 if (startTarget) playFromRepoHash(startTarget);   // named in the address but not here: fetch it from a repo
 (async () => {
   try { sample = await window.claude?.use?.("sample"); } catch (e) { sample = null; }
-  if (!sample) { askEl.disabled = true; sendBtn.disabled = true; askEl.placeholder = "Chat needs Claude. Paste or open a playbook instead."; say("note", "Chat with Claude only works in the sim-xp Claude artifact. Here you can paste or open a playbook, run it, and keep up to 20 in the Saved list."); }
+  if (!sample) {
+    askEl.disabled = true; sendBtn.disabled = true; $("bar").hidden = true;
+    HELLO.className = "msg note"; HELLO.innerHTML = "Write one with the <code>story-to-playbook</code> skill in Claude Code, then <b>Open file…</b> or drop it on the page.";
+  }
   else askEl.disabled = busy;
 })();

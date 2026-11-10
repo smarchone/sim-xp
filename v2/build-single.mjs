@@ -39,7 +39,7 @@ if (!spec.startsWith("## Schema") || spec.length < 5000) throw new Error("build-
 
 // ---- the player: its "Open another playbook" menu item opens the panel here
 // The empty data: favicon is dropped: it was the only data: URI in the page, and the artifact's public-sharing review refused a version that embeds a file type it can't read.
-const player = patch(patch(read("player.html"), ">Open another playbook<", ">Playbook and chat<", "library menu item"), `<link rel="icon" href="data:,">\n`, "", "empty favicon");
+const player = patch(patch(read("player.html"), ">Open another playbook<", ">More playbooks<", "library menu item"), `<link rel="icon" href="data:,">\n`, "", "empty favicon");
 
 // ---- bundled playbooks: only the two the page needs to start and to brief Claude. Every other playbook is loaded from a GitHub repo
 // (playbooks/index.json is the library's index; the panel fetches it from main).

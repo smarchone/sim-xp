@@ -19,14 +19,14 @@ two bundled playbooks (the default and the format example), with no other files.
 - **the GitHub Pages site**, at https://smarchone.github.io/sim-xp/v2/ (the site root is the docs page), and
 - **a Claude artifact**, where the panel's chat can ask Claude (on the viewer's own Claude usage) to write a playbook.
 
-The side panel (right, collapsible, resizable) has four parts:
+The side panel (right, resizable) starts folded to a thin **Playbooks** rail, so a first visit is just the simulation. Opened, it has, top to bottom:
 
 | Part | What it does |
 |---|---|
-| Chat | Ask Claude for a playbook, or for a change to the one in the box. Only works in the Claude artifact; elsewhere it says so. |
-| Playbook box | The JSON that **Run** plays. Paste into it, open a file, drop a file on the page, or let Claude write it. Shows the validator's result live. |
-| Library | Playbooks listed from GitHub repos ([smarchone/simxp-playbooks](https://github.com/smarchone/simxp-playbooks) by default; add any other with `owner/repo`). Each repo is a collapsible group (one open at a time, ↻ refetches its list, ✕ removes it). Click a playbook to load it into the box, ▶ to load and run. The list (`index.json`) is fetched fresh on each visit; each playbook you open is cached for a week, apart from Saved; the list of repos you added is kept too. |
-| Saved | Up to 20 playbooks you made (written by Claude, pasted, or opened from a file) kept in this browser's storage. Click to load, ▶ to load and run, ⤓ to export, ✕ to delete. |
+| Library | Playbooks listed from GitHub repos ([smarchone/simxp-playbooks](https://github.com/smarchone/simxp-playbooks) by default; add any other with `owner/repo`). Open by default. Each repo is a collapsible group (one open at a time, ↻ refetches its list, ✕ removes it). Click a playbook to play it; the panel folds away. The list (`index.json`) is fetched fresh when the panel first opens on a visit; each playbook you open is cached for a week, apart from Saved; the list of repos you added is kept too. |
+| Saved | Up to 20 playbooks you made (written by Claude, pasted, or opened from a file) kept in this browser's storage. Click to play, ⤓ to export, ✕ to delete. |
+| Make your own | In the Claude artifact, a chat that asks Claude for a playbook or a change to the current one. Elsewhere, a one-line pointer to the `story-to-playbook` skill instead. |
+| Playbook box | A row with the validator's result, **Open file…**, **Save .json** and **Run**; the JSON (what Run plays, the current playbook) is hidden until **Edit JSON**. Problems are listed even while it is hidden, and opening a file with problems shows it. Dropping a file on the page loads it too. |
 
 In the player, Space plays and pauses, ←/→ jump between key moments, R opens the report, H switches Hardcore detail.
 

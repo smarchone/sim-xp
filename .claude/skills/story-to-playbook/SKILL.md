@@ -165,7 +165,7 @@ and reveals extra items you tag `"level": "deep"`. Standard must tell the whole 
 for an engineer who wants the next level down. The toggle only appears when the playbook has a deep layer.
 
 - `dashboard[].component` (any level): the node id this chart belongs to. The chart shows a small tag with that
-  node's name, coloured by its live status (calm, degrading, failing). Tag every chart that clearly belongs to one node: charts of the same component are shown together, in the order the components first appear in `dashboard`, so the viewer can find a component's signals in one place. A chart with no `component` stays where you put it.
+  node's name, coloured by its live status (calm, degrading, failing). Tag every chart that clearly belongs to one node: charts of the same component are shown together, in the order the components first appear in `dashboard`, so the viewer can find a component's signals in one place. A chart with no `component` stays where you put it. Charts join the board as the story reaches them: a chart appears at the first key moment that notes or focuses it, or when an alert on its metric first fires. Charts the first key moment uses, and charts no key moment or alert ever points at, are on screen from the start. So point the first key moment at the 2 to 4 charts that set the baseline.
 - `dashboard[]` with `"level": "deep"`: 3–6 second-order signals (pool usage, GC, join/sync time, commit failures,
   rows scanned). In Hardcore a deep chart is drawn full size only while it matters (a key-moment note sits on it, or an
   alert on its metric is pending or firing) and is otherwise a one-line row under "Quiet signals". So put a note on a

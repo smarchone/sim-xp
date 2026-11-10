@@ -20,7 +20,7 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--o
 
 #stage{flex:1;min-width:0;height:100%;border:0;background:var(--bg)}
 
-/* Side panel: chat on top, playbook box below. Collapses to a thin rail; the player takes the width back. */
+/* Side panel: the Library and Saved lists on top, "Make your own" (chat, playbook box) below; the JSON shows only on Edit JSON. Collapses to a thin rail; the player takes the width back. */
 .panel{flex:none;height:100%;display:flex;background:var(--panel);border-left:1px solid var(--line2);position:relative}
 .panel-in{width:var(--pw,400px);display:flex;flex-direction:column;min-width:0}
 .panel-in[hidden]{display:none}
@@ -36,8 +36,10 @@ body.resizing #stage{pointer-events:none}
 .rail-text{writing-mode:vertical-rl;font-size:12px;font-weight:500;letter-spacing:.03em}
 .rail[hidden]{display:none}
 
-.chat{flex:1 1 22%;min-height:0;display:flex;flex-direction:column;background:var(--bg);border-bottom:1px solid var(--line)}
-.chat ol{list-style:none;margin:0;padding:10px 12px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:8px}
+.lists{flex:0 1 auto;max-height:55%;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding:10px 12px}
+.sect{flex:none;margin:0;padding:8px 12px 6px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-top:1px solid var(--line)}
+.chat{flex:1 1 30%;min-height:60px;display:flex;flex-direction:column;background:var(--bg);border-bottom:1px solid var(--line)}
+.chat ol{list-style:none;margin:0;padding:8px 12px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:8px}
 .msg{max-width:92%;padding:6px 10px;border-radius:8px;font-size:12.5px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
 .msg.me{align-self:flex-end;background:var(--accent);color:var(--on-accent)}
 .msg.claude{align-self:flex-start;background:var(--panel);border:1px solid var(--line)}
@@ -51,12 +53,16 @@ body.resizing #stage{pointer-events:none}
 .bar input::placeholder{color:var(--muted)}
 .bar input:disabled{opacity:.6}
 
-.pbbox{flex:1 1 78%;min-height:0;min-width:0;display:flex;flex-direction:column;padding:8px 12px 10px;gap:6px}
+.pbbox{flex:none;min-height:0;min-width:0;display:flex;flex-direction:column;padding:8px 12px 10px;gap:6px}
 .pbhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:26px}
 .pbhead b{font-size:13px;font-weight:600}
-.status{font:500 11px var(--mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1 1 120px}
+.status{font:500 11px var(--mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1 1 0}
 .status.ok{color:var(--green)} .status.warn{color:var(--amber)} .status.bad{color:var(--red)}
-.pbhead .spacer{display:none}
+.panel.editing .pbbox{flex:1 1 65%}
+.panel.editing .chat{flex:0 1 25%}
+.panel.editing .lists{max-height:35%}
+#editBtn{border-color:transparent;background:none;color:var(--muted);padding:4px 6px}
+#editBtn:hover{color:var(--accent)}
 #pb{flex:1;min-height:0;width:100%;resize:none;font:11.5px/1.45 var(--mono);color:var(--fg);background:var(--sunk);border:1px solid var(--line);border-radius:6px;padding:8px 10px;tab-size:2}
 .saved{flex:none;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
 .saved summary{cursor:pointer;padding:4px 10px;font-size:12px;font-weight:500;color:var(--muted);user-select:none}
@@ -73,7 +79,7 @@ body.resizing #stage{pointer-events:none}
 .saved .pick:hover{background:var(--sunk)}
 .saved li>button:not(.pick){padding:2px 8px;border-color:transparent;background:none;color:var(--muted)}
 .saved li>button:not(.pick):hover{color:var(--accent);background:var(--sunk)}
-#repo ul{max-height:168px}
+#repo ul{max-height:min(40vh,360px)}
 .saved li.src{padding:4px 8px 2px;gap:8px;font-size:11.5px;color:var(--muted)}
 .saved li.src b{font-weight:600;color:var(--fg);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .saved li.src{padding:2px 4px;gap:2px}
@@ -89,3 +95,4 @@ body.resizing #stage{pointer-events:none}
 .drop{position:fixed;inset:0;display:grid;place-items:center;background:color-mix(in srgb,var(--bg) 85%,transparent);border:2px dashed var(--accent);font-size:16px;font-weight:600;z-index:5}
 
 @media (prefers-reduced-motion:no-preference){.msg{animation:pop .12s ease-out}@keyframes pop{from{opacity:0;transform:translateY(3px)}}}
+.msg code{font:11.5px var(--mono);color:var(--fg)}
