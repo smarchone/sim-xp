@@ -23,16 +23,12 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - run: node --test v2/test/*.test.mjs
       - run: node --test v3/test/*.test.mjs
-      # the site root is docs/ (purpose page); the single-file build (player, side panel and bundled playbooks) is served at /v2/. The MVP is deprecated and not deployed
-      - run: node v2/build-single.mjs
+      # the site root is docs/ (purpose page). The player is the v3 single-file build; it is served at /v3/ and also at /v2/,
+      # so old /v2/ links (and their #<repo>:<id> playbooks) open v3. v2 is deprecated and no longer built; the MVP is not deployed.
       - run: node v3/build-single.mjs
-      - run: mkdir -p _site/v2 && cp -r docs/. _site/ && cp v2/dist/sim-xp.html _site/v2/index.html
-      # Google Analytics goes into the deployed /v2/ page only: the same build is the Claude artifact, whose sandbox blocks external scripts
-      - run: cat .github/ga-snippet.html v2/dist/sim-xp.html > _site/v2/index.html
-      # v3 (quiet pauses, dashboard look) is served next to v2 at /v3/
-      - run: mkdir -p _site/v3 && cat .github/ga-snippet.html v3/dist/sim-xp.html > _site/v3/index.html
+      # Google Analytics goes into the deployed pages only: the same build is the Claude artifact, whose sandbox blocks external scripts
+      - run: mkdir -p _site/v2 _site/v3 && cp -r docs/. _site/ && cat .github/ga-snippet.html v3/dist/sim-xp.html > _site/v3/index.html && cp _site/v3/index.html _site/v2/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
