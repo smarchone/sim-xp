@@ -117,6 +117,10 @@ button.primary{background:var(--accent);border-color:var(--accent);color:var(--p
 .progress i{display:block;height:100%;width:0;background:var(--accent)}
 .masthead{display:flex;align-items:center;gap:10px;min-height:32px;min-width:0}
 .hud{margin-left:auto;display:flex;align-items:center;gap:6px;position:relative;flex:none}
+/* a pointer to v3; it opens the same playbook there */
+.tryv3{font-size:var(--s);font-weight:600;color:#fff;background:#e5484d;border-radius:999px;padding:4px 12px;text-decoration:none;white-space:nowrap}
+.tryv3:hover{background:#d13b40}
+.tryv3:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .status{display:flex;align-items:center;gap:6px;font-size:var(--s);color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px 10px;max-width:640px;transition:opacity .35s ease}
 .status b{color:var(--fg);font:500 var(--s) var(--mono);font-variant-numeric:tabular-nums}
 .status .ch{color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:330px}
@@ -326,6 +330,7 @@ pre{font:var(--s)/1.5 var(--mono);background:var(--sunk);border-radius:8px;paddi
   <header class="masthead">
     <h1 id="pbTitle"></h1>
     <div class="hud">
+      <a class="tryv3" id="tryV3" href="https://smarchone.github.io/sim-xp/v3/" target="_blank" rel="noopener" title="v3: a calmer player that reads like a video, with a brief before and a result after">Try the new v3 →</a>
       <button class="status" id="status" aria-live="polite" title="Click or press Space to pause and play"></button>
       <button class="iconbtn" id="helpBtn" aria-label="Keyboard shortcuts" aria-expanded="false" title="Keyboard shortcuts (?)">?</button>
       <button class="iconbtn" id="menuBtn" aria-label="Menu" aria-expanded="false" title="Report, speed, layout">⋯</button>
@@ -1277,6 +1282,9 @@ function showIntro() { // bring the intro back at any time; it pauses the run an
 $("#introBtn").onclick = showIntro;
 $("#start").onclick = startRun;
 $("#pbTitle").textContent = PB.meta.title; document.title = PB.meta.title;
+// "Try the new v3": the same playbook there, named by the host page's address (#<repo>:<id> or #<id>)
+{ const a = $("#tryV3"); const sync = () => { let h = ""; try { h = window.parent.location.hash || ""; } catch (e) { /* other origin */ } a.href = "https://smarchone.github.io/sim-xp/v3/" + h; };
+  sync(); a.addEventListener("pointerdown", sync); a.addEventListener("focus", sync); }
 $("#libraryBtn").onclick = () => { closeMenus(); host && host.showLibrary && host.showLibrary(); };
 requestAnimationFrame(frame);
 
