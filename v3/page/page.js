@@ -19,6 +19,9 @@ const LAST = "sim-xp.last";   // the playbook played last, reopened on the next 
 function play(pb, src = null) {   // src: the library source (key) the playbook came from, when it was loaded from a repo
   if (!src && SEEDS.some((x) => JSON.stringify(x) === JSON.stringify(pb))) src = DEFAULT_SRC;   // the two bundled playbooks are copies of the default repo's
   simxp.current = pb; simxp.source = "box"; simxp.src = src;
+  // a library playbook's recorded narration, if it has one, sits next to it in <library folder>/audio/<id>/ (v3/tools/gen-audio.mjs)
+  const lib = src && sources.get(src);
+  simxp.audio = lib ? lib.base + "/audio/" + encodeURIComponent(pb.meta.id) + "/" : "";
   try { localStorage.setItem(LAST, JSON.stringify(pb)); } catch (e) { /* storage blocked: it starts on the default next time */ }
   stage.srcdoc = PLAYER_HTML + "<!-- " + Date.now() + " -->";
   track(pb); showPlayer();
@@ -200,7 +203,9 @@ renderLibrary();
 // ---------- library: playbooks loaded from GitHub repos, on demand ----------
 // A source is a folder of playbook .json files plus an index.json listing them (format in v2/README.md). The panel fetches the index when
 // the Library is opened and a playbook only when it is clicked; nothing from a repo is copied into storage. Only the list of added repos is kept.
-const DEFAULT_SRC = "smarchone/simxp-playbooks", SRCS = "sim-xp.repos", CACHE = "sim-xp.cache", TTL = 7 * 24 * 3600 * 1000, CACHE_MAX = 20;
+// The default library is this repo's v3/playbooks folder (with its audio/), read from GitHub, so the site, the artifact and a copy
+// opened from disk all list the same playbooks. It used to be the smarchone/simxp-playbooks repo; links naming it open the same playbook here.
+const DEFAULT_SRC = "smarchone/sim-xp@main/v3/playbooks", LEGACY_SRC = "smarchone/simxp-playbooks", SRCS = "sim-xp.repos", CACHE = "sim-xp.cache", TTL = 7 * 24 * 3600 * 1000, CACHE_MAX = 20;
 // Fetched playbooks are kept for a week, apart from the Saved list; an index.json is always fetched fresh. Newest 20 entries stay; a blocked or full storage just means no cache.
 function cacheGet(key) {
   try { const e = JSON.parse(localStorage.getItem(CACHE) || "{}")[key]; return e && Date.now() - e.t < TTL ? e.v : null; } catch (err) { return null; }
@@ -234,14 +239,22 @@ function parseSrc(text) {   // "owner/repo", "owner/repo@ref", "owner/repo@ref/d
 }
 const sources = new Map();   // key -> { key, base, items, state: "idle" | "loading" | "ok" | "err", error, promise }
 function addSource(text) {
+  if (sources.has(text)) return sources.get(text);   // e.g. the local server's library, which is not a GitHub repo
   const p = parseSrc(text);
   if (!p) return null;
   if (!sources.has(p.key)) sources.set(p.key, { ...p, items: [], state: "idle", error: "" });
   return sources.get(p.key);
 }
-const userSources = () => [...sources.keys()].filter((k) => k !== DEFAULT_SRC);
+const userSources = () => [...sources.keys()].filter((k) => k !== DEFAULT_SRC && k !== LOCAL_SRC);
 function saveSources() { try { localStorage.setItem(SRCS, JSON.stringify(userSources())); } catch (e) { /* storage blocked: added repos last this visit only */ } }
 addSource(DEFAULT_SRC);
+// Served by a local server (e.g. `npx serve .` or `python3 -m http.server` from the repo or v3/), the page also lists v3/playbooks, the folder
+// next to dist/, as "Local server": read fresh every time (no cache), so a playbook being written shows its latest save. Not listed when that folder
+// cannot be reached (the server's root does not include it); never on GitHub Pages, from disk, or in the Claude artifact.
+const LOCAL_SRC = "local";
+const LOCAL_BASE = /^https?:$/.test(location.protocol) && /^(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)$/.test(location.hostname)
+  ? new URL("../playbooks", location.href).href : null;
+if (LOCAL_BASE) sources.set(LOCAL_SRC, { key: LOCAL_SRC, base: LOCAL_BASE, html: "", local: true, items: [], state: "idle", error: "" });
 try { for (const k of JSON.parse(localStorage.getItem(SRCS) || "[]")) if (typeof k === "string") addSource(k); } catch (e) { /* none stored */ }
 const goodItem = (x) => x && typeof x === "object" && ["id", "file", "title"].every((k) => typeof x[k] === "string" && x[k]) && /^[\w.-]+(\/[\w.-]+)*\.json$/.test(x.file) && !x.file.split("/").includes("..");
 function loadIndex(src, again = false) {   // one fetch per source per visit until it fails; again fetches it once more
@@ -259,7 +272,7 @@ function loadIndex(src, again = false) {   // one fetch per source per visit unt
   return src.promise;
 }
 async function fetchPlaybook(src, item) {
-  const pb = await getJson(src.base + "/" + item.file, true).catch((e) => { throw new Error(`${item.file}: ${e.message}`); }), r = validate(pb);
+  const pb = await getJson(src.base + "/" + item.file, !src.local).catch((e) => { throw new Error(`${item.file}: ${e.message}`); }), r = validate(pb);
   if (r.errors.length) throw new Error(`${item.file} is not a valid playbook (${r.errors[0]})`);
   return pb;
 }
@@ -272,7 +285,7 @@ async function openFromRepo(src, item, andRun) {
   } catch (e) { note("Could not load that playbook: " + (e.message || "network error")); showIndex("make"); }
 }
 const repoList = $("repoList"), repoIn = $("repoIn");
-const label = (src) => src.key === DEFAULT_SRC ? "sim-xp playbooks" : src.key;   // the heading of a repo's group (GitHub)
+const label = (src) => src.key === DEFAULT_SRC ? "sim-xp playbooks" : src.local ? "Local server" : src.key;   // the heading of a repo's group (GitHub)
 // The sidebar lists the libraries (sim-xp playbooks first, then the repos added, then Your playground); the main column shows the one picked, which is remembered.
 const CUR = "sim-xp.lib", SAVED = "saved";
 let currentLib = DEFAULT_SRC;
@@ -300,7 +313,7 @@ function renderNav() {
     n.className = "nm"; n.textContent = name; b.append(n); c.className = "nc"; c.textContent = count; c.setAttribute("aria-hidden", "true");
     b.onclick = c.onclick = () => selectLib(key); li.append(b); if (src) li.append(ghLink(src)); li.append(c); nav.append(li);
   };
-  for (const src of sources.values()) item(src.key, label(src), src.state === "ok" ? String(src.items.length) : src.state === "loading" ? "…" : src.state === "err" ? "!" : "", src.key, src);
+  for (const src of sources.values()) item(src.key, label(src), src.state === "ok" ? String(src.items.length) : src.state === "loading" ? "…" : src.state === "err" ? "!" : "", src.local ? "v3/playbooks on this server" : src.key, src.local ? null : src);
   item(SAVED, "Your playground", library.size ? String(library.size) : "", "Playbooks kept in this browser");
   savedEl.hidden = currentLib !== SAVED;
 }
@@ -314,12 +327,12 @@ function renderRepos() {
     h.append(label(src));
     st.textContent = src.state === "loading" ? "loading…" : src.state === "err" ? src.error : src.state === "ok" ? `${src.items.length}` : "";
     if (src.state === "err") st.classList.add("bad");
-    h.append(ghLink(src));
+    if (!src.local) h.append(ghLink(src));
     h.append(st);
     const again = document.createElement("button");
     again.className = "tlink"; again.textContent = "↻"; again.title = "Fetch the list again"; again.setAttribute("aria-label", "Refresh " + label(src)); again.onclick = () => loadIndex(src, true);
     h.append(again); { const sp = document.createElement("span"); sp.className = "spacer"; h.append(sp); }
-    if (src.key !== DEFAULT_SRC) {
+    if (src.key !== DEFAULT_SRC && !src.local) {
       const del = document.createElement("button");
       del.className = "tlink"; del.textContent = "remove"; del.title = "Remove this repo"; del.setAttribute("aria-label", "Remove " + src.key);
       del.onclick = () => { sources.delete(src.key); saveSources(); selectLib(DEFAULT_SRC); };
@@ -335,6 +348,12 @@ function renderRepos() {
 }
 navReady = true;
 renderRepos();
+// the local library shows only once its index.json has answered; if it cannot be reached it is dropped, quietly
+if (LOCAL_BASE) loadIndex(sources.get(LOCAL_SRC)).then((src) => {
+  if (src.state === "ok") return;
+  sources.delete(LOCAL_SRC);
+  if (currentLib === LOCAL_SRC) selectLib(DEFAULT_SRC); else renderRepos();
+});
 // adding a library: a small dialog with what a library is, the GitHub link, the other forms it takes, and a problem shown in place
 function repoError(text) { $("repoErr").textContent = text; $("repoErr").hidden = !text; }
 function addRepoFromInput() {
@@ -476,7 +495,8 @@ function hashTarget() {
   let h = ""; try { h = decodeURIComponent(location.hash.slice(1)); } catch (e) { return null; }
   if (!h) return null;
   const i = h.indexOf(":");
-  return i > 0 ? { src: h.slice(0, i), id: h.slice(i + 1) } : { src: null, id: h };
+  const src = i > 0 ? h.slice(0, i) : null;
+  return { src: src === LEGACY_SRC ? DEFAULT_SRC : src, id: i > 0 ? h.slice(i + 1) : h };
 }
 function playbookFromHash() {   // what is already here: #<id> is the saved copy, else a bundled one (older links); #<default repo>:<id> is the bundled copy, with no fetch
   const t = hashTarget();

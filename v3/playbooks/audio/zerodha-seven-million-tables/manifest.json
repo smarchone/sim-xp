@@ -1,0 +1,422 @@
+{
+ "voice": "af_heart",
+ "file": "narration-773b8a2b.mp3",
+ "lines": {
+  "Voice on.": [
+   0.25,
+   1.6
+  ],
+  "That is the whole run.": [
+   2.1,
+   1.875
+  ],
+  "The result is below the player.": [
+   4.225,
+   2.35
+  ],
+  "7 million tables a day: Zerodha's report cache.": [
+   6.825,
+   4.025
+  ],
+  "Keep an eye on chart 1, Tables in results-db; and chart 2, ledger-db CPU; and chart 3, Report wait 95th percentile.": [
+   11.1,
+   10.2
+  ],
+  "Key moment 1.": [
+   21.55,
+   1.6
+  ],
+  "Meet the system.": [
+   23.4,
+   1.75
+  ],
+  "Console never queries the big ledger-db itself.": [
+   25.4,
+   3.775
+  ],
+  "It asks dungbeetle to run a named SQL report as a job.": [
+   29.425,
+   4.475
+  ],
+  "A worker runs it on ledger-db and writes the rows into a brand-new table in results-db, named after the job.": [
+   34.15,
+   8.05
+  ],
+  "Console then just reads that table.": [
+   42.45,
+   2.8
+  ],
+  "It is 08:00 on 31 July and results-db is empty.": [
+   45.5,
+   6
+  ],
+  "Key moment 2.": [
+   51.75,
+   1.65
+  ],
+  "A table per report.": [
+   53.65,
+   1.95
+  ],
+  "By 2 pm about 1.4 million reports have run, and each became its own table, sized 1,000 to 5,000 rows.": [
+   55.85,
+   9.4
+  ],
+  "Reading a report is a SELECT * from that small table: no index, no JOIN, no other user's rows in the way.": [
+   65.5,
+   8.2
+  ],
+  "Columns come straight from the query's result.": [
+   73.95,
+   3
+  ],
+  "Key moment 3.": [
+   77.2,
+   1.65
+  ],
+  "N requests, M queries.": [
+   79.1,
+   2.275
+  ],
+  "Requests hit 520 a second, but 200 workers can only finish about 400.": [
+   81.625,
+   6.25
+  ],
+  "The rest wait in the queue, and users see 'Your report is being generated'. ledger-db does not notice: it never runs more than 200 queries.": [
+   88.125,
+   9.6
+  ],
+  "This is the design working.": [
+   97.975,
+   2.2
+  ],
+  "The rush lands on a queue, not on the database.": [
+   100.425,
+   3.375
+  ],
+  "Key moment 4.": [
+   104.05,
+   1.65
+  ],
+  "More workers, fewer reports.": [
+   105.95,
+   2.35
+  ],
+  "Tripling the workers sent 500 heavy reports at ledger-db at once.": [
+   108.55,
+   5.15
+  ],
+  "Its 64 cores are pinned, queries trip over each other, and completions fall from 400 to about 290 a second.": [
+   113.95,
+   8.825
+  ],
+  "The queue now grows faster than before.": [
+   123.025,
+   2.65
+  ],
+  "Past the database's limit, more concurrency means less throughput.": [
+   125.925,
+   4.35
+  ],
+  "Key moment 5.": [
+   130.525,
+   1.675
+  ],
+  "Back to M: the queue drains.": [
+   132.45,
+   2.35
+  ],
+  "Back at 200 workers, ledger-db finishes about 400 reports a second again, and the rush is fading.": [
+   135.05,
+   7.55
+  ],
+  "Requests now arrive slower than they finish, so the queue shrinks by roughly 100 jobs a second.": [
+   142.85,
+   6.475
+  ],
+  "Nothing was lost: every queued job will still get its own table.": [
+   149.575,
+   4.4
+  ],
+  "Key moment 6.": [
+   154.225,
+   1.675
+  ],
+  "7 million tables, 60 gigabytes of catalog.": [
+   156.15,
+   3.85
+  ],
+  "Near midnight results-db holds about 7 million tables and 60 gigabytes of catalog: Postgres's own records of every table and column.": [
+   160.25,
+   10.225
+  ],
+  "Report fetches are still about 2 milliseconds.": [
+   170.725,
+   3.3
+  ],
+  "Postgres finds a table by name through an index on its catalog, so 7 million of them cost disk space, not speed.": [
+   174.275,
+   7.875
+  ],
+  "Key moment 7.": [
+   182.4,
+   1.7
+  ],
+  "Wiped in a minute.": [
+   184.35,
+   1.6
+  ],
+  "Deleting 7 million tables one by one would take hours and leave a bloated catalog to vacuum.": [
+   186.2,
+   6.6
+  ],
+  "Instead the cron job stops Postgres, detaches the full volume, attaches an empty one and starts again, in about a minute.": [
+   193.05,
+   8.475
+  ],
+  "The few jobs that arrived meanwhile waited in the queue.": [
+   201.775,
+   3.8
+  ],
+  "Tasks are named queries in a .sql file, -- name: get tax pnl, -- db: ledger-db.": [
+   205.825,
+   6.85
+  ],
+  "A job is one run of a task with args: POST /tasks/get tax pnl/jobs.": [
+   212.925,
+   7.1
+  ],
+  "Column types are mapped from the result set, INT8 to BIGINT, NUMERIC to DECIMAL, TIMESTAMP, DATE, BOOLEAN, everything else TEXT.": [
+   220.275,
+   8.6
+  ],
+  "TEXT columns give each table a TOAST table + index too.": [
+   229.125,
+   4.3
+  ],
+  "Throughput ceiling ≈ workers ÷ mean job time equals 200 ÷ about 0.5 seconds about 400 jobs/s.": [
+   233.675,
+   11.25
+  ],
+  "Queue grows at, 520 − 400, times 60 seconds about 7,200 jobs per minute of story time.": [
+   245.175,
+   8.825
+  ],
+  "ledger-db runs work mem equals 600 megabytes.": [
+   254.25,
+   4.425
+  ],
+  "At 200 queries that is fine; at 500 the sorts and hashes no longer fit in 128 gigabytes RAM and spill to pgsql tmp.": [
+   258.925,
+   11.55
+  ],
+  "Query 99th percentile goes from about 1.4 seconds to about 9 seconds.": [
+   270.725,
+   6.575
+  ],
+  "Queue peaked near 680 thousand at about 19:58.": [
+   277.55,
+   4.825
+  ],
+  "With requests at about 300 per second and completions at 400 per second, the backlog drains in about an hour of story time.": [
+   282.625,
+   9.125
+  ],
+  "pg attribute about 48 gigabytes, one row per column, system columns included, pg class about 9 gigabytes, about 21 million relations, pg index about 2.5 gigabytes though DungBeetle makes no indexes: likely the TOAST indexes.": [
+   292,
+   18.5
+  ],
+  "Each backend caches only the relations it touches.": [
+   310.75,
+   3.75
+  ],
+  "DROP TABLE times 7.2 million deletes about 21 million pg class and about 200 million pg attribute rows, all dead tuples needing VACUUM, plus about 21 million file unlinks.": [
+   314.75,
+   14.65
+  ],
+  "A volume swap touches none of it.": [
+   329.65,
+   2.45
+  ],
+  "This only works because results are disposable: fsync equals off, no replica.": [
+   332.35,
+   5.725
+  ],
+  "Every report a Zerodha user pulls becomes its own Postgres table, about 7 million by midnight, all thrown away at 02:00. Follow tax-deadline day, compressed, about 6 minutes per second by day, 1 minute per second in the evening rush.": [
+   338.325,
+   17.6
+  ],
+  "The system.": [
+   356.175,
+   1.525
+  ],
+  "Zerodha's Console serves P and L, tradebooks and tax reports to millions of users, from databases holding hundreds of billions of rows. Some reports are a one-line SELECT; others are hundreds of lines of JOINs. One finishes in 10 milliseconds, the next takes 10 seconds or more. Users pull millions of them a day.": [
+   357.95,
+   21.375
+  ],
+  "How it normally works.": [
+   379.575,
+   1.875
+  ],
+  "Console never queries the big database directly. It hands each report to DungBeetle, formerly sql-jobber, as a job. A fixed pool of workers runs at most M queries at a time on the big DB, and writes each result into a brand-new table, named after the job, in a separate Postgres 'results DB'. Console polls, then reads that table.": [
+   381.7,
+   22.95
+  ],
+  "Today.": [
+   404.9,
+   1.35
+  ],
+  "31 July: the income-tax filing deadline in India. Millions of users want last year's tax P and L, most of them in the evening. The clock shows India time, IST.": [
+   406.5,
+   12.15
+  ],
+  "Here is the system: console, dungbeetle, ledger-db, results-db, nightly-wipe, vol-a and vol-b.": [
+   418.9,
+   6.8
+  ],
+  "What happened.": [
+   425.95,
+   1.5
+  ],
+  "Zerodha queues every report and lets only M queries reach the big DB, writing each result into its own throwaway Postgres table. about 7 million tables a day are cheap to read and free to delete: the whole volume is swapped out every night.": [
+   427.7,
+   16.925
+  ],
+  "The numbers.": [
+   444.875,
+   1.525
+  ],
+  "Tables created in a day: 7 million tables at worst, and 0 million tables at the end.": [
+   446.65,
+   6.55
+  ],
+  "Peak queue: 678 thousand jobs at worst, and 0 jobs at the end.": [
+   453.45,
+   5.825
+  ],
+  "Worst report wait 95th percentile: 35 minutes at worst, and 0 minutes at the end.": [
+   459.525,
+   6.65
+  ],
+  "Report fetch 99th percentile, worst: 3 milliseconds at worst, and 2 milliseconds at the end.": [
+   466.425,
+   6.8
+  ],
+  "Takeaway 1.": [
+   473.475,
+   1.7
+  ],
+  "Put a queue in front of big DBs.": [
+   475.425,
+   2.5
+  ],
+  "Users are N and unbounded; the database is M. Accept every request, but send at most M queries and let the rest wait.": [
+   478.175,
+   9.075
+  ],
+  "Takeaway 2.": [
+   487.5,
+   1.725
+  ],
+  "Past the cap, more workers is less.": [
+   489.475,
+   2.625
+  ],
+  "Once the DB's cores and memory are full, extra concurrency adds contention and disk spills. Throughput falls.": [
+   492.35,
+   7.725
+  ],
+  "Takeaway 3.": [
+   500.325,
+   1.75
+  ],
+  "Shape the cache like the read.": [
+   502.325,
+   2.125
+  ],
+  "One small table per report makes reads a plain SELECT , with sorting and filtering on a few thousand rows.": [
+   504.7,
+   7.05
+  ],
+  "Takeaway 4.": [
+   512,
+   1.75
+  ],
+  "Delete disposable data in bulk.": [
+   514,
+   2.7
+  ],
+  "Don't drop 7 million tables; throw away the volume. Treat the results DB like a cache: fsync off, no replica, rebuilt nightly.": [
+   516.95,
+   9.35
+  ],
+  "How it happened.": [
+   526.55,
+   1.6
+  ],
+  "Tax-deadline rush: 520 report requests a second at peak.": [
+   528.4,
+   5.125
+  ],
+  "DungBeetle queues the excess; only 200 queries reach ledger-db.": [
+   533.775,
+   5.175
+  ],
+  "Workers raised to 500: ledger-db saturates, throughput drops to about 290 per second.": [
+   539.2,
+   7.5
+  ],
+  "Back to 200 workers: about 400 per second again, the queue drains.": [
+   546.95,
+   5.225
+  ],
+  "Each finished job becomes a table: 7.2 million tables, 60 gigabytes of catalog.": [
+   552.425,
+   6.85
+  ],
+  "02:00: stop, swap the EBS volume, start. Empty in about a minute.": [
+   559.525,
+   6.55
+  ],
+  "Back of the envelope.": [
+   566.325,
+   1.8
+  ],
+  "The working is on screen.": [
+   568.375,
+   1.975
+  ],
+  "Some common myths.": [
+   570.6,
+   1.825
+  ],
+  "Myth: Millions of tables will melt Postgres.": [
+   572.675,
+   3.3
+  ],
+  "A table is found by name through an index on pg class, and each backend caches only what it touches. The cost is disk, 60 gigabytes of catalog, not query speed.": [
+   576.225,
+   12.075
+  ],
+  "Myth: Deadline day needs more workers or read replicas.": [
+   588.55,
+   4.2
+  ],
+  "The big DB's capacity is the limit. More concurrency past it slows every query; the queue already absorbs the rush.": [
+   593,
+   8.225
+  ],
+  "Myth: One big results table with a job id column would be cleaner.": [
+   601.475,
+   4.8
+  ],
+  "Every report has different columns, and deleting rows leaves bloat to vacuum. Separate tables get their schema for free and disappear with the volume.": [
+   606.525,
+   9.75
+  ],
+  "To read more, the links are on screen.": [
+   616.525,
+   2.85
+  ]
+ }
+}

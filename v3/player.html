@@ -461,7 +461,6 @@ body{padding:0}
 .vtoggle[aria-pressed="true"]{color:var(--fg);box-shadow:inset 0 -2px 0 #e5484d}
 .app.speaking #vVoice{animation:vspeak 1.1s ease-in-out infinite}
 @keyframes vspeak{50%{color:#e5484d}}
-#vVoice.loading{color:var(--muted);font-variant-numeric:tabular-nums}
 .seg button:disabled{opacity:.4;cursor:default}
 #vNarrSel{max-width:170px;font:inherit;font-size:var(--s);background:var(--panel);color:var(--fg);border:1px solid var(--line2);border-radius:6px;padding:2px 4px}
 @media (prefers-reduced-motion:reduce){.app.speaking #vVoice{animation:none;color:#e5484d}}
@@ -745,10 +744,11 @@ body{padding:0}
 /* the result slides are slide-shaped: 16:9, content centred (taller when a slide needs more) */
 .deck-stage{aspect-ratio:16 / 9;padding:36px 48px;justify-content:center}
 
-/* full screen (F, ⛶): the player alone fills the window: the component chips, the charts, the bar and the key moment.
+/* full screen (F, ⛶): the player alone fills the window: the component chips, the charts and the bar; no key-moment banner (the
+   highlights and the notes on the charts still mark each one, and Space or ▶ carries on).
    No page around it and no event feed. Works without the browser's Fullscreen API too (the artifact frame), as a cover. */
 .app.fs .simwrap{position:fixed;inset:0;z-index:18;margin:0;max-width:none;width:auto;height:auto;padding:14px 20px;background:var(--bg);overflow:auto;display:flex;justify-content:center}
-.app.fs .chatcol,.app.fs #vFeed{display:none}
+.app.fs .chatcol,.app.fs #vFeed,.app.fs .kmrow{display:none}
 .app.fs .simwrap .simcol{flex:1;width:auto;min-width:0}
 @media (min-width:1000px) and (min-height:600px){
   .app.fs .simwrap{overflow:hidden}
@@ -756,11 +756,43 @@ body{padding:0}
 }
 html:has(.app.fs),body:has(.app.fs){overflow:hidden}
 .app.fs.playing.idle .simwrap{cursor:none}
+/* ===================== Watch mode: the whole post as one narrated video (the default); Read is the blog ===================== */
+.modeseg button{padding:3px 12px;font-size:12.5px}
+.app.watch #briefSec,.app.watch #metricsSec,.app.watch .sep,.app.watch #resultSec{display:none}
+.wstage{position:absolute;inset:0;z-index:12;display:flex;background:var(--panel);border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.wsl{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:16px;padding:clamp(20px,5%,56px) clamp(20px,7%,96px);overflow:auto;animation:slideIn .35s ease-out}
+.wsl .wt{margin:0;font-size:clamp(24px,3vw,40px);font-weight:600;line-height:1.15;letter-spacing:-.015em;white-space:normal;text-wrap:balance}
+.wsl .whook{margin:0;font-size:clamp(16px,1.5vw,21px);line-height:1.55;max-width:62ch;color:var(--fg);text-wrap:pretty}
+.wsl .wbg{margin:0;font-size:clamp(16px,1.45vw,20px);line-height:1.6;max-width:64ch;text-wrap:pretty}
+.wsl .sl-big{font-size:clamp(19px,1.8vw,26px)} .wsl .sl-t{font-size:clamp(22px,2.2vw,32px)} .wsl .sl-p{font-size:clamp(16px,1.4vw,19.5px);max-width:68ch}
+.wsl .sl-body{display:flex;flex-direction:column;gap:14px}
+.wsl.wsys-on{justify-content:flex-start}
+.wsys{flex:1;min-height:0;display:flex}
+.wsys .stage{flex:1;min-height:0;aspect-ratio:auto!important;height:auto;border:0;background:none}
+.wsys .stagebox{height:100%}
+.wend{position:absolute;inset:0;z-index:14;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(2px);border-radius:4px;font-size:18px}
+.wend-b{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.wend button{padding:8px 18px;font-size:14px}
+.app.wslide .cfilter,.app.watch.wslide .kmrow{visibility:hidden}
+.chap.wseg .pl{background:color-mix(in srgb,#e5484d 70%,var(--fg))}
+.wmeta{display:none}
+.app.watch .wmeta{display:flex;flex-direction:column;gap:2px;padding:0 2px 4px}
+.wmeta h2{margin:0;font-size:18px;font-weight:600;line-height:1.3}
+.app.fs .wmeta{display:none}
+@media (prefers-reduced-motion:reduce){.wsl{animation:none}}
+.modeseg button,.pagehead .brand,.pagehead .hbtn{white-space:nowrap}
+@media not ((min-width:1000px) and (min-height:600px)){
+  /* stacked: a slide gets a video-sized box of its own instead of covering the whole column of charts */
+  .app.watch.wslide .dashcol > .gauges,.app.watch.wslide .dashcol > .board,.app.watch.wslide .dashcol > .lanes{display:none}
+  .app.watch.wslide .wstage{position:relative;inset:auto;min-height:min(72dvh,560px)}
+  .app.watch.wslide .wsys{min-height:300px}
+  .pagehead{gap:8px;flex-wrap:wrap} .modeseg button{padding:3px 9px}
+}
 </style>
 </head>
 <body>
 <div class="app" id="app">
-  <header class="pagehead"><a class="brand" href="https://smarchone.github.io/sim-xp/" target="_blank" rel="noopener noreferrer" title="About sim-xp"><span class="mark" aria-hidden="true"></span>sim-xp</a><span class="tag">simulate a blog, an incident or a load test</span><span class="spacer"></span><button class="hbtn" id="libraryBtn">Open another playbook</button><button class="hicon" id="themeBtn" aria-label="Switch to light theme" title="Switch to light theme">☀</button><div class="seg" id="themeSeg" hidden><button data-theme-set="system">Auto</button><button data-theme-set="light">Light</button><button data-theme-set="dark">Dark</button></div></header>
+  <header class="pagehead"><a class="brand" href="https://smarchone.github.io/sim-xp/" target="_blank" rel="noopener noreferrer" title="About sim-xp"><span class="mark" aria-hidden="true"></span>sim-xp</a><span class="tag">simulate a blog, an incident or a load test</span><span class="spacer"></span><div class="seg modeseg" id="modeSeg" role="group" aria-label="How to view this playbook"><button data-mode="watch" title="Watch: the whole post as one narrated video">▶ Watch</button><button data-mode="read" title="Read: the post as a page you scroll, with the player in the middle">Read</button></div><button class="hbtn" id="libraryBtn">Open another playbook</button><button class="hicon" id="themeBtn" aria-label="Switch to light theme" title="Switch to light theme">☀</button><div class="seg" id="themeSeg" hidden><button data-theme-set="system">Auto</button><button data-theme-set="light">Light</button><button data-theme-set="dark">Dark</button></div></header>
 
   <!-- 1. Brief: read the story and what to watch, see the system. Nothing plays yet. -->
   <section class="sec brief" id="briefSec" aria-labelledby="introT">
@@ -789,12 +821,15 @@ html:has(.app.fs),body:has(.app.fs){overflow:hidden}
   <!-- 2. Run: one screen. Dashboard left, the system and the events right. Charts never move; key moments only highlight. -->
   <div class="simwrap" id="simWrap">
   <div class="simcol">
+    <div class="wmeta" id="wmeta"><h2 id="wTitle"></h2><span class="eb" id="wSub"></span></div>
     <div class="cfilter" id="cfilter" role="group" aria-label="Show the charts of one component" hidden></div>
   <section class="sec sim" id="simSec" aria-label="Simulation">
     <div class="progress" id="progress" aria-hidden="true" hidden><i></i></div>
     <h2 class="simtitle" id="pbTitle" hidden></h2>
     <main class="main">
       <div class="dashcol">
+        <div class="wstage" id="wstage" hidden><div class="wsl" id="wsl"></div></div>
+        <div class="wend" id="wend" hidden><b>That is the whole story.</b><div class="wend-b"><button class="primary" id="wAgain">↺ Watch again</button><button id="wRead">Read it as a post</button></div></div>
         <button class="poster" id="poster" aria-label="Play the simulation"><span class="pbig">▶</span><span class="ptxt">Play</span></button>
         <div class="vflash" id="vflash" aria-hidden="true"></div>
         <div class="gauges" id="gauges" aria-label="The signals to watch"></div>
@@ -847,9 +882,7 @@ html:has(.app.fs),body:has(.app.fs){overflow:hidden}
         <button class="mi" id="introBtn" role="menuitem" hidden>Show intro <kbd>I</kbd></button>
         <div class="row"><span class="small" style="flex:1">Speed</span><div class="seg" id="speedSeg"><button data-speed="2">0.5×</button><button data-speed="4">1×</button><button data-speed="8">2×</button><button data-speed="16">4×</button></div></div>
         <div class="row" id="detailRow" hidden><span class="small" style="flex:1" title="Hardcore shows the deeper layer of the same run: more charts, raw logs and commands, and a deep dive in the report">Detail <kbd>H</kbd></span><div class="seg" id="detailSeg"><button data-detail="standard">Standard</button><button data-detail="hardcore">Hardcore</button></div></div>
-        <div class="row" id="vEngineRow" title="Natural: a neural voice that runs on your GPU (about 330 MB, downloaded once, then cached). System: your computer's own voices."><span class="small" style="flex:1">Voice <kbd>V</kbd></span><div class="seg" id="vEngineSeg"><button data-engine="natural">Natural</button><button data-engine="system">System</button></div></div>
-        <div class="row" id="vNatRow"><span class="small" style="flex:1">Narrator</span><div class="seg" id="vNatSeg"><button data-nat="af_heart">Heart</button><button data-nat="am_michael">Michael</button><button data-nat="bf_emma">Emma</button></div></div>
-        <div class="row" id="vNarrRow" title="The voices installed on this computer. Premium and Enhanced ones sound the most natural (on a Mac, add them in System Settings, Accessibility, Spoken Content)."><span class="small" style="flex:1">Narrator <kbd>V</kbd></span><select id="vNarrSel" aria-label="Narrator voice"></select></div>
+        <div class="row" id="vNarrRow" title="Google's voice reads what the playbook's recorded narration does not cover."><span class="small" style="flex:1">Google voice <kbd>V</kbd></span><select id="vNarrSel" aria-label="Google voice"></select></div>
       </div>
       </div>
         <button class="vb" id="vFull" aria-label="Full screen (f)" title="Full screen (f)">⛶</button>
@@ -1581,46 +1614,57 @@ function renderGauges(v) {
 /* ===================== Video bar: chapters on the scrubber, the time, the chapter, speed, full screen =====================
    Video time is playback at 1x (4 story-seconds of the run per second), so the clock reads like a video's whatever the speed. */
 const VT = t => t / 4, mss = x => { x = Math.max(0, Math.round(x)); return `${Math.floor(x / 60)}:${p2(x % 60)}`; };
-const chapEls = (() => {
-  const box = $("#chaps"), segs = chapters.length ? chapters.map(c => ({ from: c.from, to: c.to, title: c.title, tone: c.beat && c.beat.beat && c.beat.beat.tone })) : [{ from: 0, to: D, title: "" }];
+function simSegs() {   // the run's chapters, one per key moment, in run seconds
+  const segs = chapters.length ? chapters.map(c => ({ from: c.from, to: c.to, title: c.title, tone: c.beat && c.beat.beat && c.beat.beat.tone })) : [{ from: 0, to: D, title: "" }];
   if (segs.length && segs[0].from > 0) segs.unshift({ from: 0, to: segs[0].from, title: "Intro" });
+  return segs;
+}
+function buildChaps(segs) {   // segs in bar units: run seconds in Read, video seconds in Watch
+  const box = $("#chaps"); box.replaceChildren();
   return segs.map(sg => {
-    const d = document.createElement("div"); d.className = "chap" + (sg.tone === "bad" ? " bad" : ""); d.style.flex = String(Math.max(0.001, sg.to - sg.from));
+    const d = document.createElement("div"); d.className = "chap" + (sg.tone === "bad" ? " bad" : "") + (sg.slide ? " wseg" : ""); d.style.flex = String(Math.max(0.001, sg.to - sg.from));
     d.innerHTML = `<i class="hv"></i><i class="pl"></i>`; box.appendChild(d);
     return { ...sg, el: d, pl: d.firstChild.nextSibling, hv: d.firstChild };
   });
-})();
+}
+let chapEls = buildChaps(simSegs());
 const scrub = $("#scrub"), sttip = $("#sttip");
-const tAtX = x => { const r = scrub.getBoundingClientRect(); return Math.max(0, Math.min(D, ((x - r.left) / r.width) * D)); };
+const barTotal = () => WATCH ? WTOTAL : D;
+const tAtX = x => { const r = scrub.getBoundingClientRect(); return Math.max(0, Math.min(barTotal(), ((x - r.left) / r.width) * barTotal())); };
 const fillTo = (key, t) => chapEls.forEach(c => { const f = t <= c.from ? 0 : t >= c.to ? 1 : (t - c.from) / (c.to - c.from); c[key].style.width = (f * 100).toFixed(2) + "%"; });
 function renderBar() {
-  fillTo("pl", playT); markFeedNews();
-  $("#knob").style.left = (playT / D * 100).toFixed(3) + "%";
-  const tt = `${mss(VT(playT))} <small>/ ${mss(VT(D))}</small>`; if ($("#vtime")._h !== tt) { $("#vtime")._h = tt; $("#vtime").innerHTML = tt; }
-  const ch = chapEls.find(c => playT >= c.from && playT < c.to) || chapEls[chapEls.length - 1], ct = ch ? ch.title : "";
+  const pos = barPos(), tot = barTotal(), on = WATCH ? wPlaying : playing;
+  fillTo("pl", pos); markFeedNews();
+  $("#knob").style.left = (pos / tot * 100).toFixed(3) + "%";
+  const tt = WATCH ? `${mss(pos)} <small>/ ${mss(tot)}</small>` : `${mss(VT(playT))} <small>/ ${mss(VT(D))}</small>`; if ($("#vtime")._h !== tt) { $("#vtime")._h = tt; $("#vtime").innerHTML = tt; }
+  const ch = chapEls.find(c => pos >= c.from && pos < c.to) || chapEls[chapEls.length - 1], ct = ch ? ch.title : "";
   if ($("#vchap").textContent !== ct) $("#vchap").textContent = ct;
-  const ended = playT >= D, ic = ended ? "↺" : playing ? "❚❚" : "▶";
-  if ($("#vPlay").textContent !== ic) { $("#vPlay").textContent = ic; $("#vPlay").title = ended ? "Replay" : playing ? "Pause (k)" : "Play (k)"; $("#vPlay").setAttribute("aria-label", $("#vPlay").title); }
-  $("#vResult").hidden = !(ended && resultOpen);
-  scrub.setAttribute("aria-valuemax", String(Math.round(VT(D)))); scrub.setAttribute("aria-valuenow", String(Math.round(VT(playT))));
+  const ended = WATCH ? wEnded : playT >= D, ic = ended ? "↺" : on ? "❚❚" : "▶";
+  if ($("#vPlay").textContent !== ic) { $("#vPlay").textContent = ic; $("#vPlay").title = ended ? "Replay" : on ? "Pause (k)" : "Play (k)"; $("#vPlay").setAttribute("aria-label", $("#vPlay").title); }
+  $("#vResult").hidden = WATCH || !(ended && resultOpen);
+  scrub.setAttribute("aria-valuemax", String(Math.round(WATCH ? tot : VT(D)))); scrub.setAttribute("aria-valuenow", String(Math.round(WATCH ? pos : VT(playT))));
 }
 function vflash(ic) { const f = $("#vflash"); f.textContent = ic; f.classList.remove("go"); void f.offsetWidth; f.classList.add("go"); }
-function startPlaying() { $("#poster").hidden = true; if (!introStarted) { introStarted = true; seek(0); $("#start").textContent = "Back to the simulation ▼"; narrateIntro(); } }
+function startPlaying() { $("#poster").hidden = true; if (WATCH) { introStarted = true; return; } if (!introStarted) { introStarted = true; seek(0); $("#start").textContent = "Back to the simulation ▼"; narrateIntro(); } }
 let scrubbing = false;
-scrub.addEventListener("pointerdown", e => { e.preventDefault(); scrub.setPointerCapture(e.pointerId); scrubbing = true; scrub.classList.add("drag"); startPlaying(); const was = playing; scrub._was = was; setPlaying(false); seek(tAtX(e.clientX)); });
+scrub.addEventListener("pointerdown", e => {
+  e.preventDefault(); scrub.setPointerCapture(e.pointerId); scrubbing = true; scrub.classList.add("drag"); startPlaying();
+  if (WATCH) { scrub._was = wPlaying; wPause(); wSeek(tAtX(e.clientX)); return; }
+  const was = playing; scrub._was = was; setPlaying(false); seek(tAtX(e.clientX));
+});
 scrub.addEventListener("pointermove", e => {
   const t = tAtX(e.clientX), r = scrub.getBoundingClientRect(), ch = chapEls.find(c => t >= c.from && t < c.to) || chapEls[chapEls.length - 1];
   fillTo("hv", t); sttip.hidden = false; sttip.style.left = Math.max(60, Math.min(r.width - 60, e.clientX - r.left)) + "px";
-  sttip.innerHTML = `<b>${esc(ch ? ch.title : "")}</b><span>${mss(VT(t))} · ${fmtT(t)}</span>`;
-  if (scrubbing) seek(t);
+  sttip.innerHTML = WATCH ? `<b>${esc(ch ? ch.title : "")}</b><span>${mss(t)}${ch && ch.simFrom != null ? " · " + fmtT(Math.min(D, (t - SCENES[ch.scene].from) * 4)) : ""}</span>` : `<b>${esc(ch ? ch.title : "")}</b><span>${mss(VT(t))} · ${fmtT(t)}</span>`;
+  if (scrubbing) { if (WATCH) wSeek(t); else seek(t); }
 });
-scrub.addEventListener("pointerup", () => { if (!scrubbing) return; scrubbing = false; scrub.classList.remove("drag"); if (scrub._was) setPlaying(true); });
+scrub.addEventListener("pointerup", () => { if (!scrubbing) return; scrubbing = false; scrub.classList.remove("drag"); if (scrub._was) { if (WATCH) wPlay(); else setPlaying(true); } });
 scrub.addEventListener("pointerleave", () => { if (!scrubbing) { sttip.hidden = true; fillTo("hv", 0); } });
-scrub.addEventListener("keydown", e => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); e.stopPropagation(); seek(playT + (e.key === "ArrowRight" ? 20 : -20)); } });
+scrub.addEventListener("keydown", e => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); e.stopPropagation(); if (WATCH) wSeek(barPos() + (e.key === "ArrowRight" ? 5 : -5)); else seek(playT + (e.key === "ArrowRight" ? 20 : -20)); } });
 $("#vPlay").onclick = () => primaryAction(true);
-$("#vNext").onclick = () => { startPlaying(); jumpBeat(1); };
+$("#vNext").onclick = () => { startPlaying(); jumpBeat(1); };   // in Watch, jumpBeat moves to the next chapter of the whole video
 $("#vResult").onclick = () => openReport();
-$("#poster").onclick = () => { startPlaying(); setPlaying(true); vflash("▶"); };
+$("#poster").onclick = () => { if (WATCH) { wPlay(); vflash("▶"); return; } startPlaying(); setPlaying(true); vflash("▶"); };
 const FEED_KEY = "sim-xp.feed";
 let feedOn = false; try { feedOn = localStorage.getItem(FEED_KEY) === "on"; } catch (e) { /* storage blocked */ }
 function setFeed(on, persist) {
@@ -1632,30 +1676,26 @@ function setFeed(on, persist) {
 setFeed(feedOn, false);
 $("#vFeed").onclick = () => setFeed(!feedOn, true);
 /* ===================== Voice: a narrator reads each key moment aloud, then the run carries on ===================== */
-// The narrator, best first: Natural, Kokoro's Heart voice (a neural text-to-speech model, 82M parameters, full precision, run
-// on the GPU with WebGPU in a worker so the charts stay smooth; ~330 MB downloaded once, then cached by the browser); then the
-// browser's own speech, Google UK English Female where the browser has it (Chrome); then the best other system voice. The
-// system voice also speaks while the model downloads, and takes over where it cannot run. Voice is off by default; the
-// choices made in the ⚙ are remembered.
-var VOICE_KEY = "sim-xp.voice", VENGINE_KEY = "sim-xp.voice-engine", VNAT_KEY = "sim-xp.voice-natural", VNARR_KEY = "sim-xp.voice-narrator";
+// No speech is made in the browser by a model. A sentence is read, best first:
+// 1. from the playbook's recorded narration (Kokoro's Heart voice, made when the playbook is authored by v3/tools/gen-audio.mjs):
+//    the host names its folder (host.audio), holding manifest.json, { voice, file, lines: { "<spoken sentence>": [start, length] } },
+//    and one MP3 with every sentence; the file is fetched and decoded once and a sentence plays as a slice of it;
+// 2. by a Google voice (Chrome's own speech, Google UK English Female first), for a sentence the recording lacks;
+// 3. by nobody: the other system voices sound robotic and distract, so they are never used; the line just takes its reading time.
+// Voice is offered when 1 or 2 is there. It is off by default; the choices are remembered.
+var VOICE_KEY = "sim-xp.voice", VNARR_KEY = "sim-xp.voice-narrator";
 var tts = "speechSynthesis" in window && window.SpeechSynthesisUtterance ? window.speechSynthesis : null;
-var canNatural = !!navigator.gpu && typeof Worker === "function" && !!(window.AudioContext || window.webkitAudioContext);
-var voiceOn = false, ttsVoice = null, vNarr = "", vNat = "af_heart", vEngine = canNatural ? "natural" : "system", sayId = 0, sayGo = 0, introHold = false;
-const NATURALS = { af_heart: "Heart", am_michael: "Michael", bf_emma: "Emma" };
-try {
-  voiceOn = (canNatural || !!tts) && localStorage.getItem(VOICE_KEY) === "on"; vNarr = localStorage.getItem(VNARR_KEY) || "";
-  const e = localStorage.getItem(VENGINE_KEY); if (e === "system" && tts || e === "natural" && canNatural) vEngine = e;
-  const n = localStorage.getItem(VNAT_KEY); if (NATURALS[n]) vNat = n;
-} catch (e) { /* storage blocked */ }
-// system voices: English, the most natural first (Premium, Enhanced and Natural ones are neural voices a system may have)
-const voiceRank = v => (/^google uk english female$/i.test(v.name) ? 32 : 0) + (/premium|natural|neural|enhanced/i.test(v.name) ? 8 : 0) + (/samantha|ava|allison|zoe|daniel|aria|jenny|serena|google/i.test(v.name) ? 4 : 0) + (/^en[-_]US/i.test(v.lang) ? 2 : 0) + (v.default ? 1 : 0);
-const enVoices = () => tts.getVoices().filter(v => /^en([-_]|$)/i.test(v.lang) && !/eloquence|novelty|bells|bubbles|cellos|organ|whisper|zarvox|trinoids|albert|bahh|boing|jester|superstar|wobble|grandma|grandpa|rocko|shelley|sandy|flo|reed|eddy|bad news|good news|junior|fred|ralph|kathy|princess|hysterical|deranged|pipe organ|victoria/i.test(v.name)).sort((a, b) => voiceRank(b) - voiceRank(a));
+var voiceOn = false, voiceWanted = false, ttsVoice = null, vNarr = "", sayId = 0, sayGo = 0, introHold = false;
+try { voiceWanted = localStorage.getItem(VOICE_KEY) === "on"; vNarr = localStorage.getItem(VNARR_KEY) || ""; } catch (e) { /* storage blocked */ }
+// Google's voices only (Chrome has them; Safari and Firefox do not), the UK female one first
+const googleRank = v => (/^google uk english female$/i.test(v.name) ? 8 : 0) + (/^google us english/i.test(v.name) ? 4 : 0) + (/^en[-_]GB/i.test(v.lang) ? 2 : 0);
+const googleVoices = () => tts ? tts.getVoices().filter(v => /^google\b/i.test(v.name) && /^en([-_]|$)/i.test(v.lang)).sort((a, b) => googleRank(b) - googleRank(a)) : [];
 function pickVoice() {
-  const vs = enVoices(); ttsVoice = vs.find(v => v.voiceURI === vNarr) || vs[0] || null;
+  const vs = googleVoices(); ttsVoice = vs.find(v => v.voiceURI === vNarr) || vs[0] || null;
   const sel = $("#vNarrSel");
-  sel.innerHTML = vs.map(v => `<option value="${esc(v.voiceURI)}">${esc(v.name.replace(/\s*\(English \([^)]*\)\)/, ""))} · ${esc(v.lang)}</option>`).join("");
+  sel.innerHTML = vs.map(v => `<option value="${esc(v.voiceURI)}">${esc(v.name.replace(/^Google\s+/i, ""))}</option>`).join("");
   if (ttsVoice) sel.value = ttsVoice.voiceURI;
-  voiceMenu();
+  setVoice(voiceWanted, false);   // the voices arrive late in Chrome: Voice is offered once they do
 }
 // written text to spoken text: units, percentiles and code names read the way an engineer would say them
 const ORD = n => n + (/1[123]$/.test(n) ? "th" : { 1: "st", 2: "nd", 3: "rd" }[n.slice(-1)] || "th");
@@ -1664,7 +1704,7 @@ const UNITS = { ms: "milliseconds", "µs": "microseconds", us: "microseconds", n
   rps: "requests per second", RPS: "requests per second", qps: "queries per second", QPS: "queries per second", "/s": "per second", k: "thousand", K: "thousand", M: "million" };
 function spoken(t) {
   return String(t || "")
-    .replace(/[`*_]{1,2}(?=\S)|(?<=\S)[`*_]{1,2}/g, "")
+    .replace(/[`*]{1,2}(?=\S)|(?<=\S)[`*]{1,2}|(?<!\w)_{1,2}(?=\S)|(?<=\S)_{1,2}(?!\w)/g, "")   // markdown marks; an underscore inside a word (pg_stat_activity) stays
     .replace(/\be\.g\.,?/gi, "for example,").replace(/\bi\.e\.,?/gi, "that is,").replace(/\betc\./gi, "and so on.").replace(/\bvs\.?(?=\s)/gi, "versus")
     .replace(/\bp50\b/gi, "median").replace(/\bp(99)(9)\b/gi, "99.9th percentile").replace(/\bp(\d{2})\b/gi, (_, n) => ORD(n) + " percentile")
     .replace(/(\d[\d,.]*)\s?(KB\/s|MB\/s|GB\/s|µs|us|ns|ms|sec|min|hr|KB|MB|GB|TB|rps|RPS|qps|QPS|\/s|[shkKM])(?![\w.]*\d)\b/g, (_, n, u) => n + " " + (n === "1" ? UNITS[u].replace(/s(?= per|$)/, "") : UNITS[u]))
@@ -1673,176 +1713,116 @@ function spoken(t) {
     .replace(/#(\d)/g, "number $1").replace(/\s*&\s*/g, " and ").replace(/<\s?(?=\d)/g, "under ").replace(/>\s?(?=\d)/g, "over ")
     .replace(/\b[a-z][a-z0-9]*(?:[._][a-z][a-z0-9]*)+\b/gi, w => w.replace(/\.(ms|s)$/i, "").replace(/[._]/g, " "))   // max.poll.interval.ms: "max poll interval"
     .replace(/\s*→\s*/g, " to ").replace(/(\d)\s*×/g, "$1 times").replace(/×/g, " times ").replace(/\s*[≈~]\s*(?=\d)/g, " about ")
-    .replace(/\s*[—–]\s*/g, ", ").replace(/\s*\(([^)]*)\)/g, ", $1,").replace(/,\s*([.!?;:])/g, "$1").replace(/,\s*,/g, ",").replace(/\s{2,}/g, " ").trim();
+    .replace(/\(\s*\)/g, "").replace(/\s*[—–]\s*/g, ", ").replace(/\s*\(([^)]*)\)/g, ", $1,").replace(/,\s*([.!?;:])/g, "$1").replace(/,\s*,/g, ",").replace(/\s{2,}/g, " ").trim();
 }
 const sentence = t => { t = String(t || "").trim(); return !t || /[.!?…:]$/.test(t) ? t : t + "."; };
 
-// --- the natural engine: a worker that loads Kokoro on the GPU and turns one sentence at a time into audio, in order
-const KOKORO_JS = "https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/dist/kokoro.web.js";
-const KWORKER = `let tts, q = Promise.resolve(), voice = null;
-const run = async m => {
-  if (m.type === "load") {
-    if (!navigator.gpu || !(await navigator.gpu.requestAdapter())) throw new Error("no WebGPU adapter");
-    const { KokoroTTS } = await import(${JSON.stringify(KOKORO_JS)});
-    const seen = {};
-    tts = await KokoroTTS.from_pretrained("onnx-community/Kokoro-82M-v1.0-ONNX", { dtype: "fp32", device: "webgpu",
-      progress_callback: p => { if (p.status === "progress" && p.total) { seen[p.file] = [p.loaded, p.total]; const v = Object.values(seen); self.postMessage({ type: "progress", pct: 100 * v.reduce((a, x) => a + x[0], 0) / v.reduce((a, x) => a + x[1], 0) }); } } });
-    await tts.generate("Ready.", { voice: "af_heart" });   // warm up, so the first real sentence is not the slow one
-    self.postMessage({ type: "ready" });
-  } else {
-    if (voice && m.voice !== voice) throw new Error("dropped: the narrator changed");   // queued for the old narrator: skip it
-    const a = await tts.generate(m.text, { voice: m.voice, speed: 1 });
-    self.postMessage({ type: "audio", id: m.id, pcm: a.audio, rate: a.sampling_rate }, [a.audio.buffer]);
-  }
-};
-self.onmessage = ({ data: m }) => { if (m.type === "voice") { voice = m.voice; return; } q = q.then(() => run(m)).catch(e => self.postMessage({ type: "error", id: m.id, load: m.type === "load", error: String(e && e.message || e) })); };`;
-let kw = null, kState = "off", kPct = 0, kReq = 0, actx = null, kSrc = null;
-const kWait = new Map(), kCache = new Map();
+// --- recorded narration
+const PRE = { base: host && typeof host.audio === "string" ? host.audio : "", lines: null, file: "", all: null };
+let actx = null, aSrc = null;
 function audioCtx() { if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === "suspended") actx.resume().catch(() => {}); return actx; }
-["pointerdown", "keydown"].forEach(ev => addEventListener(ev, () => { if (voiceOn && vEngine === "natural") audioCtx(); }, { capture: true, passive: true }));   // audio may start only after a gesture
-function kLoad() {
-  if (kw || kState === "failed") return;
-  kState = "loading"; kPct = 0; voiceMenu();
-  try { kw = new Worker(URL.createObjectURL(new Blob([KWORKER], { type: "text/javascript" })), { type: "module" }); } catch (e) { return kFail(e); }
-  kw.onmessage = ({ data: m }) => {
-    if (m.type === "progress") { kPct = m.pct; voiceMenu(); }
-    else if (m.type === "ready") { kState = "ready"; voiceMenu(); prefetchNext(); }
-    else if (m.type === "audio") { const w = kWait.get(m.id); kWait.delete(m.id); if (w) w.res(m); }
-    else if (m.type === "error") { if (m.load) kFail(m.error); else { const w = kWait.get(m.id); kWait.delete(m.id); if (w) w.rej(new Error(m.error)); } }
-  };
-  kw.onerror = e => kFail(e.message || "worker failed");
-  kw.postMessage({ type: "load" });
-}
-function kFail(err) {   // the model cannot run here (no GPU, offline, blocked): the system voice takes over
-  console.warn("sim-xp: natural voice unavailable, using the system voice:", err);
-  kState = "failed"; if (kw) kw.terminate(); kw = null;
-  kWait.forEach(w => w.rej(new Error("natural voice unavailable"))); kWait.clear(); kCache.clear();
-  vEngine = "system"; voiceMenu();
-  if (voiceOn) { if (tts) flash("natural voice unavailable: system voice"); else { setVoice(false, false); flash("voice unavailable here"); } }
-}
-function synth(text) {   // one sentence to audio; cached, so a prefetched key moment plays at once
-  const key = vNat + "|" + text;
-  if (!kCache.has(key)) {
-    const p = new Promise((res, rej) => { const id = ++kReq; kWait.set(id, { res, rej }); kw.postMessage({ type: "say", id, text, voice: vNat }); });
-    p.catch(() => kCache.delete(key)); kCache.set(key, p);
+["pointerdown", "keydown"].forEach(ev => addEventListener(ev, () => { if (voiceOn && PRE.lines) audioCtx(); }, { capture: true, passive: true }));   // audio may start only after a gesture
+function preLoad() {   // the playbook's file, fetched and decoded once
+  if (!PRE.all) {
+    PRE.all = fetch(new URL(PRE.file, PRE.base)).then(r => { if (!r.ok) throw new Error("audio " + r.status); return r.arrayBuffer(); })
+      .then(b => audioCtx().decodeAudioData(b));
+    PRE.all.catch(() => { PRE.all = null; });
   }
-  return kCache.get(key);
+  return PRE.all;
 }
-function playPCM(m, id) {
-  return new Promise(res => {
+function playSlice(text, id) {   // one sentence: its slice of the file, with a little of the silence around it (0.25 s between sentences)
+  const [at, len] = PRE.lines[text];
+  return preLoad().then(buf => new Promise(res => {
     if (id !== sayId) return res(false);
-    const ctx = audioCtx(), buf = ctx.createBuffer(1, m.pcm.length, m.rate); buf.copyToChannel(m.pcm, 0);
-    const src = ctx.createBufferSource(); src.buffer = buf; src.connect(ctx.destination);
-    src.onended = () => { if (kSrc === src) kSrc = null; res(id === sayId); };
-    kSrc = src; src.start();
-  });
+    const src = audioCtx().createBufferSource(); src.buffer = buf; src.connect(actx.destination);
+    src.onended = () => { if (aSrc === src) aSrc = null; res(id === sayId); };
+    const from = Math.max(0, at - 0.05);
+    aSrc = src; src.start(0, from, Math.min(buf.duration - from, len + 0.15));
+  }));
 }
-const naturalReady = () => voiceOn && vEngine === "natural" && kState === "ready";
+if (PRE.base) fetch(new URL("manifest.json", PRE.base), { cache: "no-cache" }).then(r => r.ok ? r.json() : null).then(m => {
+  if (!m || typeof m.file !== "string" || !/^[\w.-]+\.mp3$/.test(m.file) || !m.lines || typeof m.lines !== "object") return;
+  PRE.lines = Object.fromEntries(Object.entries(m.lines).filter(([, v]) => Array.isArray(v) && v.length === 2 && v.every(Number.isFinite)));
+  PRE.file = m.file;
+  setVoice(voiceWanted, false);
+}).catch(() => { /* no recorded narration: a Google voice, if there is one */ });
+const canSpeak = () => !!PRE.lines || !!ttsVoice;
 
-// --- speaking, with either engine. done() runs when it finished, never when it was cut off.
+// --- one sentence by the Google voice. Chrome can jam when speak() follows cancel() at once, so it waits a moment, and a
+// watchdog moves on if it never ends.
+function speakGoogle(text, id) {
+  return new Promise(res => setTimeout(() => {
+    if (id !== sayId) return res(false);
+    const words = text.split(/\s+/).length, dog = setTimeout(() => { tts.cancel(); res(id === sayId); }, 4000 + words * 600);
+    const u = new SpeechSynthesisUtterance(text); u.voice = ttsVoice; u.lang = ttsVoice.lang; u.rate = 0.98;
+    u.onend = () => { clearTimeout(dog); res(id === sayId); };
+    u.onerror = e => { clearTimeout(dog); res(id === sayId && e.error !== "interrupted" && e.error !== "canceled"); };
+    tts.speak(u);
+  }, 120));
+}
+
+// --- speaking. done() runs when it finished, never when it was cut off.
 const beatLines = e => [`Key moment ${beats.indexOf(e) + 1}.`, sentence(e.title), ...toPoints(e.beat.hint), ...(HC && e.beat.deep ? toPoints(e.beat.deep) : [])];
 function introLines() { const W = watchList(); return [sentence(PB.meta.title), ...(W.length ? [`Keep an eye on ${W.map((w, i) => `chart ${i + 1}, ${w.label}`).join("; and ")}.`] : [])]; }
-function prefetchNext() {   // while the run plays, the intro and the next key moment are turned into audio ahead of time
-  if (!naturalReady()) return;
-  const nb = activeBeat ? beats[beats.indexOf(activeBeat) + 1] : beats.find(b => b.t > playT + 0.01);
-  [...(introStarted ? [] : introLines()), ...(nb ? beatLines(nb) : [])].map(spoken).filter(Boolean).forEach(s => synth(s).catch(() => {}));
-}
+function prefetchNext() { if (voiceOn && PRE.lines) preLoad().catch(() => {}); }   // one file holds every sentence
 function hush() {
   sayId++; clearTimeout(sayGo); introHold = false;
   if (tts && (tts.speaking || tts.pending)) tts.cancel();
-  if (kSrc) { try { kSrc.onended = null; kSrc.stop(); } catch (e) { /* already stopped */ } kSrc = null; }
+  if (aSrc) { try { aSrc.onended = null; aSrc.stop(); } catch (e) { /* already stopped */ } aSrc = null; }
   $("#app").classList.remove("speaking");
 }
 function say(lines, done) {
   if (!voiceOn) return;
   hush(); const id = sayId, parts = lines.map(spoken).filter(Boolean);
   if (!parts.length) return;
-  if (vEngine === "natural") kLoad();
   $("#app").classList.add("speaking");
-  const finish = () => { if (id !== sayId) return; $("#app").classList.remove("speaking"); if (done) sayGo = setTimeout(() => { if (id === sayId) done(); }, 700); };
-  const natural = () => {
-    const audio = parts.map(s => synth(s));   // all queued at once, so the next sentence is ready while this one plays
-    (async () => {
-      for (let i = 0; i < audio.length; i++) {
-        let m; try { m = await audio[i]; } catch (e) { if (id === sayId) system(); return; }
-        if (!(await playPCM(m, id))) return;
-        if (i < audio.length - 1) await new Promise(r => setTimeout(r, 300));
-      }
-      finish(); prefetchNext();
-    })();
-  };
-  const system = () => {
-    if (!tts) return finish();
-    // Chrome can jam when speak() follows cancel() at once, so it waits a moment; and a watchdog moves on if it never ends
-    setTimeout(() => {
-      if (id !== sayId) return;
-      const words = parts.join(" ").split(/\s+/).length;
-      const dog = setTimeout(() => { if (id !== sayId) return; tts.cancel(); finish(); }, 4000 + words * 600);
-      parts.forEach((p, i) => {
-        const u = new SpeechSynthesisUtterance(p);
-        if (ttsVoice) { u.voice = ttsVoice; u.lang = ttsVoice.lang; }
-        u.rate = 0.98;
-        if (i === parts.length - 1) u.onend = () => { clearTimeout(dog); finish(); };
-        u.onerror = e => { if (id === sayId && e.error !== "interrupted" && e.error !== "canceled") { clearTimeout(dog); finish(); } };
-        tts.speak(u);
-      });
-    }, 120);
-  };
-  if (vEngine !== "natural" || kState === "failed") return system();
-  if (kState === "ready") return natural();
-  // the natural voice is loading: give it a few seconds (from the cache it is quick), then the system voice speaks this one
-  const t0 = performance.now();
-  (function wait() {
+  (async () => {
+    for (let i = 0; i < parts.length; i++) {
+      const x = parts[i];
+      let ok;
+      if (PRE.lines && PRE.lines[x]) ok = await playSlice(x, id).catch(() => ttsVoice ? speakGoogle(x, id) : pause(x, id));
+      else if (ttsVoice) ok = await speakGoogle(x, id);
+      else ok = await pause(x, id);   // no voice for it: its reading time, in silence
+      if (!ok || id !== sayId) return;
+      if (i < parts.length - 1) await new Promise(r => setTimeout(r, 300));
+    }
     if (id !== sayId) return;
-    if (kState === "ready") return natural();
-    if (kState === "failed" || performance.now() - t0 > 4000) return system();
-    setTimeout(wait, 100);
+    $("#app").classList.remove("speaking"); prefetchNext();
+    if (done) sayGo = setTimeout(() => { if (id === sayId) done(); }, 700);
   })();
 }
-const simVisible = () => focusOn || (() => { const r = $("#simSec").getBoundingClientRect(); return Math.min(r.bottom, innerHeight) - Math.max(r.top, 0) > Math.min(r.height, innerHeight) / 2; })();   // at least half the player shows
-function narrateBeat(e) { say(beatLines(e), () => { if (activeBeat === e && !playing && simVisible()) primaryAction(); }); }   // then carry on, like a narrated video
+const pause = (text, id) => new Promise(r => setTimeout(() => r(id === sayId), 1000 * Math.max(1.2, text.split(/\s+/).length / 2.6)));
+const simVisible = () => WATCH || focusOn || (() => { const r = $("#simSec").getBoundingClientRect(); return Math.min(r.bottom, innerHeight) - Math.max(r.top, 0) > Math.min(r.height, innerHeight) / 2; })();   // at least half the player shows
+function narrateBeat(e) {   // then carry on, like a narrated video (in Watch, only while the video plays)
+  if (WATCH && !wPlaying) return;
+  say(beatLines(e), () => { if (activeBeat === e && !playing && (WATCH ? wPlaying : simVisible())) continueRun(); });
+}
+function continueRun() { closeMenus(); hideBeat(); setPlaying(true); render(); prefetchNext(); }
 function narrateIntro() {   // the run holds at the start while the intro is spoken, so the first key moment does not cut it off
   if (!voiceOn) return;
   say(introLines(), () => { introHold = false; lastFrame = performance.now(); });
   introHold = true;
 }
 function voiceMenu() {
-  const b = $("#vVoice"), loading = voiceOn && vEngine === "natural" && kState === "loading";
-  b.textContent = loading ? `Voice ${Math.floor(kPct)}%` : "Voice"; b.classList.toggle("loading", loading);
-  if (loading) b.title = "Downloading the natural voice (once, then cached). The system voice speaks until it is ready.";
-  document.querySelectorAll("#vEngineSeg [data-engine]").forEach(x => { x.setAttribute("aria-pressed", String(x.dataset.engine === vEngine)); x.disabled = x.dataset.engine === "natural" ? !canNatural || kState === "failed" : !tts; });
-  document.querySelectorAll("#vNatSeg [data-nat]").forEach(x => x.setAttribute("aria-pressed", String(x.dataset.nat === vNat)));
-  $("#vEngineRow").hidden = !canNatural;
-  $("#vNatRow").hidden = vEngine !== "natural";
-  $("#vNarrRow").hidden = vEngine === "natural" || !tts || !$("#vNarrSel").options.length;
+  $("#vNarrRow").hidden = !ttsVoice || $("#vNarrSel").options.length < 2;
 }
 function setVoice(on, persist) {
-  voiceOn = (canNatural || !!tts) && on;
-  const b = $("#vVoice"); b.hidden = !canNatural && !tts; b.setAttribute("aria-pressed", String(voiceOn));
+  if (persist) voiceWanted = on;
+  voiceOn = canSpeak() && on;
+  const b = $("#vVoice"); b.hidden = !canSpeak(); b.setAttribute("aria-pressed", String(voiceOn));
   b.title = voiceOn ? "Voice on: the narrator explains each key moment, then the run carries on (v)" : "Voice: a narrator explains each key moment aloud (v)";
   if (persist) try { localStorage.setItem(VOICE_KEY, voiceOn ? "on" : "off"); } catch (e) { /* storage blocked */ }
   if (!voiceOn) hush();
   else {
-    if (vEngine === "natural") { kLoad(); if (persist) audioCtx(); }
-    if (persist) { if (activeBeat) narrateBeat(activeBeat); else say(["Voice on."]); }
+    if (persist && PRE.lines) { audioCtx(); preLoad().catch(() => {}); }
+    if (persist) { if (WATCH && wPlaying) wNarrate(); else if (activeBeat) narrateBeat(activeBeat); else say(["Voice on."]); }
   }
   voiceMenu();
 }
-const sample = () => { if (!voiceOn) setVoice(true, true); else if (activeBeat) narrateBeat(activeBeat); else say([`Hi, I'm ${vEngine === "natural" ? NATURALS[vNat] : ttsVoice ? ttsVoice.name.split(/[\s(]/)[0] : "your narrator"}.`]); };
+const sample = () => { if (!voiceOn) setVoice(true, true); else if (activeBeat) narrateBeat(activeBeat); else if (ttsVoice) { hush(); speakGoogle(`Hi, I'm ${ttsVoice.name.replace(/^Google\s+/i, "")}.`, sayId); } };
+setVoice(voiceWanted, false);
 if (tts) { pickVoice(); tts.addEventListener && tts.addEventListener("voiceschanged", pickVoice); }
-setVoice(voiceOn, false);
 $("#vVoice").onclick = () => { setVoice(!voiceOn, true); flash(voiceOn ? "voice on" : "voice off"); };
-$("#vEngineSeg").onclick = e => {
-  const b = e.target.closest("[data-engine]"); if (!b || b.disabled) return;
-  vEngine = b.dataset.engine; try { localStorage.setItem(VENGINE_KEY, vEngine); } catch (err) { /* storage blocked */ }
-  if (vEngine === "natural") { kLoad(); audioCtx(); }
-  voiceMenu(); sample();
-};
-$("#vNatSeg").onclick = e => {
-  const b = e.target.closest("[data-nat]"); if (!b || b.dataset.nat === vNat) return; vNat = b.dataset.nat;
-  if (kw) kw.postMessage({ type: "voice", voice: vNat });   // the worker drops what it queued for the old narrator, so the new one speaks at once
-  try { localStorage.setItem(VNAT_KEY, vNat); } catch (err) { /* storage blocked */ } voiceMenu(); audioCtx(); sample();
-};
 $("#vNarrSel").onchange = e => { vNarr = e.target.value; try { localStorage.setItem(VNARR_KEY, vNarr); } catch (err) { /* storage blocked */ } pickVoice(); sample(); };
 addEventListener("pagehide", hush);
 let lastAlertSeen = 0;
@@ -1909,7 +1889,7 @@ function flash(text) { hudFlash = { text, until: performance.now() + 1400 }; ren
 function setPlaying(p) {
   playing = p && playT < D;
   if (!p) hush();   // pausing silences the narrator
-  $("#app").classList.toggle("playing", playing);
+  $("#app").classList.toggle("playing", playing || (WATCH && wPlaying));
   if (playing && $("#poster")) $("#poster").hidden = true;
   lastFrame = performance.now();
   if (ready) renderHud(viewT());
@@ -1949,6 +1929,7 @@ function applyFocus(e) {
 const emit = (type, data) => { try { host && host.onPlayerEvent && host.onPlayerEvent(type, data); } catch (err) { /* host gone */ } };
 function showBeat(e) {
   activeBeat = e; setPlaying(false); emit("key_moment", { n: beats.indexOf(e) + 1, t: e.t });
+  if (WATCH) wHold = { el: 0, dur: readS(beatLines(e)) };   // without the voice, the banner stays up for its reading time
   $("#capK").textContent = `Key moment ${beats.indexOf(e) + 1} of ${beats.length} · ${fmtT(e.t)}`;
   { const tn = beatTone(e), cap = $("#caption"), chip = $("#capTone"); TONES.forEach(t => cap.classList.toggle("tone-" + t, t === tn)); chip.hidden = !tn; if (tn) chip.querySelector("b").textContent = TONE_LABEL[tn]; } $("#capT").textContent = e.title || ""; setCapHint(e);
   setExpanded(false); $("#caption").classList.add("open"); $("#beatGo").tabIndex = 0; fitAboveSheet(true);
@@ -1971,7 +1952,7 @@ function setCapHint(e) {
 // the banner is as tall as this playbook's longest key moment needs, measured once (and again when the width changes),
 // so it never overflows and never changes height during the run
 function fitBanner() {
-  const cap = $("#caption"), p = $("#capH"), row = cap.closest(".kmrow"); if (!row || !beats.length) return;
+  const cap = $("#caption"), p = $("#capH"), row = cap.closest(".kmrow"); if (!row || !row.offsetWidth || !beats.length) return;   // hidden (full screen): measured when it shows again
   const keep = p.innerHTML, wasOpen = cap.classList.contains("open");
   cap.style.height = "auto"; cap.classList.add("open"); p.style.overflow = "visible";
   let need = 0;
@@ -2025,18 +2006,21 @@ function frame(now) {
   else if (Math.abs(want - shownT) > 0.02) shownT += (want - shownT) * (1 - Math.exp(-dt / 0.085));
   else shownT = want;
   const eased = shownT !== before;
+  wTick(dt);
   if (playing) {
     const prev = playT; if (!introHold) playT = Math.min(D, playT + Math.max(0, (now - lastFrame) / 1000) * speed); lastFrame = Math.max(lastFrame, now);
     const b = beats.find(e => e.t > prev && e.t <= playT);
     if (playing && hoverT == null) shownT = playT;
     if (b) { playT = b.t; shownT = playT; render(); showBeat(b); } else render();
-    if (playT >= D) { setPlaying(false); render(); emit("end", { t: D }); say(["That is the whole run.", "The result is below the player."]); if (!reportSeen) { reportSeen = true; unlockResult(); } }
+    if (playT >= D && WATCH) { setPlaying(false); render(); emit("end", { t: D }); if (!reportSeen) { reportSeen = true; unlockResult(); } wNext(); }
+    else if (playT >= D) { setPlaying(false); render(); emit("end", { t: D }); say(["That is the whole run.", "The result is below the player."]); if (!reportSeen) { reportSeen = true; unlockResult(); } }
   } else if (eased) render();
   requestAnimationFrame(frame);
 }
-const simInView = () => focusOn || (() => { const r = $("#simSec").getBoundingClientRect(); return r.top < innerHeight * 0.5 && r.bottom > innerHeight * 0.5; })();
+const simInView = () => WATCH || focusOn || (() => { const r = $("#simSec").getBoundingClientRect(); return r.top < innerHeight * 0.5 && r.bottom > innerHeight * 0.5; })();
 // Space does the one obvious thing for the current state
 function primaryAction(fromBar) {
+  if (WATCH) return wToggle();
   closeMenus();
   if (!introStarted) { startPlaying(); setPlaying(true); vflash("▶"); render(); return; }
   if (playT >= D) { if (fromBar || !resultOpen) { seek(0); setPlaying(true); vflash("↺"); return; } return openReport(); }
@@ -2048,6 +2032,7 @@ function primaryAction(fromBar) {
   setPlaying(!playing); render();
 }
 function jumpBeat(dir) {
+  if (WATCH) return wJump(dir);
   const b = dir > 0 ? beats.find(x => x.t > playT + 0.01) : [...beats].reverse().find(x => x.t < playT - 0.01);
   if (!b) {
     if (dir < 0) { seek(0); setPlaying(false); flash("start"); return; }
@@ -2060,7 +2045,7 @@ function jumpBeat(dir) {
 }
 function setSpeed(v) { speed = v; if ($("#vSpeed")) $("#vSpeed").textContent = speedLabel(v); document.querySelectorAll("#speedSeg button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.speed === v))); }
 function stepSpeed(d) { const i = Math.max(0, Math.min(SPEEDS.length - 1, SPEEDS.indexOf(speed) + d)); setSpeed(SPEEDS[i]); flash(`speed ${speedLabel(speed)}`); }
-$("#beatGo").onclick = () => primaryAction();
+$("#beatGo").onclick = () => { if (!WATCH) return primaryAction(); wPlaying = true; if (briefing) wNext(); else if (activeBeat) continueRun(); };
 dashGrid.addEventListener("scroll", () => placeCallout(), { passive: true });
 $("#status").onclick = () => primaryAction();
 $("#speedSeg").onclick = e => { const b = e.target.closest("[data-speed]"); if (b) { setSpeed(+b.dataset.speed); flash(`speed ${speedLabel(speed)}`); } };
@@ -2076,6 +2061,7 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape") { if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); if (closeMenus()) return; if (focusOn) { setFocus(false); return; } if (isOpen($("#scrim"))) closeReport(); else if (introStarted && isOpen($("#intro"))) startRun(); return; }
   if (e.key === "i" || e.key === "I") { if (!isOpen($("#scrim"))) showIntro(); return; }
   if ((e.key === "k" || e.key === "K") && simInView()) { primaryAction(true); return; }
+  if ((e.key === "j" || e.key === "J" || e.key === "l" || e.key === "L") && WATCH) { wSeek(barPos() + (/l/i.test(e.key) ? 10 : -10)); return; }
   if ((e.key === "j" || e.key === "J" || e.key === "l" || e.key === "L") && simInView()) { startPlaying(); seek(playT + (/l/i.test(e.key) ? 40 : -40)); return; }
   if ((e.key === "f" || e.key === "F") && simInView()) { toggleFull(); return; }
   if ((e.key === "e" || e.key === "E") && simInView() && !focusOn) { setFeed(!feedOn, true); return; }
@@ -2119,14 +2105,15 @@ const safeUrl = u => /^https?:\/\//i.test(u) ? u : "#";
 const sec = (title, body) => body ? `<section><h4>${title}</h4>${body}</section>` : "";
 // the result as a short deck: one idea per slide, ‹ › or the dots (or ←/→ while the result is on screen) to move
 const SLIDES = [
-  { k: "What happened", h: `<p class="sl-big">${esc(R.tldr)}</p>` },
-  R.stats.length ? { k: "The numbers", h: `<table class="rp-num"><tr><th></th><th>Worst</th><th>At the end</th></tr>${R.stats.map(st => { const [b, a] = statVals(st); return `<tr><td>${esc(st.label)}</td><td class="bf">${withUnit(b, st.unit)}</td><td class="af">${withUnit(a, st.unit)}</td></tr>`; }).join("")}</table>` } : null,
-  ...R.learnings.map((l, i) => ({ k: `Takeaway ${i + 1} of ${R.learnings.length}`, h: `<h3 class="sl-t">${esc(l.title)}</h3><p class="sl-p">${esc(l.body)}</p>` })),
-  (R.chain || []).length ? { k: "How it happened", h: chainHTML() } : null,
-  R.math ? { k: esc(R.math.title || "The arithmetic"), h: `<pre class="rp-math">${esc(R.math.lines.join("\n"))}</pre>` } : null,
-  (R.myths || []).length ? { k: "Common myths", h: R.myths.map(m => `<div class="rp-myth"><q>${esc(m.myth)}</q><p>${esc(m.truth)}</p></div>`).join("") } : null,
-  HC && R.deep && ((R.deep.config || []).length || (R.deep.runbook || []).length) ? { k: "Deep dive", h: `${(R.deep.config || []).length ? `<h5>Config involved</h5><pre class="rp-math">${esc(R.deep.config.join("\n"))}</pre>` : ""}${(R.deep.runbook || []).length ? `<h5>What to check next time</h5><ol class="sl-ol">${R.deep.runbook.map(x => `<li>${esc(x)}</li>`).join("")}</ol>` : ""}` } : null,
-  (R.links || []).length ? { k: "Read more", h: `<div class="rp-links">${R.links.map(l => `<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener noreferrer">${esc(l.label)} ↗</a>`).join("")}</div>` } : null,
+  { k: "What happened", h: `<p class="sl-big">${esc(R.tldr)}</p>`, v: ["What happened.", R.tldr] },
+  R.stats.length ? { k: "The numbers", h: `<table class="rp-num"><tr><th></th><th>Worst</th><th>At the end</th></tr>${R.stats.map(st => { const [b, a] = statVals(st); return `<tr><td>${esc(st.label)}</td><td class="bf">${withUnit(b, st.unit)}</td><td class="af">${withUnit(a, st.unit)}</td></tr>`; }).join("")}</table>`,
+    v: ["The numbers.", ...R.stats.map(st => { const [b, a] = statVals(st); return `${sentence(st.label).slice(0, -1)}: ${withUnit(b, st.unit)} at worst, and ${withUnit(a, st.unit)} at the end.`; })] } : null,
+  ...R.learnings.map((l, i) => ({ k: `Takeaway ${i + 1} of ${R.learnings.length}`, h: `<h3 class="sl-t">${esc(l.title)}</h3><p class="sl-p">${esc(l.body)}</p>`, v: [`Takeaway ${i + 1}.`, sentence(l.title), l.body] })),
+  (R.chain || []).length ? { k: "How it happened", h: chainHTML(), v: ["How it happened.", ...R.chain.map(c => sentence(c.text))] } : null,
+  R.math ? { k: esc(R.math.title || "The arithmetic"), h: `<pre class="rp-math">${esc(R.math.lines.join("\n"))}</pre>`, v: [sentence(R.math.title || "The arithmetic"), "The working is on screen."] } : null,
+  (R.myths || []).length ? { k: "Common myths", h: R.myths.map(m => `<div class="rp-myth"><q>${esc(m.myth)}</q><p>${esc(m.truth)}</p></div>`).join(""), v: ["Some common myths.", ...R.myths.flatMap(m => [`Myth: ${sentence(m.myth)}`, m.truth])] } : null,
+  HC && R.deep && ((R.deep.config || []).length || (R.deep.runbook || []).length) ? { k: "Deep dive", h: `${(R.deep.config || []).length ? `<h5>Config involved</h5><pre class="rp-math">${esc(R.deep.config.join("\n"))}</pre>` : ""}${(R.deep.runbook || []).length ? `<h5>What to check next time</h5><ol class="sl-ol">${R.deep.runbook.map(x => `<li>${esc(x)}</li>`).join("")}</ol>` : ""}`, v: ["Deep dive: the config involved, and what to check next time."] } : null,
+  (R.links || []).length ? { k: "Read more", h: `<div class="rp-links">${R.links.map(l => `<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener noreferrer">${esc(l.label)} ↗</a>`).join("")}</div>`, v: ["To read more, the links are on screen."] } : null,
 ].filter(Boolean);
 $("#report").innerHTML = `
   <div class="deck" id="deck" aria-roledescription="slides" aria-label="The result">
@@ -2165,6 +2152,7 @@ function unlockResult() { if (resultOpen) return; resultOpen = true; $("#resLock
 function openReport() {   // R, the menu, or Space at the end: scroll down to the result (it stays locked until the run has ended once)
   closeMenus();
   if (!resultOpen) { flash("finish the run to see the result"); return; }
+  if (WATCH) { wEnter(SCENES.findIndex(s => s.res != null), { fresh: true }); return; }
   setPlaying(false); setFocus(false); goTo("resultSec");
 }
 function closeReport(done) { if (done) done(); }
@@ -2260,11 +2248,170 @@ function startRun() {   // Run in the brief: bring the dashboard up, then play
   startPlaying();
   setTimeout(() => { if (!activeBeat && playT < D) setPlaying(true); }, 450);
 }
-function showIntro() { closeMenus(); setPlaying(false); goTo("briefSec"); }   // the brief stays on the page; I scrolls back to it
+function showIntro() { closeMenus(); if (WATCH) { wEnter(0, { fresh: true }); return; } setPlaying(false); goTo("briefSec"); }   // the brief stays on the page; I scrolls back to it
 $("#introBtn").onclick = showIntro; $("#introBtn").firstChild.textContent = "Back to the brief ";
 $("#start").onclick = startRun;
 $("#pbTitle").textContent = PB.meta.title; document.title = PB.meta.title;
 $("#libraryBtn").onclick = () => { closeMenus(); setFocus(false); if (host && host.showLibrary) host.showLibrary(); };   // the host page shows its index of playbooks
+
+/* ===================== Watch mode: the whole post as one narrated video =====================
+   Watch (the default) plays the post as scenes on one timeline, in the player's frame: the title, the background, the
+   system, the charts to watch (on the real dashboard), the run, then the result as slides. Read is the blog: brief, run
+   and result as sections you scroll. Both render the same playbook. A slide moves on when the narrator has read it (Voice
+   on) or after its reading time (Voice off; the slide is its own caption); key moments carry on the same way, so the
+   video never waits for a click. Playback speed applies to the run only; slides keep the narrator's pace. */
+var WATCH = false, wPlaying = false, wEnded = false, wAt = 0, wHold = null, wInit = false;
+const MODE_KEY = "sim-xp.mode";
+const nWords = lines => lines.join(" ").split(/\s+/).filter(Boolean).length;
+function readS(lines) { return Math.min(28, Math.max(4, 1.6 + nWords(lines) / 2.6)); }   // about 155 words a minute, 4 to 28 s
+const andList = xs => xs.length < 2 ? xs.join("") : xs.slice(0, -1).join(", ") + " and " + xs[xs.length - 1];
+const plain = h => String(h).replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"');
+const SCENES = (() => {
+  const S = [], bg = (M.background || []).map(b => typeof b === "string" ? { body: b } : b), Wl = watchList(), names = PB.components.nodes.map(n => n.label);
+  S.push({ kind: "slide", title: "Intro", h: `<span class="sl-k">${esc($("#introMeta").textContent)}</span><h1 class="wt">${esc(M.title)}</h1><p class="whook">${esc(M.story)}</p>`, lines: [sentence(M.title), M.story] });
+  bg.forEach(b => S.push({ kind: "slide", title: b.title || "Background", h: `<span class="sl-k">${esc(b.title || "Background")}</span><p class="wbg">${esc(b.body)}</p>`, lines: [...(b.title ? [sentence(b.title)] : []), b.body] }));
+  const sysT = bg.some(b => /^the system$/i.test(b.title || "")) ? "The system map" : "The system";
+  S.push({ kind: "slide", sys: true, title: sysT, h: `<span class="sl-k">${sysT}</span><div class="wsys" id="wsys"></div>`, lines: [names.length && names.length <= 7 ? `Here is the system: ${andList(names)}.` : "Here is the system we will watch."] });
+  if (Wl.length) S.push({ kind: "watch", title: "What to watch", lines: [`Keep an eye on ${Wl.map((w, i) => `chart ${i + 1}, ${w.label}`).join("; and ")}.`] });
+  S.push({ kind: "sim", title: "The run" });
+  SLIDES.forEach((sl, i) => S.push({ kind: "slide", res: i, title: plain(sl.k), h: `<span class="sl-k">${sl.k}</span><div class="sl-body">${sl.h}</div>`, lines: sl.v || [plain(sl.k)] }));
+  let acc = 0; S.forEach(s => { s.dur = s.kind === "sim" ? VT(D) : readS(s.lines); s.from = acc; acc += s.dur; s.to = acc; });
+  return S;
+})();
+const WTOTAL = SCENES[SCENES.length - 1].to;
+const stageHome = stageEl.parentNode;
+function watchChaps() {
+  return SCENES.flatMap((s, i) => s.kind !== "sim" ? [{ from: s.from, to: s.to, title: s.title, scene: i, slide: s.kind === "slide" }]
+    : simSegs().map((c, k) => ({ ...c, from: s.from + VT(c.from), to: s.from + VT(c.to), simFrom: k === 0 ? 0 : c.from, scene: i })));
+}
+function barPos() {   // where the video is, in bar units (run seconds in Read, video seconds in Watch)
+  if (!WATCH) return playT;
+  if (wEnded) return WTOTAL;
+  const s = SCENES[wAt];
+  return s.kind === "sim" ? s.from + VT(playT) : s.from + Math.min(s.dur * 0.995, wHold ? wHold.el : 0);
+}
+function wShowScene(s) {
+  if (stageEl.parentNode !== stageHome) { stageHome.appendChild(stageEl); }   // the system map goes back to the brief before the slide is replaced
+  const slide = !!s && s.kind === "slide";
+  $("#app").classList.toggle("wslide", slide); $("#wstage").hidden = !slide; $("#wend").hidden = true;
+  if (!slide) return;
+  const box = $("#wsl"); box.innerHTML = s.h; box.classList.toggle("wsys-on", !!s.sys);
+  box.style.animation = "none"; void box.offsetWidth; box.style.animation = "";
+  if (s.sys) { $("#wsys").appendChild(stageEl); render(); requestAnimationFrame(resetView); }
+}
+function wEnter(i, opt = {}) {
+  if (i < 0) return;
+  const s = SCENES[i], same = i === wAt && wInit && !opt.fresh;
+  $("#poster").hidden = true; introStarted = true;
+  wAt = i; wEnded = false;
+  if (!same) { hush(); hideBeat(); setPlaying(false); wShowScene(s); }
+  if (s.kind === "sim") {
+    if (opt.t != null || !same) seek(opt.t || 0);
+    if (wPlaying && playT < D) setPlaying(true);
+  } else {
+    wHold = { el: opt.el || 0, dur: s.dur };
+    if (!same) {
+      if (s.kind === "watch") { seek(0); showBrief(); }
+      if (s.res != null) { if (!reportSeen) { reportSeen = true; } unlockResult(); showSlide(s.res); }
+      if (wPlaying) wNarrate();
+    }
+  }
+  $("#app").classList.toggle("playing", playing || wPlaying);
+  wPrefetch(); renderBar();
+}
+function wNarrate() {   // the current scene, read aloud; it moves on when the narrator is done
+  const s = SCENES[wAt], i = wAt;
+  if (s.kind === "sim") { if (activeBeat) narrateBeat(activeBeat); return; }
+  say(s.lines, () => { if (wPlaying && wAt === i) wNext(); });
+}
+function wPrefetch() { if (WATCH) prefetchNext(); }   // the recorded narration is one file, loaded once
+// every sentence the narrator can say for this playbook, as spoken (both detail levels, Watch and Read): what gen-audio.mjs renders
+function narration() {
+  const L = ["Voice on.", "That is the whole run.", "The result is below the player.", ...introLines()], hc = HC;
+  for (const h of hasDeep ? [false, true] : [false]) { HC = h; beats.forEach(b => L.push(...beatLines(b))); }
+  HC = hc;
+  SCENES.forEach(sc => sc.lines && L.push(...sc.lines));
+  return [...new Set(L.map(spoken).filter(Boolean))];
+}
+function wNext() { if (wAt + 1 < SCENES.length) wEnter(wAt + 1, { fresh: true }); else wEnd(); }
+function wEnd() { wPlaying = false; wEnded = true; setPlaying(false); $("#wend").hidden = false; emit("end", { t: D, watch: true }); renderBar(); }
+function wPlay() {
+  closeMenus(); $("#poster").hidden = true; introStarted = true;
+  if (wEnded) { wPlaying = true; wEnter(0, { fresh: true }); return; }
+  wPlaying = true; $("#wend").hidden = true;
+  const s = SCENES[wAt];
+  if (s.kind === "sim" && !activeBeat) { if (playT < D) setPlaying(true); else wNext(); }
+  else wNarrate();
+  $("#app").classList.add("playing"); renderBar();
+}
+function wPause() { wPlaying = false; setPlaying(false); $("#app").classList.remove("playing"); renderBar(); }
+function wToggle() { if (wPlaying) { wPause(); vflash("❚❚"); } else { const end = wEnded; wPlay(); vflash(end ? "↺" : "▶"); } }
+function wSeek(u) {
+  u = Math.max(0, Math.min(WTOTAL - 0.01, u));
+  let i = SCENES.findIndex(s => u < s.to); if (i < 0) i = SCENES.length - 1;
+  const s = SCENES[i];
+  if (s.kind === "sim") wEnter(i, { t: (u - s.from) * 4 }); else wEnter(i, { el: u - s.from });
+}
+function wJump(dir) {   // ⏭ and ←/→: the next or previous chapter of the whole video (back: this chapter's start first)
+  const pos = barPos();
+  let k = chapEls.findIndex(c => pos >= c.from && pos < c.to); if (k < 0) k = chapEls.length - 1;
+  const cur = chapEls[k], to = dir > 0 ? chapEls[k + 1] : (pos - cur.from > 1.5 || k === 0 ? cur : chapEls[k - 1]);
+  if (!to) { if (dir > 0) wEnd(); return; }
+  const s = SCENES[to.scene];
+  if (s.kind !== "sim") return wEnter(to.scene, { fresh: true });
+  if (wAt !== to.scene) wEnter(to.scene, { fresh: true, t: to.simFrom });
+  const b = beats.find(x => x.t === to.simFrom && to.simFrom > 0);
+  seek(to.simFrom);
+  if (b) showBeat(b); else if (wPlaying) setPlaying(true);
+  if (b && wPlaying) narrateBeat(b);
+  renderBar();
+}
+function wTick(dt) {   // called every frame: slides and key moments move on by themselves while the video plays
+  if (!WATCH || !wPlaying || !wHold) return;
+  const s = SCENES[wAt];
+  const due = () => wHold.el >= wHold.dur && (!voiceOn || wHold.el >= wHold.dur * 2.5 + 8);   // with the voice on, the narrator moves on; this is its watchdog
+  if (s.kind !== "sim") { wHold.el += dt; renderBar(); if (due()) wNext(); return; }
+  if (activeBeat) { wHold.el += dt; if (due()) continueRun(); }
+}
+function setMode(m, persist) {
+  const watch = m !== "read";
+  if (persist) try { localStorage.setItem(MODE_KEY, watch ? "watch" : "read"); } catch (e) { /* storage blocked */ }
+  document.querySelectorAll("#modeSeg [data-mode]").forEach(b => b.setAttribute("aria-pressed", String((b.dataset.mode === "watch") === watch)));
+  if (wInit && watch === WATCH) return;
+  // where the viewer is now, so the other mode opens at the same place
+  const was = WATCH ? SCENES[wAt] : null;
+  const readAt = !WATCH && wInit ? (resultOpen && resultInView() ? "result" : introStarted && simInView() ? "sim" : "brief") : null;
+  const t0 = playT, started = introStarted, first = !wInit;
+  if (WATCH) wPause(); else setPlaying(false);
+  hush(); hideBeat();
+  WATCH = watch; $("#app").classList.toggle("watch", watch);
+  chapEls = buildChaps(watch ? watchChaps() : simSegs());
+  if (watch) {
+    const i = readAt === "result" ? SCENES.findIndex(s => s.res === slideAt) : readAt === "sim" ? SCENES.findIndex(s => s.kind === "sim") : 0;
+    wInit = true; wEnter(i, { fresh: true, t: readAt === "sim" ? t0 : 0 });
+    introStarted = started; $("#poster").hidden = started;
+    try { scrollTo({ top: 0 }); } catch (e) { /* old browser */ }
+  } else {
+    wShowScene(null); wEnded = false; wInit = true;
+    if (first) { /* the page opens at its top */ }
+    else if (was && was.res != null) { showSlide(was.res); setTimeout(() => goTo("resultSec"), 30); }
+    else if (was && (was.kind === "sim" || was.kind === "watch") && started) setTimeout(() => goTo("simSec"), 30);
+    else setTimeout(() => goTo("briefSec"), 30);
+    $("#poster").hidden = started; if (!started && !first) seek(0);
+  }
+  render(); renderBar();
+  if (wInit && persist) flash(watch ? "Watch: the whole post as a video" : "Read: the post as a page");
+}
+document.querySelectorAll("#modeSeg [data-mode]").forEach(b => (b.onclick = () => setMode(b.dataset.mode, true)));
+$("#wAgain").onclick = () => { wPlaying = true; wEnter(0, { fresh: true }); vflash("↺"); };
+$("#wRead").onclick = () => setMode("read", true);
+$("#wTitle").textContent = M.title; $("#wSub").textContent = $("#introMeta").textContent;
+{   // ?mode=read or ?mode=watch on the page's address picks the mode for that link; otherwise the viewer's last choice, else Watch
+  let m = null;
+  try { m = new URLSearchParams(location.search).get("mode") || new URLSearchParams(window.parent.location.search).get("mode"); } catch (e) { /* not allowed here */ }
+  if (m !== "read" && m !== "watch") try { m = localStorage.getItem(MODE_KEY); } catch (e) { /* storage blocked */ }
+  setMode(m === "read" ? "read" : "watch", false);
+}
 requestAnimationFrame(frame);
 
 // Playback API for the host page. Speeds are multipliers: 0.5, 1, 2, 4.
@@ -2273,22 +2420,28 @@ window.player = {
   status: () => ({
     t: Math.round(playT * 10) / 10, playing, speed: speed / 4,
     key_moment: activeBeat ? beats.indexOf(activeBeat) + 1 : null,
-    intro_open: isOpen($("#intro")), report_open: isOpen($("#scrim")), ended: playT >= D,
+    intro_open: isOpen($("#intro")), report_open: isOpen($("#scrim")), ended: WATCH ? wEnded : playT >= D,
     detail: HC ? "hardcore" : "standard", has_deep: hasDeep, voice: voiceOn,
+    mode: WATCH ? "watch" : "read", ...(WATCH ? { scene: SCENES[wAt].title, video_t: Math.round(barPos() * 10) / 10, video_total: Math.round(WTOTAL) } : {}),
   }),
-  start() { if (isOpen($("#intro"))) startRun(); else { if (isOpen($("#scrim"))) closeReport(); hideBeat(); setPlaying(true); } },
-  pause() { setPlaying(false); render(); },
-  seek(t) { if (isOpen($("#intro"))) hideModal($("#intro")); if (isOpen($("#scrim"))) closeReport(); setPlaying(false); seek(t); },
+  mode(m) { if (!["watch", "read"].includes(m)) throw new Error('mode must be "watch" or "read"'); setMode(m, true); },
+  start() {
+    if (WATCH) return wPlay(); if (isOpen($("#intro"))) startRun(); else { if (isOpen($("#scrim"))) closeReport(); hideBeat(); setPlaying(true); } },
+  pause() { if (WATCH) return wPause(); setPlaying(false); render(); },
+  seek(t) {
+    if (WATCH) { wPause(); wEnter(SCENES.findIndex(s => s.kind === "sim"), { fresh: true, t }); return; } if (isOpen($("#intro"))) hideModal($("#intro")); if (isOpen($("#scrim"))) closeReport(); setPlaying(false); seek(t); },
   keyMoment(n) {
     const b = beats[n - 1]; if (!b) throw new Error(`key moment ${n} does not exist; this playbook has ${beats.length}`);
     if (isOpen($("#intro"))) hideModal($("#intro")); if (isOpen($("#scrim"))) closeReport();
+    if (WATCH) wEnter(SCENES.findIndex(s => s.kind === "sim"), { fresh: true, t: b.t });
     seek(b.t); showBeat(b);
   },
   step(dir) { if (isOpen($("#intro"))) hideModal($("#intro")); if (isOpen($("#scrim"))) closeReport(); jumpBeat(dir); },
   report(open) { if (open) openReport(); else if (isOpen($("#scrim"))) closeReport(); },
-  restart() { if (isOpen($("#intro"))) hideModal($("#intro")); if (isOpen($("#scrim"))) closeReport(); reportSeen = false; seek(0); setPlaying(true); },
+  restart() { if (WATCH) { wPlaying = true; wEnter(0, { fresh: true }); return; } if (isOpen($("#intro"))) hideModal($("#intro")); if (isOpen($("#scrim"))) closeReport(); reportSeen = false; seek(0); setPlaying(true); },
   detail(mode) { if (!["standard", "hardcore"].includes(mode)) throw new Error('detail must be "standard" or "hardcore"'); if (mode === "hardcore" && !hasDeep) throw new Error("this playbook has no deep layer"); setDetail(mode === "hardcore"); },
   voice(on) { setVoice(on !== false, true); },
+  narration,
   speed(x) { if (!SPEED_X[x]) throw new Error("speed must be 0.5, 1, 2 or 4"); setSpeed(SPEED_X[x]); flash(`speed ${speedLabel(speed)}`); },
 };
 emit("ready", {});

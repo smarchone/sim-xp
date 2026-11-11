@@ -42,11 +42,11 @@ the side panel) and press Space.
 ## Share your playbook library
 
 A library of playbooks can be hosted as a public Github repo.<br>
-eg: [smarchone/simxp-playbooks](https://github.com/smarchone/simxp-playbooks)
+eg: the default library is this repo's [v3/playbooks](https://github.com/smarchone/sim-xp/tree/main/v3/playbooks) folder (`smarchone/sim-xp@main/v3/playbooks`)
 
 Import it in the [player](https://smarchone.github.io/sim-xp/v2/):<br>
 `side panel → *Library* → type the repo name → Add`
 
-Can also run a playbook directly via URL eg:<br> `https://smarchone.github.io/sim-xp/v2/#smarchone/simxp-playbooks:postgres-queue-load-test`
+Can also run a playbook directly via URL eg:<br> `https://smarchone.github.io/sim-xp/v3/#smarchone/sim-xp@main/v3/playbooks:postgres-queue-load-test`
 
 Part of [agentic experiences](https://smarchone.github.io/agentic-experiences): accelerate learning with agents.

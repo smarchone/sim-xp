@@ -1,0 +1,9 @@
+{
+  "name": "sim-xp-v3-tools",
+  "private": true,
+  "type": "module",
+  "description": "Dev-only tools for sim-xp v3 (not part of the build): gen-audio.mjs pregenerates the narrator's audio for v3/playbooks.",
+  "dependencies": {
+    "kokoro-js": "1.2.1"
+  }
+}

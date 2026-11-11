@@ -1,0 +1,406 @@
+{
+ "voice": "af_heart",
+ "file": "narration-52919cfc.mp3",
+ "lines": {
+  "Voice on.": [
+   0.25,
+   1.6
+  ],
+  "That is the whole run.": [
+   2.1,
+   1.875
+  ],
+  "The result is below the player.": [
+   4.225,
+   2.35
+  ],
+  "Load test until it breaks: the three walls of a Kafka cluster.": [
+   6.825,
+   4.55
+  ],
+  "Keep an eye on chart 1, Produce 99th percentile latency; and chart 2, Request handler idle, b1.": [
+   11.625,
+   8.05
+  ],
+  "Key moment 1.": [
+   19.925,
+   1.6
+  ],
+  "Meet the cluster.": [
+   21.775,
+   1.725
+  ],
+  "Three brokers, one topic of 48 partitions, each stored three times.": [
+   23.75,
+   5.25
+  ],
+  "Six load generators send 20 megabytes per second of 1 kilobyte records with acks equals all.": [
+   29.25,
+   7.075
+  ],
+  "Everything is boring: 99th percentile about 9 milliseconds, brokers mostly idle.": [
+   36.575,
+   6.675
+  ],
+  "The plan is to raise the load in steps until something gives.": [
+   43.5,
+   4.15
+  ],
+  "Key moment 2.": [
+   47.9,
+   1.65
+  ],
+  "Linear zone: up to 150 megabytes per second.": [
+   49.8,
+   4.025
+  ],
+  "From 20 to 150 megabytes per second the cluster scales linearly: acked tracks offered, 99th percentile stays under 20 milliseconds.": [
+   54.075,
+   10.4
+  ],
+  "With RF 3 on 3 brokers each disk writes one full copy of the stream, so disk megabytes per second equals produce megabytes per second.": [
+   64.725,
+   10.05
+  ],
+  "But b1's handlers went from 92 percent to 42 percent idle: a quiet early warning.": [
+   75.025,
+   6.8
+  ],
+  "Key moment 3.": [
+   82.075,
+   1.65
+  ],
+  "Wall 1: the hot leader.": [
+   83.975,
+   2.225
+  ],
+  "At 190 megabytes per second b1's request handlers are mostly busy.": [
+   86.45,
+   5.725
+  ],
+  "The disks are fine, 76 percent of cap; the cluster is lopsided: b1 leads 58 percent of the partitions, so it takes most produce and replica-fetch traffic.": [
+   92.425,
+   11.575
+  ],
+  "Requests queue and 99th percentile more than doubles.": [
+   104.25,
+   4.025
+  ],
+  "Nothing has failed yet.": [
+   108.525,
+   1.975
+  ],
+  "Key moment 4.": [
+   110.75,
+   1.65
+  ],
+  "Wall 2: the disks saturate.": [
+   112.65,
+   2.5
+  ],
+  "At 230 megabytes per second each disk is 92 percent busy against its 250 megabytes per second cap.": [
+   115.4,
+   8.65
+  ],
+  "Writes wait behind writeback, 99th percentile jumps to about 400 milliseconds and followers start to trail.": [
+   124.3,
+   8.125
+  ],
+  "More I/O or network threads is the tempting fix, but they would only wait on the same disk.": [
+   132.675,
+   6.675
+  ],
+  "Key moment 5.": [
+   139.6,
+   1.675
+  ],
+  "Wall 3: the ISR collapses.": [
+   141.525,
+   2.8
+  ],
+  "At 270 megabytes per second the disks can't drain the load.": [
+   144.575,
+   4.7
+  ],
+  "Dirty pages hit the 6.4 gigabytes limit and followers stall past 30 seconds. b3, then b2, leave the ISR of b1's 28 partitions: one replica, below min insync replicas equals 2, so every write is rejected.": [
+   149.525,
+   17.1
+  ],
+  "Retrying batches then fill the shared producer buffer and starve even the healthy partitions.": [
+   166.875,
+   6.3
+  ],
+  "Key moment 6.": [
+   173.425,
+   1.675
+  ],
+  "Healing starts when the load stops.": [
+   175.35,
+   2.425
+  ],
+  "Marta stopped the test.": [
+   178.025,
+   1.95
+  ],
+  "Producers drained, but healing took about six more minutes: followers had to re-fetch the gap while the disks were still busy.": [
+   180.225,
+   7.85
+  ],
+  "Once each caught up to the high watermark it re-entered the ISR.": [
+   188.325,
+   4.375
+  ],
+  "Below-min-ISR cleared first, then under-replicated.": [
+   192.95,
+   3.95
+  ],
+  "Key moment 7.": [
+   197.15,
+   1.7
+  ],
+  "The safe ceiling: 175 megabytes per second.": [
+   199.1,
+   4.2
+  ],
+  "With leaders rebalanced, 16, 16, 16, and the load at 175 megabytes per second, 70 percent of the disk cap, 99th percentile is 14 milliseconds, handlers are about 50 percent idle, and 75 megabytes per second of disk is spare for catch-up after a restart.": [
+   203.55,
+   20.1
+  ],
+  "It hurt at 150 to 190, broke at 270, and is safe at 175: three different numbers.": [
+   223.9,
+   8.9
+  ],
+  "events: 48 partitions, RF 3, minutes insync replicas equals 2.": [
+   233.05,
+   5.725
+  ],
+  "Producers: acks equals all, linger equals 5, batch size equals 128 kilobytes, buffer memory equals 32 megabytes each.": [
+   239.025,
+   10.25
+  ],
+  "Brokers: num replica fetchers equals 1, replica lag time max equals 30000, auto leader rebalance enable equals false.": [
+   249.525,
+   9.5
+  ],
+  "b1 leads 28 of 48 partitions, 28, 12, 8.": [
+   259.275,
+   5.225
+  ],
+  "Leadership drifted during the last rolling restart and auto leader rebalance enable equals false keeps it that way, so b1 does 58 percent of the produce work and serves the follower fetches for those partitions.": [
+   264.75,
+   14.1
+  ],
+  "Rule of thumb: alert when RequestHandlerAvgIdlePercent under 30 percent, saturated near 20 percent.": [
+   279.1,
+   8.1
+  ],
+  "Queue time 99th percentile on b1 is 45 milliseconds; produce 99th percentile equals queue + local append + wait for followers + response.": [
+   287.45,
+   12.075
+  ],
+  "Dirty pages climb to 2.4 gigabytes, background writeback starts at 3.2 gigabytes, writers block at vm dirty ratio equals 6.4 gigabytes.": [
+   299.775,
+   12
+  ],
+  "Disk await 3 to 18 milliseconds: near saturation, queueing delay grows steeply.": [
+   312.025,
+   6.1
+  ],
+  "min insync replicas equals 1 would hide the errors by acking single-copy writes; a 4th broker means copying terabytes through these saturated disks.": [
+   318.375,
+   10.65
+  ],
+  "With unclean leader election enable equals false, losing b1 now takes 28 partitions offline.": [
+   329.275,
+   7.625
+  ],
+  "A follower re-enters the ISR once its log end offset reaches the leader's high watermark. num replica fetchers equals 1 and the busy disks set the catch-up speed; no config change was needed.": [
+   337.15,
+   13.475
+  ],
+  "Why 70 percent: after a broker restart its replicas re-fetch the gap while still taking new writes, and that extra traffic shares the same 250 megabytes per second.": [
+   350.875,
+   11.75
+  ],
+  "Re-run the same ramp to confirm before trusting the number.": [
+   362.875,
+   4.05
+  ],
+  "A team ramps a healthy 3-broker Kafka cluster from 20 to 270 megabytes per second with the abort guard switched off, to learn exactly how it fails. Compressed: 1 second of playback about 10 seconds of test time.": [
+   367.175,
+   15.375
+  ],
+  "The system.": [
+   382.8,
+   1.525
+  ],
+  "A 3-broker Kafka cluster, b1, b2, b3, each with a 250 megabytes per second gp3 volume. The events topic has 48 partitions, replication factor 3, minutes insync replicas equals 2. Six load generators write 1 kilobyte records with acks equals all; a consumer group reads them live.": [
+   384.575,
+   22.175
+  ],
+  "How it normally works.": [
+   407,
+   1.875
+  ],
+  "A produce request goes to the partition leader, which appends it; followers fetch from the leader. With acks equals all the producer is acked once every in-sync replica, ISR, has the data. A follower that is behind for replica lag time max, 30 seconds, is dropped from the ISR. If the ISR shrinks below min insync replicas, writes are rejected.": [
+   409.125,
+   23.05
+  ],
+  "Today.": [
+   432.425,
+   1.35
+  ],
+  "Marta's team raises the load in 7-minute steps: 20, 60, 100, 150, 190, 230, 270 megabytes per second. The abort guard is off on purpose. They want to know which signal moves first, where it starts to hurt, and what 'broken' actually looks like.": [
+   434.025,
+   19.625
+  ],
+  "Here is the system: loadgen, broker-1, broker-2, broker-3 and consumers.": [
+   453.9,
+   6.05
+  ],
+  "What happened.": [
+   460.2,
+   1.5
+  ],
+  "Ramping a 3-broker Kafka from 20 to 270 megabytes per second: it got slow at 150 to 190 megabytes per second, a hot leader, saturated its disks at 230, and broke at 270 when stalled followers left the ISR and producers starved. A safe steady-state is about 175 megabytes per second.": [
+   461.95,
+   23.55
+  ],
+  "The numbers.": [
+   485.75,
+   1.525
+  ],
+  "Peak acked: 245 megabytes per second at worst, and 175 megabytes per second at the end.": [
+   487.525,
+   7.625
+  ],
+  "Worst produce 99th percentile: 3.5 seconds at worst, and 14 milliseconds at the end.": [
+   495.4,
+   7.225
+  ],
+  "Partitions below min ISR: 28 partitions at worst, and 0 partitions at the end.": [
+   502.875,
+   6.65
+  ],
+  "Producer errors: 118 thousand rec/s at worst, and 0 thousand rec/s at the end.": [
+   509.775,
+   7.575
+  ],
+  "Takeaway 1.": [
+   517.6,
+   1.7
+  ],
+  "Find the knee, not the cliff.": [
+   519.55,
+   2.225
+  ],
+  "99th percentile and handler idle moved 80 megabytes per second before anything failed. Plan capacity from the knee.": [
+   522.025,
+   8.75
+  ],
+  "Takeaway 2.": [
+   531.025,
+   1.725
+  ],
+  "Balance leaders before you benchmark.": [
+   533,
+   2.75
+  ],
+  "A 28, 12, 8 leader skew made b1 the early bottleneck. Enable auto leader rebalance or run preferred election.": [
+   536,
+   8.95
+  ],
+  "Takeaway 3.": [
+   545.2,
+   1.75
+  ],
+  "Alert on 99th percentile and under-min-ISR.": [
+   547.2,
+   3.95
+  ],
+  "Consumer lag stayed under 50 thousand msgs the whole time. It measures consumers, not producers.": [
+   551.4,
+   7.375
+  ],
+  "Takeaway 4.": [
+   559.025,
+   1.75
+  ],
+  "Keep 30 percent of the disk spare.": [
+   561.025,
+   2.475
+  ],
+  "Restarts and catch-up share the same volume. A 70 percent ceiling leaves room to heal.": [
+   563.75,
+   6.025
+  ],
+  "How it happened.": [
+   570.025,
+   1.6
+  ],
+  "Offered 270 megabytes per second over 250 megabytes per second disk cap per broker.": [
+   571.875,
+   7.225
+  ],
+  "Dirty pages hit vm dirty ratio: writers stall.": [
+   579.35,
+   4.15
+  ],
+  "Followers stall over 30 seconds and leave the ISR.": [
+   583.75,
+   3.975
+  ],
+  "ISR equals 1 < min insync replicas: writes rejected.": [
+   587.975,
+   4.625
+  ],
+  "Retries fill the shared buffer, starving all.": [
+   592.85,
+   3.3
+  ],
+  "Stop load, let followers catch up, rebalance leaders.": [
+   596.4,
+   3.825
+  ],
+  "Where the numbers come from.": [
+   600.475,
+   1.9
+  ],
+  "The working is on screen.": [
+   602.625,
+   1.975
+  ],
+  "Some common myths.": [
+   604.85,
+   1.825
+  ],
+  "Myth: Consumer lag will warn us.": [
+   606.925,
+   2.6
+  ],
+  "Lag stayed small while producers failed. Watch produce 99th percentile, under-replicated and under-min-ISR partitions.": [
+   609.775,
+   8.875
+  ],
+  "Myth: Set min insync replicas equals 1 so the test passes.": [
+   618.9,
+   4.8
+  ],
+  "Errors vanish because writes are acked with one copy. The first broker loss then loses data.": [
+   623.95,
+   6.425
+  ],
+  "Myth: More io/network threads will fix it.": [
+   630.625,
+   3.4
+  ],
+  "The threads were waiting on a saturated disk; more of them only adds queueing.": [
+   634.275,
+   4.85
+  ],
+  "To read more, the links are on screen.": [
+   639.375,
+   2.85
+  ]
+ }
+}

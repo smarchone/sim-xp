@@ -1,0 +1,258 @@
+{
+ "voice": "af_heart",
+ "file": "narration-de552770.mp3",
+ "lines": {
+  "Voice on.": [
+   0.25,
+   1.6
+  ],
+  "That is the whole run.": [
+   2.1,
+   1.875
+  ],
+  "The result is below the player.": [
+   4.225,
+   2.35
+  ],
+  "Postgres as a queue: the load test that found the wall.": [
+   6.825,
+   3.65
+  ],
+  "Keep an eye on chart 1, Queue depth; and chart 2, Dequeue 99th percentile; and chart 3, Dead tuples.": [
+   10.725,
+   7.65
+  ],
+  "Key moment 1.": [
+   18.625,
+   1.6
+  ],
+  "Meet the system.": [
+   20.475,
+   1.75
+  ],
+  "Jobs go into one Postgres table and workers claim them with SKIP LOCKED, so no two workers take the same row.": [
+   22.475,
+   7.45
+  ],
+  "At 200 jobs/s everything is quiet: queue near zero, dequeue in a few milliseconds.": [
+   30.175,
+   6.475
+  ],
+  "Key moment 2.": [
+   36.9,
+   1.65
+  ],
+  "A long transaction opens.": [
+   38.8,
+   2.35
+  ],
+  "The weekly export starts a read transaction on the same database and keeps it open while it streams.": [
+   41.4,
+   6.525
+  ],
+  "Nobody connects it to the load test.": [
+   48.175,
+   2.625
+  ],
+  "From now on, vacuum may not delete any row this transaction could still see.": [
+   51.05,
+   5.025
+  ],
+  "Key moment 3.": [
+   56.325,
+   1.65
+  ],
+  "Dequeues slow to a crawl.": [
+   58.225,
+   2.025
+  ],
+  "Every claim scans an index full of dead entries to find live rows, and it gets worse as the dead pile grows.": [
+   60.5,
+   7.3
+  ],
+  "Workers wait longer per batch, so completed falls even though the load has not changed.": [
+   68.05,
+   5.725
+  ],
+  "Key moment 4.": [
+   74.025,
+   1.65
+  ],
+  "The wall: pool exhausted.": [
+   75.925,
+   2.275
+  ],
+  "Slow claims hold connections longer, so the pool fills.": [
+   78.45,
+   3.925
+  ],
+  "Inserts can no longer get a connection and start failing.": [
+   82.625,
+   3.9
+  ],
+  "The queue now has 64 thousand jobs behind it and the test has found its limit, but the cause is not load.": [
+   86.775,
+   7.3
+  ],
+  "Key moment 5.": [
+   94.325,
+   1.675
+  ],
+  "Kill the long transaction.": [
+   96.25,
+   2.125
+  ],
+  "Once the transaction ends, vacuum can finally remove the backlog and claims get fast again.": [
+   98.625,
+   6.45
+  ],
+  "Adding workers would not have helped, since the pool was already full and every worker needs a connection.": [
+   105.325,
+   6.25
+  ],
+  "Key moment 6.": [
+   111.825,
+   1.675
+  ],
+  "Drained.": [
+   113.75,
+   1.45
+  ],
+  "The queue is empty and dequeues are fast again, but the table is still bloated.": [
+   115.45,
+   5.125
+  ],
+  "The limit this test found was not Postgres throughput: it was one open transaction holding back vacuum.": [
+   120.825,
+   7.175
+  ],
+  "A team runs its job queue on a Postgres table with SKIP LOCKED and ramps a load test to see where it breaks. The first two stages pass easily, then something quiet starts piling up. Compressed: 1 second about 4 seconds.": [
+   128.25,
+   15.05
+  ],
+  "The system.": [
+   143.55,
+   1.525
+  ],
+  "checkout enqueues jobs into a jobs table in Postgres. 20 workers claim 50 rows at a time with SELECT ... FOR UPDATE SKIP LOCKED, process them and delete them. No broker, one less thing to run.": [
+   145.325,
+   13.65
+  ],
+  "How it normally works.": [
+   159.225,
+   1.875
+  ],
+  "Every claim and delete leaves dead row versions behind. Autovacuum removes them, but only versions no open transaction could still see. Normally that is milliseconds after the delete, so the table stays small.": [
+   161.35,
+   14.5
+  ],
+  "Today.": [
+   176.1,
+   1.35
+  ],
+  "A load test ramps from 200 to 800 to 1,500 jobs/s to find the limit. At some point in the run, a scheduled weekly export also starts on the same database.": [
+   177.7,
+   12.975
+  ],
+  "Here is the system: k6 load test, enqueue-api, jobs-db, worker-pool, autovacuum and weekly-export.": [
+   190.925,
+   8
+  ],
+  "What happened.": [
+   199.175,
+   1.5
+  ],
+  "A weekly export held a transaction open, so vacuum could not clear dead job rows. Dequeues slowed, connections filled, and enqueues failed, with the load unchanged.": [
+   200.925,
+   11.225
+  ],
+  "The numbers.": [
+   212.4,
+   1.525
+  ],
+  "Queue depth: 71 thousand jobs at worst, and 200 jobs at the end.": [
+   214.175,
+   5.275
+  ],
+  "Dequeue 99th percentile: 850 milliseconds at worst, and 15 milliseconds at the end.": [
+   219.7,
+   6.95
+  ],
+  "Dead tuples: 695 thousand at worst, and 40 thousand at the end.": [
+   226.9,
+   5.775
+  ],
+  "Takeaway 1.": [
+   232.925,
+   1.7
+  ],
+  "Cap transaction age.": [
+   234.875,
+   2.05
+  ],
+  "Set idle in transaction session timeout and statement timeout. One forgotten transaction can stall vacuum for the whole database.": [
+   237.175,
+   8.825
+  ],
+  "Takeaway 2.": [
+   246.25,
+   1.725
+  ],
+  "Churny tables need vacuum headroom.": [
+   248.225,
+   2.7
+  ],
+  "Queue tables create dead rows at the job rate. Tune autovacuum per table, or partition so old data is dropped instead of vacuumed.": [
+   251.175,
+   9.225
+  ],
+  "Takeaway 3.": [
+   260.65,
+   1.75
+  ],
+  "Find the horizon, not the hot query.": [
+   262.65,
+   2.9
+  ],
+  "When CPU is high with no hot query, check pg stat activity for the oldest xact start and the dead-but-not-removable counts.": [
+   265.8,
+   9.425
+  ],
+  "Takeaway 4.": [
+   275.475,
+   1.75
+  ],
+  "Don't add workers into a full pool.": [
+   277.475,
+   2.55
+  ],
+  "More consumers mean more connections competing for the same slow table. Fix cleanup first.": [
+   280.275,
+   6.1
+  ],
+  "How it happened.": [
+   286.625,
+   1.6
+  ],
+  "Long export transaction pins the cleanup horizon.": [
+   288.475,
+   3.875
+  ],
+  "Vacuum cannot remove dead job rows; table bloats.": [
+   292.6,
+   3.8
+  ],
+  "Each claim scans dead index entries, 99th percentile explodes.": [
+   296.65,
+   5.2
+  ],
+  "Slow claims hold connections; pool fills, inserts fail.": [
+   302.1,
+   4.325
+  ],
+  "Kill the transaction; vacuum catches up, queue drains.": [
+   306.675,
+   3.9
+  ]
+ }
+}

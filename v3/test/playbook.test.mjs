@@ -90,3 +90,8 @@ test("every panel says why it matters, and meta.clock / feed.key are checked", (
   const r = validate(pb);
   for (const bit of ["meta.clock.start", "meta.clock.scale", "meta.clock.changes[1]", "feed.key"]) assert.ok(r.errors.some((e) => e.includes(bit)), bit);
 });
+
+test("playbooks/index.json is current (node v3/tools/build-index.mjs)", async () => {
+  const { execFileSync } = await import("node:child_process");
+  execFileSync(process.execPath, [new URL("../tools/build-index.mjs", import.meta.url).pathname, "--check"], { stdio: "pipe" });
+});
