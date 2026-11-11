@@ -136,7 +136,7 @@ function pumpAudio() {
   if (recording || !audioQueue.size) return;
   const id = audioQueue.values().next().value; audioQueue.delete(id); recording = id;
   post(id, "status", "Recording the narration… (in the background; the playbook plays meanwhile)");
-  // its own process group, so a timeout stops the headless Chrome and the model with it
+  // its own process group, so a timeout stops it and the model with it
   const child = spawn(process.execPath, [join(V3, "tools/gen-audio.mjs"), id], { cwd: dirname(V3), stdio: ["ignore", "pipe", "pipe"], detached: true });
   let tail = "", timedOut = false, progress = "";
   const limit = setTimeout(() => { timedOut = true; try { process.kill(-child.pid, "SIGTERM"); } catch (e) { child.kill("SIGTERM"); } }, AUDIO_LIMIT_MIN * 60000);

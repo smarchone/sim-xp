@@ -22,17 +22,21 @@ function patch(src, from, to, what) {
 }
 const inScript = (s) => s.replace(/<\/(script)/gi, "<\\/$1").replace(/<!--/g, "<\\!--");
 
-// ---- validator as a scope (playbook.js uses ES exports)
-const names = [];
-const playbookJs = read("js/playbook.js").replace(/^export\s+(?:async\s+)?(const|function|let)\s+([A-Za-z_$][\w$]*)/gm, (m, kind, id) => {
-  names.push(id);
-  return m.replace(/^export\s+/, "");
-});
-const validatorScope = `const __playbook = (() => {\n${playbookJs}\nreturn { ${names.join(", ")} };\n})();`;
+// ---- an ES module as a scope: `const name = (() => { …; return { its exports }; })();`, its imports given as lines of code
+function scope(file, name, imports = {}) {
+  const names = [];
+  let js = read(file).replace(/^export\s+(?:async\s+)?(const|function|let)\s+([A-Za-z_$][\w$]*)/gm, (m, kind, id) => { names.push(id); return m.replace(/^export\s+/, ""); });
+  js = js.replace(/^import\s+\{[^}]*\}\s+from\s+"([^"]+)";$/gm, (m, from) => { if (!(from in imports)) throw new Error(`build-single: ${file} imports ${from}, which is not provided`); return imports[from]; });
+  return `const ${name} = (() => {\n${js}\nreturn { ${names.join(", ")} };\n})();`;
+}
+const validatorScope = scope("js/playbook.js", "__playbook");
+// what the narrator says (js/narration.js, shared with v3/tools/gen-audio.mjs), with the noise-free simulation it uses
+const narrationScope = scope("js/narration.js", "__narration", { "./playbook.js": "const { simulate } = __playbook;" });
 
 // ---- the player: its "Open another playbook" button opens the index here
 // The empty data: favicon is dropped: the page has no data: URIs.
-const player = patch(patch(read("player.html"), ">Open another playbook<", ">← All playbooks<", "library menu item"), `<link rel="icon" href="data:,">\n`, "", "empty favicon");
+const player = patch(patch(patch(read("player.html"), ">Open another playbook<", ">← All playbooks<", "library menu item"), `<link rel="icon" href="data:,">\n`, "", "empty favicon"),
+  "/*@narration: the build puts js/playbook.js and js/narration.js here, as __playbook and __narration*/", inScript(validatorScope + "\n" + narrationScope), "narration modules");
 
 // ---- bundled playbooks: only the two the page needs to start and to brief Claude. Every other playbook is loaded from a GitHub repo
 // (playbooks/index.json is the library's index; the index page fetches it from main).

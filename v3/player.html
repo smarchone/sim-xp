@@ -751,6 +751,7 @@ a.hicon{text-decoration:none}
   .simcol{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
   .app.feed-off .simwrap .simcol{flex:none;width:calc(100% - clamp(300px,24vw,380px) - 12px)}
   .simwrap .sim{flex:none;height:min(80dvh,880px);width:100%}
+  .app.watch .simwrap .sim{height:min(calc(80dvh - 20px),880px)}   /* gives back the 20px gap above the title (.wmeta) */
   .chatcol{height:auto}
 }
 .app.feed-off .simwrap .sim{width:100%}
@@ -808,7 +809,7 @@ html:has(.app.fs),body:has(.app.fs){overflow:hidden}
 .app.wslide .cfilter,.app.watch.wslide .kmrow{visibility:hidden}
 .chap.wseg .pl{background:color-mix(in srgb,#e5484d 70%,var(--fg))}
 .wmeta{display:none}
-.app.watch .wmeta{display:flex;flex-direction:column;gap:2px;padding:0 2px 4px}
+.app.watch .wmeta{display:flex;flex-direction:column;gap:2px;padding:0 2px 4px;margin-top:20px}
 .wmeta h2{margin:0;font-size:18px;font-weight:600;line-height:1.3}
 .app.fs .wmeta{display:none}
 @media (prefers-reduced-motion:reduce){.wsl{animation:none}}
@@ -966,6 +967,9 @@ html:has(.app.fs),body:has(.app.fs){overflow:hidden}
 <script>
 // The player plays one playbook, handed over by the page that hosts it (index.html). That page owns loading,
 // validation and the WebMCP tools; it drives playback through window.player (end of this script).
+/*@narration: the build puts js/playbook.js and js/narration.js here, as __playbook and __narration*/
+// What the narrator says comes from js/narration.js (shared with v3/tools/gen-audio.mjs, which records it): one copy of that logic.
+const { spoken, sentence, toPoints, andList, unitOf, kfmt, fmtV, withUnit } = __narration;
 const host = window.parent !== window ? window.parent.simxp : null;
 const PB = host && host.current ? structuredClone(host.current) : null;
 if (!PB) { document.body.innerHTML = '<p style="padding:24px">No playbook loaded. Open <a href="./" target="_top">sim-xp</a> to pick one.</p>'; throw new Error("no playbook"); }
@@ -1352,10 +1356,6 @@ const PL = 40, PR = 10;
 // teal/violet/pink stay reserved for partition ownership in the components view
 const seriesColor = (P, i) => `var(--c${(i % 6) + 1})`;   // classic dashboard palette: green, yellow, blue, orange, red, purple
 // the unit shown next to a number: none for plain counts, and none for ms (fmtV already writes "ms" or "s")
-const unitOf = u => !u || u === "count" || u === "ms" ? "" : u;
-const withUnit = (v, u) => { const n = fmtV(v, u), k = unitOf(u); return k === "%" ? n + "%" : k ? `${n} ${k}` : n; };
-const kfmt = v => (v / 1000).toFixed(v >= 100000 ? 0 : 1).replace(/\.0$/, "") + "k";
-const fmtV = (v, unit) => unit === "count" ? String(Math.round(v)) : unit === "ms" ? (v >= 1000 ? (v / 1000).toFixed(2).replace(/0$/, "") + "s" : Math.round(v) + "ms") : v >= 1000 ? kfmt(v) : String(Math.round(v));
 const niceCeil = v => { if (v <= 0) return 1; const e = Math.pow(10, Math.floor(Math.log10(v))), f = v / e; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * e; };
 const isEvent = p => p.metrics.every(m => metricById[m].unit === "count");
 const annos = [
@@ -1475,14 +1475,8 @@ const surfaced = P => !!(activeBeat && (activeBeat.beat.notes || []).some(n => n
 let watchMemo = null;
 function watchList() {
   if (watchMemo) return watchMemo;
-  const norm = x => String(x || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(), charts = panels.filter(P => P.kind === "chart" && !P.deep);
-  watchMemo = [];
-  (PB.meta.watch || []).forEach(w => {
-    const k = norm(w.label);
-    const P = (w.panel && charts.find(P => P.p.id === w.panel)) || charts.find(P => norm(P.p.title) === k) || charts.find(P => P.p.metrics.some(m => norm(metricById[m].label) === k))
-      || charts.find(P => norm(P.p.title).includes(k) || k.includes(norm(P.p.title)));
-    if (P && !watchMemo.some(o => o.P === P)) watchMemo.push({ P, label: w.label, normal: w.normal });
-  });
+  // which charts, matched the same way the narrator names them (js/narration.js), then numbered on the board
+  watchMemo = __narration.watchCharts(PB).map(w => ({ P: panels.find(P => P.p === w.panel), label: w.label, normal: w.normal })).filter(w => w.P);
   watchMemo.forEach((w, i) => {
     const h = w.P.card.querySelector(".panel-h"), n = document.createElement("span"), t = document.createElement("span");
     n.className = "wnum"; n.textContent = i + 1; n.title = "One of the signals to watch";
@@ -1811,25 +1805,6 @@ function pickVoice() {
   if (ttsVoice) sel.value = ttsVoice.voiceURI;
   setVoice(voiceWanted, false);   // the voices arrive late in Chrome: Voice is offered once they do
 }
-// written text to spoken text: units, percentiles and code names read the way an engineer would say them
-const ORD = n => n + (/1[123]$/.test(n) ? "th" : { 1: "st", 2: "nd", 3: "rd" }[n.slice(-1)] || "th");
-const UNITS = { ms: "milliseconds", "µs": "microseconds", us: "microseconds", ns: "nanoseconds", s: "seconds", sec: "seconds", min: "minutes", h: "hours", hr: "hours",
-  "KB/s": "kilobytes per second", "MB/s": "megabytes per second", "GB/s": "gigabytes per second", KB: "kilobytes", MB: "megabytes", GB: "gigabytes", TB: "terabytes",
-  rps: "requests per second", RPS: "requests per second", qps: "queries per second", QPS: "queries per second", "/s": "per second", k: "thousand", K: "thousand", M: "million" };
-function spoken(t) {
-  return String(t || "")
-    .replace(/[`*]{1,2}(?=\S)|(?<=\S)[`*]{1,2}|(?<!\w)_{1,2}(?=\S)|(?<=\S)_{1,2}(?!\w)/g, "")   // markdown marks; an underscore inside a word (pg_stat_activity) stays
-    .replace(/\be\.g\.,?/gi, "for example,").replace(/\bi\.e\.,?/gi, "that is,").replace(/\betc\./gi, "and so on.").replace(/\bvs\.?(?=\s)/gi, "versus")
-    .replace(/\bp50\b/gi, "median").replace(/\bp(99)(9)\b/gi, "99.9th percentile").replace(/\bp(\d{2})\b/gi, (_, n) => ORD(n) + " percentile")
-    .replace(/(\d[\d,.]*)\s?(KB\/s|MB\/s|GB\/s|µs|us|ns|ms|sec|min|hr|KB|MB|GB|TB|rps|RPS|qps|QPS|\/s|[shkKM])(?![\w.]*\d)\b/g, (_, n, u) => n + " " + (n === "1" ? UNITS[u].replace(/s(?= per|$)/, "") : UNITS[u]))
-    .replace(/\b(KB|MB|GB)\/s\b/g, (_, u) => UNITS[u + "/s"]).replace(/(\d+)(?:\/(\d+))+/g, m => m.split("/").join(", ")).replace(/\s*=\s*/g, " equals ")
-    .replace(/(\d)\s?\/s\b/g, "$1 per second").replace(/(\d)\s?%/g, "$1 percent")
-    .replace(/#(\d)/g, "number $1").replace(/\s*&\s*/g, " and ").replace(/<\s?(?=\d)/g, "under ").replace(/>\s?(?=\d)/g, "over ")
-    .replace(/\b[a-z][a-z0-9]*(?:[._][a-z][a-z0-9]*)+\b/gi, w => w.replace(/\.(ms|s)$/i, "").replace(/[._]/g, " "))   // max.poll.interval.ms: "max poll interval"
-    .replace(/\s*→\s*/g, " to ").replace(/(\d)\s*×/g, "$1 times").replace(/×/g, " times ").replace(/\s*[≈~]\s*(?=\d)/g, " about ")
-    .replace(/\(\s*\)/g, "").replace(/\s*[—–]\s*/g, ", ").replace(/\s*\(([^)]*)\)/g, ", $1,").replace(/,\s*([.!?;:])/g, "$1").replace(/,\s*,/g, ",").replace(/\s{2,}/g, " ").trim();
-}
-const sentence = t => { t = String(t || "").trim(); return !t || /[.!?…:]$/.test(t) ? t : t + "."; };
 
 // --- recorded narration
 const PRE = { base: host && typeof host.audio === "string" ? host.audio : "", lines: null, file: "", all: null };
@@ -1878,8 +1853,8 @@ function speakGoogle(text, id) {
 }
 
 // --- speaking. done() runs when it finished, never when it was cut off.
-const beatLines = e => [`Key moment ${beats.indexOf(e) + 1}.`, sentence(e.title), ...toPoints(e.beat.hint), ...(HC && e.beat.deep ? toPoints(e.beat.deep) : [])];
-function introLines() { const W = watchList(); return [sentence(PB.meta.title), ...(W.length ? [`Keep an eye on ${W.map((w, i) => `chart ${i + 1}, ${w.label}`).join("; and ")}.`] : [])]; }
+const beatLines = e => __narration.beatLines(PB, e, HC);
+function introLines() { return __narration.introLines(PB); }
 function prefetchNext() { if (voiceOn && PRE.lines) preLoad().catch(() => {}); }   // one file holds every sentence
 function hush() {
   sayId++; clearTimeout(sayGo); introHold = false;
@@ -2059,7 +2034,6 @@ function showBeat(e) {
 }
 
 // the explanation as points: one per sentence (a full stop, ! or ? followed by a space and a capital, digit or quote)
-const toPoints = t => String(t || "").split(/(?<=[.!?])\s+(?=[A-Z0-9'"(“‘])/).map(x => x.trim()).filter(Boolean);
 function setCapHint(e) {
   const h = $("#capH"), pts = toPoints(e.beat.hint);
   h.innerHTML = pts.length > 1 ? `<ul class="kpts">${pts.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : esc(e.beat.hint || "");
@@ -2204,13 +2178,7 @@ function hoverable(svg, toTime) {
 /* ===================== Report (opens itself at the end; R or the menu reopen it) ===================== */
 $("#pbTitle").textContent = PB.meta.title;
 const R = PB.report;
-function statVals(st) {
-  // whole run: peak (or low) vs the end; delta = how much it moved before vs after the fix
-  const s = clean[st.metric], f = Number.isInteger(R.fix_t) ? R.fix_t : D;
-  if (st.agg === "delta") return [s[f] - s[0], s[D] - s[f]];
-  if (st.agg === "min") return [Math.min(...s), s[D]];
-  return [Math.max(...s), s[D]];
-}
+const statVals = st => __narration.statVals(PB, clean, st);
 const TAGS = { cause: "cause", effect: "effect", amp: "amplifies", fix: "fix" };
 const chainHTML = () => {
   const items = R.chain.map(c => `<li class="k-${c.kind}"><span class="tag">${TAGS[c.kind]}</span><span>${esc(c.text)}</span></li>`).join("");
@@ -2221,17 +2189,18 @@ const chainHTML = () => {
 const safeUrl = u => /^https?:\/\//i.test(u) ? u : "#";
 const sec = (title, body) => body ? `<section><h4>${title}</h4>${body}</section>` : "";
 // the result as a short deck: one idea per slide, ‹ › or the dots (or ←/→ while the result is on screen) to move
-const SLIDES = [
-  { k: "What happened", h: `<p class="sl-big">${esc(R.tldr)}</p>`, v: ["What happened.", R.tldr] },
-  R.stats.length ? { k: "The numbers", h: `<table class="rp-num"><tr><th></th><th>Worst</th><th>At the end</th></tr>${R.stats.map(st => { const [b, a] = statVals(st); return `<tr><td>${esc(st.label)}</td><td class="bf">${withUnit(b, st.unit)}</td><td class="af">${withUnit(a, st.unit)}</td></tr>`; }).join("")}</table>`,
-    v: ["The numbers.", ...R.stats.map(st => { const [b, a] = statVals(st); return `${sentence(st.label).slice(0, -1)}: ${withUnit(b, st.unit)} at worst, and ${withUnit(a, st.unit)} at the end.`; })] } : null,
-  ...R.learnings.map((l, i) => ({ k: `Takeaway ${i + 1} of ${R.learnings.length}`, h: `<h3 class="sl-t">${esc(l.title)}</h3><p class="sl-p">${esc(l.body)}</p>`, v: [`Takeaway ${i + 1}.`, sentence(l.title), l.body] })),
-  (R.chain || []).length ? { k: "How it happened", h: chainHTML(), v: ["How it happened.", ...R.chain.map(c => sentence(c.text))] } : null,
-  R.math ? { k: esc(R.math.title || "The arithmetic"), h: `<pre class="rp-math">${esc(R.math.lines.join("\n"))}</pre>`, v: [sentence(R.math.title || "The arithmetic"), "The working is on screen."] } : null,
-  (R.myths || []).length ? { k: "Common myths", h: R.myths.map(m => `<div class="rp-myth"><q>${esc(m.myth)}</q><p>${esc(m.truth)}</p></div>`).join(""), v: ["Some common myths.", ...R.myths.flatMap(m => [`Myth: ${sentence(m.myth)}`, m.truth])] } : null,
-  HC && R.deep && ((R.deep.config || []).length || (R.deep.runbook || []).length) ? { k: "Deep dive", h: `${(R.deep.config || []).length ? `<h5>Config involved</h5><pre class="rp-math">${esc(R.deep.config.join("\n"))}</pre>` : ""}${(R.deep.runbook || []).length ? `<h5>What to check next time</h5><ol class="sl-ol">${R.deep.runbook.map(x => `<li>${esc(x)}</li>`).join("")}</ol>` : ""}`, v: ["Deep dive: the config involved, and what to check next time."] } : null,
-  (R.links || []).length ? { k: "Read more", h: `<div class="rp-links">${R.links.map(l => `<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener noreferrer">${esc(l.label)} ↗</a>`).join("")}</div>`, v: ["To read more, the links are on screen."] } : null,
-].filter(Boolean);
+// the result as a short deck: what each slide says comes from js/narration.js (resultSlides); what it shows is drawn here
+const SLIDE_VIEW = {
+  what: () => ({ k: "What happened", h: `<p class="sl-big">${esc(R.tldr)}</p>` }),
+  numbers: () => ({ k: "The numbers", h: `<table class="rp-num"><tr><th></th><th>Worst</th><th>At the end</th></tr>${R.stats.map(st => { const [b, a] = statVals(st); return `<tr><td>${esc(st.label)}</td><td class="bf">${withUnit(b, st.unit)}</td><td class="af">${withUnit(a, st.unit)}</td></tr>`; }).join("")}</table>` }),
+  takeaway: ({ i }) => ({ k: `Takeaway ${i + 1} of ${R.learnings.length}`, h: `<h3 class="sl-t">${esc(R.learnings[i].title)}</h3><p class="sl-p">${esc(R.learnings[i].body)}</p>` }),
+  chain: () => ({ k: "How it happened", h: chainHTML() }),
+  math: () => ({ k: esc(R.math.title || "The arithmetic"), h: `<pre class="rp-math">${esc(R.math.lines.join("\n"))}</pre>` }),
+  myths: () => ({ k: "Common myths", h: R.myths.map(m => `<div class="rp-myth"><q>${esc(m.myth)}</q><p>${esc(m.truth)}</p></div>`).join("") }),
+  deep: () => ({ k: "Deep dive", h: `${(R.deep.config || []).length ? `<h5>Config involved</h5><pre class="rp-math">${esc(R.deep.config.join("\n"))}</pre>` : ""}${(R.deep.runbook || []).length ? `<h5>What to check next time</h5><ol class="sl-ol">${R.deep.runbook.map(x => `<li>${esc(x)}</li>`).join("")}</ol>` : ""}` }),
+  links: () => ({ k: "Read more", h: `<div class="rp-links">${R.links.map(l => `<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener noreferrer">${esc(l.label)} ↗</a>`).join("")}</div>` }),
+};
+const SLIDES = __narration.resultSlides(PB, HC, clean).map(sl => ({ ...SLIDE_VIEW[sl.kind](sl), v: sl.v }));
 $("#report").innerHTML = `
   <div class="deck" id="deck" aria-roledescription="slides" aria-label="The result">
     <div class="deck-top"><span class="eb"><b class="res-k">The result</b> · ${humanDur(TOTAL)} of story · ${beats.length} key moments</span><span class="deck-n" id="deckN"></span></div>
@@ -2382,15 +2351,15 @@ var WATCH = false, wPlaying = false, wEnded = false, wAt = 0, wHold = null, wIni
 const MODE_KEY = "sim-xp.mode";
 const nWords = lines => lines.join(" ").split(/\s+/).filter(Boolean).length;
 function readS(lines) { return Math.min(28, Math.max(4, 1.6 + nWords(lines) / 2.6)); }   // about 155 words a minute, 4 to 28 s
-const andList = xs => xs.length < 2 ? xs.join("") : xs.slice(0, -1).join(", ") + " and " + xs[xs.length - 1];
 const plain = h => String(h).replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"');
 const SCENES = (() => {
-  const S = [], bg = (M.background || []).map(b => typeof b === "string" ? { body: b } : b), Wl = watchList(), names = PB.components.nodes.map(n => n.label);
-  S.push({ kind: "slide", title: "Intro", h: `<span class="sl-k">${esc($("#introMeta").textContent)}</span><h1 class="wt">${esc(M.title)}</h1><p class="whook">${esc(M.story)}</p>`, lines: [sentence(M.title), M.story] });
-  bg.forEach(b => S.push({ kind: "slide", title: b.title || "Background", h: `<span class="sl-k">${esc(b.title || "Background")}</span><p class="wbg">${esc(b.body)}</p>`, lines: [...(b.title ? [sentence(b.title)] : []), b.body] }));
+  // what each opening slide says comes from js/narration.js (openingScenes); what it shows is drawn here
+  const S = [], OPEN = __narration.openingScenes(PB), bg = OPEN.filter(o => o.kind === "bg").map(o => o.b), line = k => OPEN.find(o => o.kind === k);
+  S.push({ kind: "slide", title: "Intro", h: `<span class="sl-k">${esc($("#introMeta").textContent)}</span><h1 class="wt">${esc(M.title)}</h1><p class="whook">${esc(M.story)}</p>`, lines: line("intro").lines });
+  OPEN.filter(o => o.kind === "bg").forEach(({ b, lines }) => S.push({ kind: "slide", title: b.title || "Background", h: `<span class="sl-k">${esc(b.title || "Background")}</span><p class="wbg">${esc(b.body)}</p>`, lines }));
   const sysT = bg.some(b => /^the system$/i.test(b.title || "")) ? "The system map" : "The system";
-  S.push({ kind: "slide", sys: true, title: sysT, h: `<span class="sl-k">${sysT}</span><div class="wsys" id="wsys"></div>`, lines: [names.length && names.length <= 7 ? `Here is the system: ${andList(names)}.` : "Here is the system we will watch."] });
-  if (Wl.length) S.push({ kind: "watch", title: "What to watch", lines: [`Keep an eye on ${Wl.map((w, i) => `chart ${i + 1}, ${w.label}`).join("; and ")}.`] });
+  S.push({ kind: "slide", sys: true, title: sysT, h: `<span class="sl-k">${sysT}</span><div class="wsys" id="wsys"></div>`, lines: line("system").lines });
+  if (line("watch")) { watchList(); S.push({ kind: "watch", title: "What to watch", lines: line("watch").lines }); }
   S.push({ kind: "sim", title: "The run" });
   SLIDES.forEach((sl, i) => S.push({ kind: "slide", res: i, title: plain(sl.k), h: `<span class="sl-k">${sl.k}</span><div class="sl-body">${sl.h}</div>`, lines: sl.v || [plain(sl.k)] }));
   let acc = 0; S.forEach(s => { s.dur = s.kind === "sim" ? VT(D) : readS(s.lines); s.from = acc; acc += s.dur; s.to = acc; });
@@ -2443,14 +2412,7 @@ function wNarrate() {   // the current scene, read aloud; it moves on when the n
   say(s.lines, () => { if (wPlaying && wAt === i) wNext(); });
 }
 function wPrefetch() { if (WATCH) prefetchNext(); }   // the recorded narration is one file, loaded once
-// every sentence the narrator can say for this playbook, as spoken (both detail levels, Watch and Read): what gen-audio.mjs renders
-function narration() {
-  const L = ["Voice on.", "That is the whole run.", "The result is below the player.", ...introLines()], hc = HC;
-  for (const h of hasDeep ? [false, true] : [false]) { HC = h; beats.forEach(b => L.push(...beatLines(b))); }
-  HC = hc;
-  SCENES.forEach(sc => sc.lines && L.push(...sc.lines));
-  return [...new Set(L.map(spoken).filter(Boolean))];
-}
+const narration = () => __narration.narration(PB);   // every sentence the narrator can say (js/narration.js): what gen-audio records
 function wNext() { if (wAt + 1 < SCENES.length) wEnter(wAt + 1, { fresh: true }); else wEnd(); }
 function wEnd() { wPlaying = false; wEnded = true; setPlaying(false); $("#wend").hidden = false; emit("end", { t: D, watch: true }); renderBar(); }
 function wPlay() {
