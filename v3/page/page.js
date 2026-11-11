@@ -201,7 +201,7 @@ var navReady = false;   // the sidebar is drawn once the repos are known (below)
 renderLibrary();
 
 // ---------- library: playbooks loaded from GitHub repos, on demand ----------
-// A source is a folder of playbook .json files plus an index.json listing them (format in v2/README.md). The panel fetches the index when
+// A source is a folder of playbook .json files plus an index.json listing them (format in v3/README.md). The panel fetches the index when
 // the Library is opened and a playbook only when it is clicked; nothing from a repo is copied into storage. Only the list of added repos is kept.
 // The default library is this repo's v3/playbooks folder (with its audio/), read from GitHub, so the site, the artifact and a copy
 // opened from disk all list the same playbooks. It used to be the smarchone/simxp-playbooks repo; links naming it open the same playbook here.

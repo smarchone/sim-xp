@@ -9,7 +9,7 @@ simulation that brings you closer to reality, and saves you the reading.
 experience ──encode──▶ playbook.json ──run──▶ simulation
 ```
 
-**Start playing:** https://smarchone.github.io/sim-xp/v2/ · **About:** https://smarchone.github.io/sim-xp/
+**Start playing:** https://smarchone.github.io/sim-xp/v3/ · **About:** https://smarchone.github.io/sim-xp/
 
 ## The problem
 
@@ -36,7 +36,7 @@ Then give it a story in Claude Code:
 /story-to-playbook "How a Kafka consumer rebalance storm starts and ends"
 ```
 
-Open the file in the [player](https://smarchone.github.io/sim-xp/v2/) (drop it on the page, or *Open file…* in
+Open the file in the [player](https://smarchone.github.io/sim-xp/v3/) (drop it on the page, or *Open file…* in
 the side panel) and press Space.
 
 ## Share your playbook library
@@ -44,7 +44,7 @@ the side panel) and press Space.
 A library of playbooks can be hosted as a public Github repo.<br>
 eg: the default library is this repo's [v3/playbooks](https://github.com/smarchone/sim-xp/tree/main/v3/playbooks) folder (`smarchone/sim-xp@main/v3/playbooks`)
 
-Import it in the [player](https://smarchone.github.io/sim-xp/v2/):<br>
+Import it in the [player](https://smarchone.github.io/sim-xp/v3/):<br>
 `side panel → *Library* → type the repo name → Add`
 
 Can also run a playbook directly via URL eg:<br> `https://smarchone.github.io/sim-xp/v3/#smarchone/sim-xp@main/v3/playbooks:postgres-queue-load-test`
