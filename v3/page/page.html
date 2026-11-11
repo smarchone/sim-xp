@@ -1,0 +1,72 @@
+<div class="home" id="home">
+  <header class="pagehead">
+    <a class="brand" href="https://smarchone.github.io/sim-xp/" target="_blank" rel="noopener noreferrer" title="About sim-xp"><span class="mark" aria-hidden="true"></span>sim-xp</a>
+    <span class="tag">simulate a blog, an incident or a load test</span>
+    <span class="spacer"></span>
+    <button type="button" class="hicon" id="themeBtn" aria-label="Switch theme" title="Switch theme">☀</button>
+  </header>
+  <main class="hmain">
+    <button type="button" class="resume" id="backBtn" hidden><span class="rk">▶ Continue</span><span class="rt" id="backTitle"></span></button>
+    <p class="lede">Stories about systems, told as runs you watch: a dashboard of live charts that pauses at every key moment to explain what just happened.</p>
+
+    <div class="libs">
+      <nav class="libnav" aria-labelledby="libsT">
+        <h2 id="libsT">Libraries</h2>
+        <ul id="libNav"></ul>
+        <button type="button" class="tlink" id="addLibBtn" aria-haspopup="dialog" aria-controls="addLib">+ Add a library</button>
+      </nav>
+      <div class="libview" id="libView">
+        <section id="saved" hidden aria-labelledby="savedT">
+          <h2 class="lhead" id="savedT">Your playground <span class="count">in this browser</span><span class="count" id="savedCount"></span><span class="spacer"></span><button type="button" class="tlink" id="makeBtn" aria-controls="drawer" aria-expanded="false">+ Add your own</button></h2>
+          <ul class="posts" id="savedList"></ul>
+        </section>
+        <div id="repoList"></div>
+      </div>
+    </div>
+  </main>
+</div>
+<div class="scrim" id="scrim" hidden></div>
+<div class="modal" id="addLib" role="dialog" aria-modal="true" aria-labelledby="addLibT" hidden>
+  <h2 id="addLibT">Add a library</h2>
+  <p>A library is a GitHub repo, or a folder in one, that holds playbook <code>.json</code> files and an <code>index.json</code> listing them. Paste its GitHub link:</p>
+  <input id="repoIn" type="text" autocomplete="off" spellcheck="false" placeholder="https://github.com/owner/repo" aria-label="GitHub link of a library" aria-describedby="repoHint repoErr">
+  <p class="err" id="repoErr" hidden></p>
+  <p class="hint" id="repoHint">A folder works too: <code>github.com/owner/repo/tree/branch/folder</code>. Or write <code>owner/repo</code>, or <code>owner/repo@branch/folder</code>. Example: <code>smarchone/simxp-playbooks</code>. <a href="https://github.com/smarchone/sim-xp/tree/main/v3#playbook-repos-the-library" target="_blank" rel="noopener noreferrer">How to make one</a></p>
+  <div class="mfoot"><button type="button" class="tlink" id="repoCancel">Cancel</button><button type="button" class="primary" id="repoAdd">Add library</button></div>
+</div>
+<aside class="drawer" id="drawer" aria-labelledby="makeT" hidden>
+  <div class="dhead"><h2 id="makeT">Add your own playbook</h2><span class="spacer"></span><button type="button" class="tlink" id="drawerClose" aria-label="Close">✕</button></div>
+  <p class="dlede">A playbook is a <code>.json</code> file that tells a story about a system. Here is how to make one; yours are kept in <b>Your playground</b>.</p>
+  <p class="dnote" id="note" role="status" hidden></p>
+  <div class="make" id="make">
+    <section class="way" id="wayInstall" aria-labelledby="w0">
+      <h3 id="w0"><span class="wn"></span>Install the skill</h3>
+      <p>Add the <a href="https://github.com/smarchone/sim-xp/tree/main/.claude/skills/story-to-playbook" target="_blank" rel="noopener noreferrer">story-to-playbook skill</a> to Claude Code. Run this in a terminal:</p>
+      <div class="cmd"><code id="skillCmd">npx skills add smarchone/sim-xp --skill story-to-playbook -g</code><button type="button" class="tlink" id="copyCmd">Copy</button></div>
+    </section>
+    <section class="way" aria-labelledby="w1">
+      <h3 id="w1"><span class="wn"></span>Generate a playbook</h3>
+      <div class="chat" id="chat">
+        <ol id="log" aria-live="polite"></ol>
+        <div class="bar" id="bar">
+          <input id="ask" type="text" autocomplete="off" placeholder="Describe a story, an incident, or a system and what goes wrong" aria-label="Message to Claude">
+          <button type="button" id="send" class="primary">Send</button>
+          <button type="button" id="stop" hidden>Stop</button>
+        </div>
+      </div>
+    </section>
+    <section class="way" aria-labelledby="w2">
+      <h3 id="w2"><span class="wn"></span>Load it</h3>
+      <p>Pick the <code>.json</code> file Claude wrote, or drop it anywhere on this page. It opens here, ready to play.</p>
+      <div><label class="btn" for="file">Choose a file…</label><input type="file" id="file" accept=".json,application/json" hidden></div>
+    </section>
+    <textarea id="pb" spellcheck="false" aria-hidden="true" tabindex="-1" hidden></textarea>
+  </div>
+  <section class="result" id="result" aria-label="Your playbook" hidden>
+    <div class="rtop"><span class="status" id="status"></span><p class="boxnote" id="boxNote"></p></div>
+    <ul class="problems" id="problems" hidden></ul>
+    <div class="ractions"><span class="spacer"></span><button type="button" id="runBtn" class="primary">Play ▶</button></div>
+  </section>
+</aside>
+<iframe id="stage" title="Player" allow="fullscreen" hidden></iframe>
+<div class="drop" id="drop" hidden><span>Drop the playbook file to load it into the box</span></div>

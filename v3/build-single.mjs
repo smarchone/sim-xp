@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// Builds sim-xp into ONE html file: the player, a collapsible side panel (chat with Claude, playbook box, saved list),
+// Builds sim-xp into ONE html file: an index of playbooks (the Library, Saved, and Make your own: chat with Claude and the playbook box), the player,
 // and two bundled playbooks (the rest load from GitHub). The same file is the Claude artifact and the GitHub Pages site.
 //   node v3/build-single.mjs [out]        default out: v3/dist/sim-xp.html
-// Inlined: player.html (given to the frame as srcdoc), the validator, sidebar/page.{html,css,js}, the default and example playbooks from
+// Inlined: player.html (given to the frame as srcdoc), the validator, page/page.{html,css,js}, the default and example playbooks from
 // playbooks/index.json, and the format reference Claude reads (the schema part of the story-to-playbook skill).
 // Fonts stay on Google Fonts, which an artifact may load. The file has no <html>/<head>/<body> tags because the artifact
 // publisher adds its own skeleton; browsers accept that too.
@@ -37,12 +37,12 @@ const skill = readFileSync(join(here, "../.claude/skills/story-to-playbook/SKILL
 const spec = skill.slice(skill.indexOf("## Schema")).trim();
 if (!spec.startsWith("## Schema") || spec.length < 5000) throw new Error("build-single: could not extract the schema from SKILL.md");
 
-// ---- the player: its "Open another playbook" menu item opens the panel here
+// ---- the player: its "Open another playbook" button opens the index here
 // The empty data: favicon is dropped: it was the only data: URI in the page, and the artifact's public-sharing review refused a version that embeds a file type it can't read.
-const player = patch(patch(read("player.html"), ">Open another playbook<", ">More playbooks<", "library menu item"), `<link rel="icon" href="data:,">\n`, "", "empty favicon");
+const player = patch(patch(read("player.html"), ">Open another playbook<", ">← All playbooks<", "library menu item"), `<link rel="icon" href="data:,">\n`, "", "empty favicon");
 
 // ---- bundled playbooks: only the two the page needs to start and to brief Claude. Every other playbook is loaded from a GitHub repo
-// (playbooks/index.json is the library's index; the panel fetches it from main).
+// (playbooks/index.json is the library's index; the index page fetches it from main).
 const index = JSON.parse(read("playbooks/index.json"));
 const DEFAULT_ID = "kafka-load-test-until-it-breaks", EXAMPLE_ID = "kafka-rebalance-storm";   // what the box starts with / what Claude reads as the format example (it has a full Hardcore layer)
 const seeds = [DEFAULT_ID, EXAMPLE_ID].map((id) => {
@@ -58,7 +58,7 @@ const script = [
   `const DEFAULT = SEEDS.find((p) => p.meta.id === ${JSON.stringify(DEFAULT_ID)});`,
   `const SPEC = ${inScript(JSON.stringify(spec))};`,
   validatorScope,
-  read("sidebar/page.js"),
+  read("page/page.js"),
 ].join("\n");
 
 const fonts = `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Roboto+Mono:wght@400;500&display=swap">`;
@@ -68,10 +68,10 @@ const page = `<title>sim-xp</title>
 <meta name="description" content="Watch a system in motion. Ask Claude for a playbook, then watch it run.">
 ${fonts}
 <style>
-${read("sidebar/page.css")}
+${read("page/page.css")}
 </style>
 ${themeBoot}
-${read("sidebar/page.html").trim()}
+${read("page/page.html").trim()}
 <script type="module">
 ${script}
 </script>

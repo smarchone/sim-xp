@@ -18,7 +18,7 @@ test("the single file is one self-contained page for the artifact and for Pages"
   assert.ok(!/<(html|head|body)[\s>]/i.test(markup), "no document tags: the artifact publisher adds its own skeleton");
   assert.ok(!/data:,|data:[a-z]+\//.test(html), "no data: URIs: the artifact's public-sharing review refuses ones it can't read");
   assert.ok(/<title>sim-xp<\/title>/.test(html));
-  for (const id of ["stage", "panel", "ask", "pb", "runBtn", "saved"]) assert.ok(markup.includes(`id="${id}"`), `#${id} is in the page`);
+  for (const id of ["stage", "home", "repoList", "ask", "pb", "runBtn", "saved"]) assert.ok(markup.includes(`id="${id}"`), `#${id} is in the page`);
 });
 
 test("the script parses and carries only the two bundled playbooks; the rest load from the repo", () => {

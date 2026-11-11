@@ -738,6 +738,18 @@ body{padding:0}
 
 /* the result slides are slide-shaped: 16:9, content centred (taller when a slide needs more) */
 .deck-stage{aspect-ratio:16 / 9;padding:36px 48px;justify-content:center}
+
+/* full screen (F, ⛶): the player alone fills the window: the component chips, the charts, the bar and the key moment.
+   No page around it and no event feed. Works without the browser's Fullscreen API too (the artifact frame), as a cover. */
+.app.fs .simwrap{position:fixed;inset:0;z-index:18;margin:0;max-width:none;width:auto;height:auto;padding:14px 20px;background:var(--bg);overflow:auto;display:flex;justify-content:center}
+.app.fs .chatcol,.app.fs #vFeed{display:none}
+.app.fs .simwrap .simcol{flex:1;width:auto;min-width:0}
+@media (min-width:1000px) and (min-height:600px){
+  .app.fs .simwrap{overflow:hidden}
+  .app.fs .simwrap .sim{flex:1 1 auto;min-height:0;height:auto}
+}
+html:has(.app.fs),body:has(.app.fs){overflow:hidden}
+.app.fs.playing.idle .simwrap{cursor:none}
 </style>
 </head>
 <body>
@@ -808,7 +820,7 @@ body{padding:0}
         <div class="keys">
           <span><kbd>Space</kbd> <kbd>K</kbd></span><span>play · pause · continue</span>
           <span><kbd>J</kbd> <kbd>L</kbd></span><span>back / forward 10 s</span>
-          <span><kbd>F</kbd></span><span>full screen</span>
+          <span><kbd>F</kbd></span><span>full screen, just the player (no feed)</span>
           <span><kbd>E</kbd></span><span>show / hide the event feed</span>
           <span><kbd>←</kbd><kbd>→</kbd></span><span>previous / next key moment</span>
           <span><kbd>R</kbd></span><span>report</span>
@@ -1616,11 +1628,23 @@ function markFeedNews() {   // a new alert while the feed is hidden: a small red
   lastAlertSeen = a;
 }
 $("#vSpeed").onclick = () => { const i = SPEEDS.indexOf(speed); setSpeed(SPEEDS[(i + 1) % SPEEDS.length]); flash(`speed ${speedLabel(speed)}`); };
-const canFull = !!(document.fullscreenEnabled && $("#simSec").requestFullscreen);
-$("#vFull").hidden = !canFull;
-function toggleFull() { if (!canFull) return; try { document.fullscreenElement ? document.exitFullscreen() : $("#simSec").requestFullscreen(); } catch (e) { /* not allowed here */ } }
+// full screen: the player covers the window (page, side panel and feed hidden), and the browser goes full screen where it may
+let focusOn = false;
+const canNative = !!(document.fullscreenEnabled && document.documentElement.requestFullscreen);
+function setFocus(on) {
+  if (on === focusOn) return;
+  focusOn = on; closeMenus();
+  $("#app").classList.toggle("fs", on);
+  const b = $("#vFull"); b.textContent = on ? "⤡" : "⛶"; b.title = b.ariaLabel = on ? "Exit full screen (f, Esc)" : "Full screen (f)";
+  try {
+    if (on && canNative && !document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+    if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  } catch (e) { /* not allowed here: the cover alone */ }
+  renderLayout();
+}
+function toggleFull() { setFocus(!focusOn); }
 $("#vFull").onclick = toggleFull;
-document.addEventListener("fullscreenchange", () => { $("#vFull").textContent = document.fullscreenElement ? "⤡" : "⛶"; renderLayout(); });
+document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && focusOn) setFocus(false); renderLayout(); });
 // while it plays, the bar fades after 2.5 s without the mouse, like a video player
 let idleT = 0; const wake = () => { $("#app").classList.remove("idle"); clearTimeout(idleT); idleT = setTimeout(() => $("#app").classList.add("idle"), 2500); };
 addEventListener("pointermove", wake, { passive: true }); wake();
@@ -1783,7 +1807,7 @@ function frame(now) {
   } else if (eased) render();
   requestAnimationFrame(frame);
 }
-const simInView = () => { const r = $("#simSec").getBoundingClientRect(); return r.top < innerHeight * 0.5 && r.bottom > innerHeight * 0.5; };
+const simInView = () => focusOn || (() => { const r = $("#simSec").getBoundingClientRect(); return r.top < innerHeight * 0.5 && r.bottom > innerHeight * 0.5; })();
 // Space does the one obvious thing for the current state
 function primaryAction(fromBar) {
   closeMenus();
@@ -1822,12 +1846,12 @@ document.addEventListener("pointerdown", e => { if (!e.target.closest(".hud")) c
 document.addEventListener("keydown", e => {
   if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.target.matches && e.target.matches("input,select,textarea")) return;
-  if (e.key === "Escape") { if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); if (closeMenus()) return; if (isOpen($("#scrim"))) closeReport(); else if (introStarted && isOpen($("#intro"))) startRun(); return; }
+  if (e.key === "Escape") { if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); if (closeMenus()) return; if (focusOn) { setFocus(false); return; } if (isOpen($("#scrim"))) closeReport(); else if (introStarted && isOpen($("#intro"))) startRun(); return; }
   if (e.key === "i" || e.key === "I") { if (!isOpen($("#scrim"))) showIntro(); return; }
   if ((e.key === "k" || e.key === "K") && simInView()) { primaryAction(true); return; }
   if ((e.key === "j" || e.key === "J" || e.key === "l" || e.key === "L") && simInView()) { startPlaying(); seek(playT + (/l/i.test(e.key) ? 40 : -40)); return; }
   if ((e.key === "f" || e.key === "F") && simInView()) { toggleFull(); return; }
-  if ((e.key === "e" || e.key === "E") && simInView()) { setFeed(!feedOn, true); return; }
+  if ((e.key === "e" || e.key === "E") && simInView() && !focusOn) { setFeed(!feedOn, true); return; }
   if (e.code === "Space" && !simInView()) return;   // reading the brief or the result: Space scrolls as usual
   if (e.code === "Space") { e.preventDefault(); if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); primaryAction(); return; }
   if (e.key === "?") { toggleMenu("help"); return; }
@@ -1898,7 +1922,7 @@ function showSlide(i) {
 $("#deckPrev").onclick = () => showSlide(slideAt - 1);
 $("#deckNext").onclick = () => showSlide(slideAt + 1);
 document.querySelectorAll("#deck .dot").forEach(b => (b.onclick = () => showSlide(+b.dataset.i)));
-const resultInView = () => { const r = $("#resultSec").getBoundingClientRect(); return !$("#report").hidden && r.top < innerHeight * 0.6 && r.bottom > innerHeight * 0.4; };
+const resultInView = () => !focusOn && (() => { const r = $("#resultSec").getBoundingClientRect(); return !$("#report").hidden && r.top < innerHeight * 0.6 && r.bottom > innerHeight * 0.4; })();
 showSlide(0);
 function fitDeck() {   // the slide area takes the tallest slide's height, so the controls never move between slides
   const st = $("#deck .deck-stage") || document.querySelector("#deck .deck-stage"); if (!st || $("#report").hidden) return;
@@ -1913,7 +1937,7 @@ function unlockResult() { if (resultOpen) return; resultOpen = true; $("#resLock
 function openReport() {   // R, the menu, or Space at the end: scroll down to the result (it stays locked until the run has ended once)
   closeMenus();
   if (!resultOpen) { flash("finish the run to see the result"); return; }
-  setPlaying(false); goTo("resultSec");
+  setPlaying(false); setFocus(false); goTo("resultSec");
 }
 function closeReport(done) { if (done) done(); }
 function watchAgain() { goTo("simSec"); seek(0); setTimeout(() => setPlaying(true), 450); }
@@ -2012,12 +2036,7 @@ function showIntro() { closeMenus(); setPlaying(false); goTo("briefSec"); }   //
 $("#introBtn").onclick = showIntro; $("#introBtn").firstChild.textContent = "Back to the brief ";
 $("#start").onclick = startRun;
 $("#pbTitle").textContent = PB.meta.title; document.title = PB.meta.title;
-$("#libraryBtn").onclick = () => {   // toggles the playbooks panel; the host keeps aria-pressed in step, even when the panel closes itself
-  closeMenus(); if (!host) return;
-  const open = host.toggleLibrary ? host.toggleLibrary() : (host.showLibrary && (host.showLibrary(), true));
-  $("#libraryBtn").setAttribute("aria-pressed", String(!!open));
-};
-$("#libraryBtn").setAttribute("aria-pressed", "false");
+$("#libraryBtn").onclick = () => { closeMenus(); setFocus(false); if (host && host.showLibrary) host.showLibrary(); };   // the host page shows its index of playbooks
 requestAnimationFrame(frame);
 
 // Playback API for the host page. Speeds are multipliers: 0.5, 1, 2, 4.
