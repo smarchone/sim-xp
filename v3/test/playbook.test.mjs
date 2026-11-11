@@ -54,10 +54,9 @@ test("page tools reject unknown arguments and report the world at any second", a
   assert.equal(v.world.at[0].t, 100);
 });
 
-test("the page uses the skill's validator and example, not copies", () => {
+test("the page uses the skill's validator, not a copy (a symlink: the build reads it locally)", () => {
   const skill = "../../.claude/skills/story-to-playbook/";
   assert.equal(fs.readlinkSync(new URL("../js/playbook.js", import.meta.url)), skill + "scripts/playbook.js");
-  assert.equal(fs.readlinkSync(new URL("kafka-rebalance-storm.json", dir)), skill + "examples/kafka-rebalance-storm.json");
 });
 
 test("intro and report context fields are checked, and bundled playbooks carry them", () => {
@@ -94,4 +93,10 @@ test("every panel says why it matters, and meta.clock / feed.key are checked", (
 test("playbooks/index.json is current (node v3/tools/build-index.mjs)", async () => {
   const { execFileSync } = await import("node:child_process");
   execFileSync(process.execPath, [new URL("../tools/build-index.mjs", import.meta.url).pathname, "--check"], { stdio: "pipe" });
+});
+
+test("playbooks/kafka-rebalance-storm.json is a real copy of the skill's example, not a symlink (GitHub serves a symlink as its path)", () => {
+  const here = new URL("../playbooks/kafka-rebalance-storm.json", import.meta.url), skill = new URL("../../.claude/skills/story-to-playbook/examples/kafka-rebalance-storm.json", import.meta.url);
+  assert.ok(!fs.lstatSync(here).isSymbolicLink(), "a symlink loads as text from raw.githubusercontent.com, not JSON");
+  assert.equal(fs.readFileSync(here, "utf8"), fs.readFileSync(skill, "utf8"), "keep it in step with the skill's example: copy it over");
 });
