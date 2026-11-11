@@ -395,6 +395,7 @@ body{padding:0}
 .banner p{position:absolute;top:calc(100% + 4px);left:0;right:0;padding:10px 14px;background:var(--glass);border:1px solid var(--line2);border-radius:4px;box-shadow:0 10px 28px rgba(0,0,0,.3);font-size:13.5px;line-height:1.55}
 .banner .wlist{display:none}
 .focus-mode .dimmable{opacity:.5}
+.focus-mode .feed.dimmable{opacity:1}   /* a key moment never fades the events: they keep reading as the story's context */
 /* 3. result: a reading column, locked until the run ends */
 .result{max-width:820px;margin:0 auto;padding:56px 24px 72px;min-height:60dvh}
 .rlock{border:1px dashed var(--line2);border-radius:4px;padding:32px;display:flex;flex-direction:column;gap:4px;align-items:center;color:var(--muted);text-align:center}
@@ -594,6 +595,8 @@ body{padding:0}
 /* theme: one quiet icon button */
 .hicon{width:34px;height:34px;padding:0;border-radius:50%;border:0;background:none;color:var(--muted);font-size:17px;display:grid;place-items:center}
 .hicon:hover{border:0;color:var(--fg);background:var(--sunk)}
+a.hicon{text-decoration:none}
+.hicon.ghabout svg{width:18px;height:18px;display:block}
 
 .hbtn[aria-pressed="true"]{background:color-mix(in srgb,var(--accent) 16%,transparent);border-color:var(--accent);color:var(--accent)}
 
@@ -792,7 +795,7 @@ html:has(.app.fs),body:has(.app.fs){overflow:hidden}
 </head>
 <body>
 <div class="app" id="app">
-  <header class="pagehead"><a class="brand" href="https://smarchone.github.io/sim-xp/" target="_blank" rel="noopener noreferrer" title="About sim-xp"><span class="mark" aria-hidden="true"></span>sim-xp</a><span class="tag">simulate a blog, an incident or a load test</span><span class="spacer"></span><div class="seg modeseg" id="modeSeg" role="group" aria-label="How to view this playbook"><button data-mode="watch" title="Watch: the whole post as one narrated video">▶ Watch</button><button data-mode="read" title="Read: the post as a page you scroll, with the player in the middle">Read</button></div><button class="hbtn" id="libraryBtn">Open another playbook</button><button class="hicon" id="themeBtn" aria-label="Switch to light theme" title="Switch to light theme">☀</button><div class="seg" id="themeSeg" hidden><button data-theme-set="system">Auto</button><button data-theme-set="light">Light</button><button data-theme-set="dark">Dark</button></div></header>
+  <header class="pagehead"><a class="brand" id="brandHome" href="./" title="All playbooks"><span class="mark" aria-hidden="true"></span>sim-xp</a><span class="tag">simulate a blog, an incident or a load test</span><span class="spacer"></span><div class="seg modeseg" id="modeSeg" role="group" aria-label="How to view this playbook"><button data-mode="watch" title="Watch: the whole post as one narrated video">▶ Watch</button><button data-mode="read" title="Read: the post as a page you scroll, with the player in the middle">Read</button></div><button class="hbtn" id="libraryBtn">Open another playbook</button><a class="hicon ghabout" href="https://smarchone.github.io/sim-xp/" target="_blank" rel="noopener noreferrer" title="About sim-xp" aria-label="About sim-xp"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a><button class="hicon" id="themeBtn" aria-label="Switch to light theme" title="Switch to light theme">☀</button><div class="seg" id="themeSeg" hidden><button data-theme-set="system">Auto</button><button data-theme-set="light">Light</button><button data-theme-set="dark">Dark</button></div></header>
 
   <!-- 1. Brief: read the story and what to watch, see the system. Nothing plays yet. -->
   <section class="sec brief" id="briefSec" aria-labelledby="introT">
@@ -1672,7 +1675,20 @@ function setFeed(on, persist) {
   $("#vFeed").title = on ? "Hide the event feed (e)" : "Show the event feed: logs, alerts and chat (e)";
   if (on) $("#vFeed").classList.remove("news");
   if (persist) try { localStorage.setItem(FEED_KEY, on ? "on" : "off"); } catch (e) { /* storage blocked */ }
+  fitFeedCol();
 }   // the board's ResizeObserver re-lays the charts when the column appears or goes
+// In Watch, the events column lines up with the video: the same top edge and height as the player's frame (not the title above
+// it or the key moment below). Read keeps the column the height of the whole player section.
+function fitFeedCol() {
+  const c = $("#chatCol"), sim = $("#simWrap .sim"), col = $("#simWrap .simcol");
+  if (typeof WATCH === "undefined" || !WATCH || !feedOn || !ONE_SCREEN.matches || $("#app").classList.contains("fs")) { c.style.alignSelf = c.style.marginTop = c.style.height = ""; return; }
+  c.style.alignSelf = "flex-start";
+  c.style.marginTop = Math.round(sim.getBoundingClientRect().top - col.getBoundingClientRect().top) + "px";
+  c.style.height = sim.offsetHeight + "px";
+}
+new ResizeObserver(() => fitFeedCol()).observe($("#simWrap .sim"));
+new ResizeObserver(() => fitFeedCol()).observe($("#wmeta"));
+ONE_SCREEN.addEventListener("change", () => fitFeedCol());
 setFeed(feedOn, false);
 $("#vFeed").onclick = () => setFeed(!feedOn, true);
 /* ===================== Voice: a narrator reads each key moment aloud, then the run carries on ===================== */
@@ -1686,7 +1702,11 @@ $("#vFeed").onclick = () => setFeed(!feedOn, true);
 var VOICE_KEY = "sim-xp.voice", VNARR_KEY = "sim-xp.voice-narrator";
 var tts = "speechSynthesis" in window && window.SpeechSynthesisUtterance ? window.speechSynthesis : null;
 var voiceOn = false, voiceWanted = false, ttsVoice = null, vNarr = "", sayId = 0, sayGo = 0, introHold = false;
-try { voiceWanted = localStorage.getItem(VOICE_KEY) === "on"; vNarr = localStorage.getItem(VNARR_KEY) || ""; } catch (e) { /* storage blocked */ }
+// Voice is remembered per mode: Watch is a narrated video, so it starts with the voice on; Read starts with it off.
+const voiceKey = () => WATCH ? VOICE_KEY + ".watch" : VOICE_KEY;
+function wantVoice() { try { const v = localStorage.getItem(voiceKey()); return v ? v === "on" : WATCH; } catch (e) { return WATCH; } }
+voiceWanted = wantVoice();
+try { vNarr = localStorage.getItem(VNARR_KEY) || ""; } catch (e) { /* storage blocked */ }
 // Google's voices only (Chrome has them; Safari and Firefox do not), the UK female one first
 const googleRank = v => (/^google uk english female$/i.test(v.name) ? 8 : 0) + (/^google us english/i.test(v.name) ? 4 : 0) + (/^en[-_]GB/i.test(v.lang) ? 2 : 0);
 const googleVoices = () => tts ? tts.getVoices().filter(v => /^google\b/i.test(v.name) && /^en([-_]|$)/i.test(v.lang)).sort((a, b) => googleRank(b) - googleRank(a)) : [];
@@ -1811,7 +1831,7 @@ function setVoice(on, persist) {
   voiceOn = canSpeak() && on;
   const b = $("#vVoice"); b.hidden = !canSpeak(); b.setAttribute("aria-pressed", String(voiceOn));
   b.title = voiceOn ? "Voice on: the narrator explains each key moment, then the run carries on (v)" : "Voice: a narrator explains each key moment aloud (v)";
-  if (persist) try { localStorage.setItem(VOICE_KEY, voiceOn ? "on" : "off"); } catch (e) { /* storage blocked */ }
+  if (persist) try { localStorage.setItem(voiceKey(), voiceOn ? "on" : "off"); } catch (e) { /* storage blocked */ }
   if (!voiceOn) hush();
   else {
     if (persist && PRE.lines) { audioCtx(); preLoad().catch(() => {}); }
@@ -2253,6 +2273,7 @@ $("#introBtn").onclick = showIntro; $("#introBtn").firstChild.textContent = "Bac
 $("#start").onclick = startRun;
 $("#pbTitle").textContent = PB.meta.title; document.title = PB.meta.title;
 $("#libraryBtn").onclick = () => { closeMenus(); setFocus(false); if (host && host.showLibrary) host.showLibrary(); };   // the host page shows its index of playbooks
+$("#brandHome").onclick = e => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return; e.preventDefault(); $("#libraryBtn").onclick(); };   // the sim-xp name goes home too
 
 /* ===================== Watch mode: the whole post as one narrated video =====================
    Watch (the default) plays the post as scenes on one timeline, in the player's frame: the title, the background, the
@@ -2385,6 +2406,8 @@ function setMode(m, persist) {
   if (WATCH) wPause(); else setPlaying(false);
   hush(); hideBeat();
   WATCH = watch; $("#app").classList.toggle("watch", watch);
+  voiceWanted = wantVoice(); setVoice(voiceWanted, false);   // each mode keeps its own voice setting (Watch: on unless turned off there)
+  requestAnimationFrame(fitFeedCol);
   chapEls = buildChaps(watch ? watchChaps() : simSegs());
   if (watch) {
     const i = readAt === "result" ? SCENES.findIndex(s => s.res === slideAt) : readAt === "sim" ? SCENES.findIndex(s => s.kind === "sim") : 0;

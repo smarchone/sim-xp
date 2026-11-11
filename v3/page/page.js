@@ -542,3 +542,6 @@ window.addEventListener("popstate", openHash);   // Back, Forward, or the person
   }
   else { askEl.disabled = busy; $("wayInstall").hidden = true; }   // in the Claude artifact the chat writes playbooks, no skill to install
 })();
+
+// the sim-xp name in the header: back to the top of the index (a new tab with a modifier key, as a link)
+$("brandHome").onclick = (e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return; e.preventDefault(); showIndex(); try { scrollTo({ top: 0 }); } catch (err) { /* old browser */ } };

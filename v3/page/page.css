@@ -45,6 +45,8 @@ body.view-player .home{display:none}
 .hbtn:hover{border-color:var(--accent);color:var(--accent)}
 .hicon{width:34px;height:34px;padding:0;border-radius:50%;border:0;background:none;color:var(--muted);font-size:17px;display:grid;place-items:center}
 .hicon:hover{border:0;color:var(--fg);background:var(--sunk)}
+a.hicon{text-decoration:none}
+.hicon.ghabout svg{width:18px;height:18px;display:block}
 .tlink{border:0;background:none;padding:0;color:var(--muted);font:inherit;font-size:13px;cursor:pointer}
 .tlink:hover{color:var(--accent);border:0}
 .lede{margin:40px 0 36px;font:400 19px/1.5 var(--serif);color:var(--fg);letter-spacing:-.005em}
