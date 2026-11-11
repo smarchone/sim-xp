@@ -13,12 +13,11 @@ const open = '<script type="module">', at = html.indexOf(open);
 const script = html.slice(at + open.length, html.lastIndexOf("</script>"));
 const markup = html.slice(0, at);
 
-test("the single file is one self-contained page for the artifact and for Pages", () => {
-  assert.ok(html.length < 1024 * 1024, "stays well under the artifact limit");
-  assert.ok(!/<(html|head|body)[\s>]/i.test(markup), "no document tags: the artifact publisher adds its own skeleton");
-  assert.ok(!/data:,|data:[a-z]+\//.test(html), "no data: URIs: the artifact's public-sharing review refuses ones it can't read");
+test("the single file is one self-contained page for Pages and the local server", () => {
+  assert.ok(html.length < 1024 * 1024, "stays small");
+  assert.ok(!/window\.claude|use\("sample"\)/.test(html), "no Claude artifact hooks: the chat is the local server's");
   assert.ok(/<title>sim-xp<\/title>/.test(html));
-  for (const id of ["stage", "home", "repoList", "ask", "pb", "runBtn", "saved"]) assert.ok(markup.includes(`id="${id}"`), `#${id} is in the page`);
+  for (const id of ["stage", "home", "repoList", "pb", "runBtn", "saved"]) assert.ok(markup.includes(`id="${id}"`), `#${id} is in the page`);
 });
 
 test("the script parses and carries only the two bundled playbooks; the rest load from the repo", () => {
@@ -29,5 +28,5 @@ test("the script parses and carries only the two bundled playbooks; the rest loa
   const bundled = ["kafka-load-test-until-it-breaks", "kafka-rebalance-storm"];
   for (const p of index) assert.equal(script.includes(`"id":"${p.id}"`), bundled.includes(p.id), `${p.id} is ${bundled.includes(p.id) ? "" : "not "}bundled`);
   assert.ok(script.includes("raw.githubusercontent.com") && script.includes('const DEFAULT_SRC = "smarchone/sim-xp@main/v3/playbooks"'));
-  assert.ok(script.includes("const DEFAULT = SEEDS.find") && script.includes("const EXAMPLE = SEEDS.find"));
+  assert.ok(script.includes("const DEFAULT = SEEDS.find"));
 });

@@ -1,12 +1,10 @@
 #!/usr/bin/env node
-// Builds sim-xp into ONE html file: an index of playbooks (the Library, Saved, and Make your own: chat with Claude and the playbook box), the player,
-// and two bundled playbooks (the rest load from GitHub). The same file is the Claude artifact and the GitHub Pages site.
+// Builds sim-xp into ONE html file: an index of playbooks (the Library, the Local server, Your playground), the player,
+// and two bundled playbooks (the rest load from a library). The same file is the GitHub Pages site and what v3/server.js serves
+// (where the page also gets its chat with Claude Code).
 //   node v3/build-single.mjs [out]        default out: v3/dist/sim-xp.html
-// Inlined: player.html (given to the frame as srcdoc), the validator, page/page.{html,css,js}, the default and example playbooks from
-// playbooks/index.json, and the format reference Claude reads (the schema part of the story-to-playbook skill).
-// Fonts stay on Google Fonts, which an artifact may load. The file has no <html>/<head>/<body> tags because the artifact
-// publisher adds its own skeleton; browsers accept that too.
-// Publish the artifact with capabilities {sample: {}, downloads: true}. The chat needs `sample` and only works there.
+// Inlined: player.html (given to the frame as srcdoc), the validator, page/page.{html,css,js}, and the two bundled playbooks from
+// playbooks/index.json. Fonts stay on Google Fonts. The file has no <html>/<head>/<body> tags; browsers add them.
 // js/tools.js (the WebMCP tools) is kept in the repo but is not part of this build.
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -32,19 +30,14 @@ const playbookJs = read("js/playbook.js").replace(/^export\s+(?:async\s+)?(const
 });
 const validatorScope = `const __playbook = (() => {\n${playbookJs}\nreturn { ${names.join(", ")} };\n})();`;
 
-// ---- the format reference Claude reads: the skill's schema and rules, without its file-and-workflow parts
-const skill = readFileSync(join(here, "../.claude/skills/story-to-playbook/SKILL.md"), "utf8");
-const spec = skill.slice(skill.indexOf("## Schema")).trim();
-if (!spec.startsWith("## Schema") || spec.length < 5000) throw new Error("build-single: could not extract the schema from SKILL.md");
-
 // ---- the player: its "Open another playbook" button opens the index here
-// The empty data: favicon is dropped: it was the only data: URI in the page, and the artifact's public-sharing review refused a version that embeds a file type it can't read.
+// The empty data: favicon is dropped: the page has no data: URIs.
 const player = patch(patch(read("player.html"), ">Open another playbook<", ">← All playbooks<", "library menu item"), `<link rel="icon" href="data:,">\n`, "", "empty favicon");
 
 // ---- bundled playbooks: only the two the page needs to start and to brief Claude. Every other playbook is loaded from a GitHub repo
 // (playbooks/index.json is the library's index; the index page fetches it from main).
 const index = JSON.parse(read("playbooks/index.json"));
-const DEFAULT_ID = "kafka-load-test-until-it-breaks", EXAMPLE_ID = "kafka-rebalance-storm";   // what the box starts with / what Claude reads as the format example (it has a full Hardcore layer)
+const DEFAULT_ID = "kafka-load-test-until-it-breaks", EXAMPLE_ID = "kafka-rebalance-storm";   // the bundled two: the fallback when a library cannot be reached (the second has a full Hardcore layer)
 const seeds = [DEFAULT_ID, EXAMPLE_ID].map((id) => {
   const item = index.find((p) => p.id === id);
   if (!item) throw new Error(`build-single: playbook ${id} is not in playbooks/index.json`);
@@ -54,9 +47,7 @@ const seeds = [DEFAULT_ID, EXAMPLE_ID].map((id) => {
 const script = [
   `const PLAYER_HTML = ${inScript(JSON.stringify(player))};`,
   `const SEEDS = ${inScript(JSON.stringify(seeds))};`,
-  `const EXAMPLE = SEEDS.find((p) => p.meta.id === ${JSON.stringify(EXAMPLE_ID)});`,
   `const DEFAULT = SEEDS.find((p) => p.meta.id === ${JSON.stringify(DEFAULT_ID)});`,
-  `const SPEC = ${inScript(JSON.stringify(spec))};`,
   validatorScope,
   read("page/page.js"),
 ].join("\n");

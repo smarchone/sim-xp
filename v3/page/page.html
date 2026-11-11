@@ -47,14 +47,9 @@
     </section>
     <section class="way" aria-labelledby="w1">
       <h3 id="w1"><span class="wn"></span>Generate a playbook</h3>
-      <div class="chat" id="chat">
-        <ol id="log" aria-live="polite"></ol>
-        <div class="bar" id="bar">
-          <input id="ask" type="text" autocomplete="off" placeholder="Describe a story, an incident, or a system and what goes wrong" aria-label="Message to Claude">
-          <button type="button" id="send" class="primary">Send</button>
-          <button type="button" id="stop" hidden>Stop</button>
-        </div>
-      </div>
+      <p>In Claude Code, ask for a playbook of your story, for example:</p>
+      <div class="cmd"><code>/story-to-playbook a cache stampede after a deploy takes the database down</code></div>
+      <p class="hint" id="chatHint">Or run sim-xp's local server (<code>node v3/server.js</code>) and use the chat under <b>Local server</b>: Claude writes the playbook there and it plays straight away.</p>
     </section>
     <section class="way" aria-labelledby="w2">
       <h3 id="w2"><span class="wn"></span>Load it</h3>

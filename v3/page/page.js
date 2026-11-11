@@ -1,20 +1,27 @@
-// sim-xp as an artifact: an index of playbooks (the Library: GitHub repos, and Your playground with + Add your own), and the player, which fills the
-// window once one is picked. A chat bar asks Claude (the viewer's own Claude, through the `sample`
-// capability) to write a playbook into the playbook box; Run plays whatever is in the box.
-// Globals the build adds above this file: PLAYER_HTML, SEEDS (the two bundled playbooks: the default and the format example; every other playbook is loaded from a GitHub repo on demand), EXAMPLE (the format reference Claude reads), DEFAULT (the fallback playbook),
-// SPEC (the format and authoring rules), __playbook (the validator).
+// sim-xp: an index of playbooks (the Library: GitHub repos, the Local server, and Your playground with + Add your own), and the
+// player, which fills the window once one is picked. Served by v3/server.js, the page also has a chat with a Claude Code worker
+// that writes playbooks into v3/playbooks (see "local server" below); on GitHub Pages there is no chat.
+// Globals the build adds above this file: PLAYER_HTML, SEEDS (the two bundled playbooks: every other playbook is loaded from a
+// library on demand), DEFAULT (the fallback playbook), __playbook (the validator).
 const { validate } = __playbook;
 const $ = (id) => document.getElementById(id);
-const stage = $("stage"), pbBox = $("pb"), logEl = $("log"), statusEl = $("status"), problemsEl = $("problems");
-const askEl = $("ask"), sendBtn = $("send"), stopBtn = $("stop"), runBtn = $("runBtn");
+const stage = $("stage"), pbBox = $("pb"), statusEl = $("status"), problemsEl = $("problems");
+const runBtn = $("runBtn");
 
 // ---------- player frame (the player reads simxp.current when it boots and reports back through onPlayerEvent) ----------
 const simxp = (window.simxp = {
   current: null,
   source: null,
   showLibrary() { showIndex(); },
-  onPlayerEvent(type) { if (type === "ready") stage.contentWindow.focus(); },
+  chat: null,      // the local server's chat, when the page is served by v3/server.js (see "local server" below)
+  restore: null,   // where the player was before a playbook reload (the same place is restored when it is ready)
+  onPlayerEvent(type) {
+    if (type !== "ready") return;
+    stage.contentWindow.focus();
+    if (simxp.restore) { const r = simxp.restore; simxp.restore = null; try { stage.contentWindow.player.restore(r); } catch (e) { /* an older player */ } }
+  },
 });
+let LCHAT = null;   // the index's chat under Local server (built once the server answers)
 const LAST = "sim-xp.last";   // the playbook played last, reopened on the next visit
 function play(pb, src = null) {   // src: the library source (key) the playbook came from, when it was loaded from a repo
   if (!src && SEEDS.some((x) => JSON.stringify(x) === JSON.stringify(pb))) src = DEFAULT_SRC;   // the two bundled playbooks are copies of the default repo's
@@ -26,7 +33,7 @@ function play(pb, src = null) {   // src: the library source (key) the playbook 
   stage.srcdoc = PLAYER_HTML + "<!-- " + Date.now() + " -->";
   track(pb); showPlayer();
 }
-// Mark the run in the address (#<playbook id>) and send a Google Analytics event. Both are best effort: the artifact has no gtag and may not allow history changes.
+// Mark the run in the address (#<playbook id>) and send a Google Analytics event. Both are best effort: a local copy has no gtag and may not allow history changes.
 function track(pb) {
   const id = String(pb.meta.id), src = simxp.src || "";   // #<owner/repo[@ref][/path]>:<id> for a repo playbook (the default repo too), plain #<id> for one in the Saved list
   // from the index it is a new entry, so Back returns to the index
@@ -53,7 +60,7 @@ function showIndex(target) {   // target: the id of a section to bring into view
 // Add your own (the chat and the playbook box) is a drawer over the index, opened from the Your playground heading
 function setDrawer(on) {
   $("drawer").hidden = $("scrim").hidden = !on; $("makeBtn").setAttribute("aria-expanded", String(on));
-  if (on) ($("ask").disabled ? $("runBtn") : $("ask")).focus(); else $("makeBtn").focus();
+  if (on) $("drawerClose").focus(); else $("makeBtn").focus();
 }
 $("makeBtn").onclick = () => setDrawer($("drawer").hidden);
 $("drawerClose").onclick = () => setDrawer(false);
@@ -130,14 +137,14 @@ function run() {
 }
 runBtn.onclick = run;
 
-// ---------- saved playbooks: this browser's storage, at most 20, per artifact and per device ----------
+// ---------- saved playbooks: this browser's storage, at most 20, per site and per device ----------
 const savedEl = $("saved"), savedList = $("savedList"), MAX_SAVED = 20, LIB = "sim-xp.playbooks";
 const library = new Map();   // id -> { title, story, duration_s, beats, updated, json }, newest first
-const anchorSave = async ({ filename, data }) => {   // outside the Claude artifact an ordinary download works
+const anchorSave = async ({ filename, data }) => {   // an ordinary download
   const url = URL.createObjectURL(new Blob([data], { type: "application/json" })), a = document.createElement("a");
   a.href = url; a.download = filename; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
-let storageOk = true, downloads = window.claude ? null : { save: anchorSave };
+let storageOk = true, downloads = { save: anchorSave };
 try { for (const [id, x] of JSON.parse(localStorage.getItem(LIB) || "[]")) if (x && typeof x.json === "string") library.set(id, x); } catch (e) { storageOk = false; }
 function persist() {
   try { localStorage.setItem(LIB, JSON.stringify([...library])); return true; }
@@ -203,7 +210,7 @@ renderLibrary();
 // ---------- library: playbooks loaded from GitHub repos, on demand ----------
 // A source is a folder of playbook .json files plus an index.json listing them (format in v3/README.md). The panel fetches the index when
 // the Library is opened and a playbook only when it is clicked; nothing from a repo is copied into storage. Only the list of added repos is kept.
-// The default library is this repo's v3/playbooks folder (with its audio/), read from GitHub, so the site, the artifact and a copy
+// The default library is this repo's v3/playbooks folder (with its audio/), read from GitHub, so the site, the local server and a copy
 // opened from disk all list the same playbooks. It used to be the smarchone/simxp-playbooks repo; links naming it open the same playbook here.
 const DEFAULT_SRC = "smarchone/sim-xp@main/v3/playbooks", LEGACY_SRC = "smarchone/simxp-playbooks", SRCS = "sim-xp.repos", CACHE = "sim-xp.cache", TTL = 7 * 24 * 3600 * 1000, CACHE_MAX = 20;
 // Fetched playbooks are kept for a week, apart from the Saved list; an index.json is always fetched fresh. Newest 20 entries stay; a blocked or full storage just means no cache.
@@ -250,7 +257,7 @@ function saveSources() { try { localStorage.setItem(SRCS, JSON.stringify(userSou
 addSource(DEFAULT_SRC);
 // Served by a local server (e.g. `npx serve .` or `python3 -m http.server` from the repo or v3/), the page also lists v3/playbooks, the folder
 // next to dist/, as "Local server": read fresh every time (no cache), so a playbook being written shows its latest save. Not listed when that folder
-// cannot be reached (the server's root does not include it); never on GitHub Pages, from disk, or in the Claude artifact.
+// cannot be reached (the server's root does not include it); never on GitHub Pages or from disk.
 const LOCAL_SRC = "local";
 const LOCAL_BASE = /^https?:$/.test(location.protocol) && /^(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)$/.test(location.hostname)
   ? new URL("../playbooks", location.href).href : null;
@@ -343,7 +350,7 @@ function renderRepos() {
     for (const item of src.items) ul.append(card(item.title, item.story, [fmtMin(item.duration_s), item.key_moments ? `${item.key_moments} key moments` : "", ...(Array.isArray(item.tags) ? item.tags.slice(0, 2) : [])], () => openFromRepo(src, item, true), isNow(item.id, src.key)));
     if (src.state === "err" && src.key === DEFAULT_SRC) for (const pb of SEEDS) ul.append(card(pb.meta.title, pb.meta.story, [fmtMin(pb.meta.duration_s), `${(pb.timeline || []).filter((e) => e.beat).length} key moments`, "bundled"], () => { setBox(JSON.stringify(pb, null, 2)); repoLoaded = null; play(pb); }, isNow(pb.meta.id, DEFAULT_SRC)));
     if (src.state === "ok" && !src.items.length) { const li = document.createElement("li"); li.className = "empty"; li.textContent = "No playbooks listed in its index.json."; ul.append(li); }
-    g.append(h, ul); repoList.append(g);
+    g.append(h, ...(src.local && LCHAT ? [LCHAT.el] : []), ul); repoList.append(g);
   }
 }
 navReady = true;
@@ -354,6 +361,100 @@ if (LOCAL_BASE) loadIndex(sources.get(LOCAL_SRC)).then((src) => {
   sources.delete(LOCAL_SRC);
   if (currentLib === LOCAL_SRC) selectLib(DEFAULT_SRC); else renderRepos();
 });
+
+// ---------- local server: a chat with a Claude Code worker (v3/server.js, /simxp) ----------
+// Only when the page is served by sim-xp's own server (it answers /api/health); GitHub Pages, a plain static server or a file
+// opened from disk have no chat. The page holds the one connection (server-sent events) and lends it to the player as
+// simxp.chat: the index's chat makes new playbooks (thread "new"), the player's chat changes the open one (thread = its id).
+// When a playbook file changes, the Local server list reloads, and so does the player if that playbook is open, at the same place.
+const API = LOCAL_BASE ? new URL("/api/", location.href).href : null;
+async function api(path, payload) {
+  const r = await fetch(API + path, payload ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) } : { cache: "no-store" });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || "the server answered " + r.status);
+  return j;
+}
+const chatSubs = new Set();
+const chatApi = {
+  listening: false,
+  get: (thread) => api("chat?thread=" + encodeURIComponent(thread)),
+  send: (thread, text) => api("chat", { thread, text }),
+  cancel: (thread) => api("jobs/cancel", { thread }),
+  // "Claude is working…" with how long, so a job that is stuck is plain to see
+  working: (since) => { const m = since ? Math.floor((Date.now() - since) / 60000) : 0; return "Claude is working…" + (m >= 1 ? ` ${m} min` : ""); },
+  subscribe(cb) { chatSubs.add(cb); return () => chatSubs.delete(cb); },
+};
+function fire(ev) { for (const cb of [...chatSubs]) { try { cb(ev); } catch (e) { chatSubs.delete(cb); } } }   // a player that was reloaded is gone: drop it
+if (API) api("health").then((h) => {
+  if (!h || !h.ok) return;
+  chatApi.listening = !!h.listening; simxp.chat = chatApi;
+  LCHAT = buildIndexChat(); renderRepos();
+  const es = new EventSource(API + "events");
+  es.addEventListener("worker", (e) => { chatApi.listening = JSON.parse(e.data).listening; fire({ type: "worker" }); });
+  es.addEventListener("chat", (e) => fire({ type: "chat", ...JSON.parse(e.data) }));
+  es.addEventListener("playbooks", (e) => onPlaybooksChanged(JSON.parse(e.data).ids || []));
+  es.addEventListener("audio", (e) => { const ids = JSON.parse(e.data).ids || []; if (simxp.src === LOCAL_SRC && simxp.current && ids.includes(simxp.current.meta.id)) try { stage.contentWindow.player.refreshAudio(); } catch (err) { /* no player */ } });
+}).catch(() => { /* not sim-xp's server: no chat */ });
+async function onPlaybooksChanged(ids) {
+  const src = sources.get(LOCAL_SRC); if (!src) return;
+  await loadIndex(src, true);
+  if (simxp.src !== LOCAL_SRC || !simxp.current || !ids.includes(simxp.current.meta.id)) return;
+  // the open playbook changed on disk: reload it in the player at the same place (a file that does not validate is left alone)
+  const id = simxp.current.meta.id, item = src.items.find((x) => x.id === id) || { id, file: id + ".json", title: id };
+  let pb; try { pb = await fetchPlaybook(src, item); } catch (e) { return; }
+  try { simxp.restore = stage.contentWindow.player.state(); } catch (e) { simxp.restore = null; }
+  setBox(JSON.stringify(pb, null, 2)); repoLoaded = { text: pbBox.value, src: LOCAL_SRC, id };
+  simxp.current = pb; stage.srcdoc = PLAYER_HTML + "<!-- " + Date.now() + " -->";
+}
+// a chat log: the person's messages, Claude's replies, and status lines from the worker
+function renderChat(ol, messages) {
+  ol.replaceChildren();
+  for (const m of messages) {
+    const li = document.createElement("li"); li.className = "cm " + (m.author === "user" ? "me" : m.author === "status" ? "st" : "ai") + (m.queued ? " queued" : "");
+    li.textContent = m.text; ol.append(li);
+  }
+  ol.scrollTop = ol.scrollHeight;
+}
+function buildIndexChat() {
+  const el = document.createElement("section"); el.className = "lchat"; el.setAttribute("aria-label", "Simulate a story with Claude");
+  el.innerHTML = `<div class="chead"><b>Simulate a story</b><span class="pres" role="status"><i></i><span>…</span></span></div><ol class="clog" aria-live="polite"></ol><div class="cbar"><textarea rows="2" placeholder="Describe a story to simulate: a blog post URL, an incident, or a concept and what goes wrong" aria-label="Story to simulate"></textarea><button type="button" class="primary">Simulate</button></div><p class="cstat"></p>`;
+  const ol = el.querySelector("ol"), ta = el.querySelector("textarea"), btn = el.querySelector(".cbar button"), st = el.querySelector(".cstat");
+  const stop = document.createElement("button"); stop.type = "button"; stop.className = "tlink cstop"; stop.textContent = "Stop"; stop.hidden = true;
+  stop.title = "Stop waiting for Claude: drops this request (and any queued after it)";
+  stop.onclick = async () => { stop.disabled = true; try { await chatApi.cancel("new"); } catch (e) { st.textContent = e.message; st.hidden = false; } stop.disabled = false; };
+  el.querySelector(".chead").append(stop);
+  setInterval(() => { if (busy) refresh(); }, 30000);
+  let busy = false, since = null, made = [];   // made: playbooks this chat created during this visit, with a Play link each
+  async function refresh() {
+    let r; try { r = await chatApi.get("new"); } catch (e) { st.textContent = "The local server is not answering."; return; }
+    busy = r.busy; since = r.since; renderChat(ol, r.messages);
+    for (const m of made) {
+      const li = document.createElement("li"), b = document.createElement("button");
+      li.className = "cm made"; li.append(`✓ ${m.reply} `); b.type = "button"; b.className = "tlink"; b.textContent = "Play ▶";
+      b.onclick = () => { try { history.pushState(null, "", "#" + LOCAL_SRC + ":" + encodeURIComponent(m.id)); } catch (e) { /* not allowed */ } openHash(); };
+      li.append(b); ol.append(li);
+    }
+    ol.hidden = !ol.children.length; ol.scrollTop = ol.scrollHeight;
+    const pr = el.querySelector(".pres"), on = chatApi.listening;
+    pr.className = "pres" + (on ? (busy ? " busy" : " on") : "");
+    pr.lastChild.textContent = on ? (busy ? chatApi.working(since) : "Claude is listening") : "Claude is offline";
+    st.textContent = on ? "" : "To start it: in Claude Code, in this repo, run /simxp."; st.hidden = on; st.classList.toggle("off", !on);
+    stop.hidden = !busy;
+  }
+  async function send() {
+    const text = ta.value.trim(); if (!text) return;
+    btn.disabled = true;
+    try { await chatApi.send("new", text); ta.value = ""; } catch (e) { st.textContent = e.message; } finally { btn.disabled = false; ta.focus(); }
+  }
+  btn.onclick = send;
+  ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } });
+  chatApi.subscribe((ev) => {
+    if (ev.type === "chat" && ev.created) made.push({ id: ev.created, reply: ev.reply });
+    if (ev.type === "worker" || (ev.type === "chat" && ev.thread === "new")) refresh();
+  });
+  refresh();
+  return { el };
+}
 // adding a library: a small dialog with what a library is, the GitHub link, the other forms it takes, and a problem shown in place
 function repoError(text) { $("repoErr").textContent = text; $("repoErr").hidden = !text; }
 function addRepoFromInput() {
@@ -384,110 +485,7 @@ addEventListener("dragenter", (e) => { if ([...e.dataTransfer.types].includes("F
 addEventListener("dragleave", () => { if (--depth <= 0) { depth = 0; $("drop").hidden = true; } });
 addEventListener("dragover", (e) => e.preventDefault());
 addEventListener("drop", async (e) => { e.preventDefault(); depth = 0; $("drop").hidden = true; const f = e.dataTransfer.files[0]; if (f) openText(await f.text(), f.name); });
-(async () => {
-  if (window.claude) { try { downloads = await window.claude.use("downloads"); } catch (e) { /* not available */ } }
-  if (!downloads) return;
-  renderLibrary();   // local playbooks get Export
-})();
 
-// ---------- chat ----------
-function say(kind, text) {
-  const li = document.createElement("li"), d = document.createElement("div");
-  d.className = "msg " + kind; d.textContent = text; li.append(d); logEl.append(li);
-  logEl.scrollTop = logEl.scrollHeight;
-  return d;
-}
-const HELLO = say("claude", "");
-HELLO.classList.add("hello");
-HELLO.innerHTML = "Tell Claude what to simulate, for example <i>a cache stampede after a deploy</i>. It writes the playbook; then press <b>Play</b>. Ask again to change it.";
-
-const PREAMBLE = `You write playbooks for sim-xp, a player that animates a scripted, deterministic run of a small system: components light up, charts move, a feed scrolls, and playback pauses at key moments. A person chats with you. Each playbook you write goes straight into a box on the page, is checked by a validator, and the person presses Run to watch it.
-
-How to reply:
-- If the person asks for a playbook, or a change to the one in the box: reply with one or two plain sentences (what the story is, and anything you invented), then the COMPLETE playbook as ONE \`\`\`json code fence of compact JSON (no indentation, to keep it short), and nothing after the fence. Never send a patch, always the whole playbook.
-- If they ask a question about the format or the story: answer briefly in plain text and write no playbook.
-- Keep it complete rather than long. Skip the optional Hardcore layer (items tagged "deep"), report.math, report.myths and report.links unless the person asks for them or the story needs them. 8 to 10 dashboard panels, 8 to 12 metrics, 10 to 16 feed lines, 4 to 7 key moments.
-- You cannot run the validator yourself. Be careful with ids (every id referenced must exist), times (integers from 0 to duration_s, timeline sorted) and arithmetic (a backlog grows at in minus out). When the message lists validator problems, fix them all and return the whole playbook.
-
-The reference follows. Ignore its mentions of files, scripts and the Claude Code workflow; the box and the page replace them.`;
-const SYSTEM = PREAMBLE + "\n\n" + SPEC + "\n\nExample of a complete, valid playbook (compact):\n```json\n" + JSON.stringify(EXAMPLE) + "\n```";
-
-let sample = null, busy = false, ctl = null, turns = [];
-const COPY = {
-  not_granted: "Claude is not allowed for this page. Allow it when asked, or open or paste a playbook instead.",
-  rate_limited: "Too many requests, or your Claude usage limit is reached. Try again later.",
-  session_expired: "Your session expired. Sign in to Claude again, then retry.",
-  refused: "Claude declined that request. Try asking for something different.",
-  empty_completion: "Claude sent nothing back. Try again with a bit more detail.",
-  prompt_too_large: "The current playbook is too large to send along. Reload the page and ask again.",
-};
-function setBusy(on) {
-  busy = on; sendBtn.hidden = on; stopBtn.hidden = !on; askEl.disabled = on || !sample;
-  runBtn.disabled = on || runBtn.disabled; pbBox.readOnly = on;
-  if (!on) refresh();
-}
-const fence = (text) => {
-  const i = text.indexOf("```json");
-  if (i < 0) return { note: text.trim(), code: null, closed: false };
-  const rest = text.slice(i + 7).replace(/^\s*\n/, ""), j = rest.indexOf("```");
-  return { note: text.slice(0, i).trim(), code: j < 0 ? rest : rest.slice(0, j), closed: j >= 0 };
-};
-
-async function send(text) {
-  text = text.trim();
-  if (busy || !sample || !text) return;
-  setBusy(true); askEl.value = "";
-  say("me", text);
-  const prev = pbBox.value, cur = prev.trim();
-  let state = "The box is empty.";
-  if (cur) {
-    let body = cur; try { body = JSON.stringify(JSON.parse(cur)); } catch (e) { /* send as typed */ }
-    state = "The playbook in the box now:\n" + body;
-    const r = check(cur);
-    if (r.errors.length) state += "\n\nValidator problems with it:\n- " + r.errors.join("\n- ");
-  }
-  const bubble = say("claude", "Thinking…");
-  ctl = new AbortController();
-  let wrote = false;
-  try {
-    const res = await sample(
-      [{ role: "user", content: SYSTEM }, ...turns.slice(-6), { role: "user", content: text + "\n\n---\n" + state }],
-      {
-        cache: false, signal: ctl.signal,
-        onText: ({ text: t }) => {
-          const f = fence(t);
-          bubble.textContent = f.note || (f.code == null ? t : "Writing the playbook…");
-          if (f.code != null) { wrote = true; pbBox.value = f.code; pbBox.scrollTop = pbBox.scrollHeight; statusEl.className = "status"; statusEl.textContent = `Claude is writing… ${Math.round(f.code.length / 1024)} KB`; }
-          logEl.scrollTop = logEl.scrollHeight;
-        },
-      });
-    const f = fence(res.text);
-    bubble.textContent = f.note || (f.code == null ? res.text : "Done.");
-    turns.push({ role: "user", content: text }, { role: "assistant", content: (f.note || res.text) + (f.code != null ? " [playbook written to the box]" : "") });
-    if (f.code == null) { setBusy(false); return; }
-    let out = f.code.trim();
-    try { out = JSON.stringify(JSON.parse(out), null, 2); } catch (e) { /* leave as written; the box shows the problem */ }
-    setBusy(false); setBox(out, true);
-    if (res.truncated) say("err", "Claude hit its length limit and the playbook is cut off. Ask for a shorter one, for example fewer feed lines and charts.");
-    else if (last.errors.length) {
-      const m = say("err", `The playbook has ${last.errors.length} problem${last.errors.length === 1 ? "" : "s"} (listed below).`);
-      const b = document.createElement("button"); b.textContent = "Ask Claude to fix them"; b.onclick = () => { b.remove(); send("Fix the validator problems and return the whole playbook."); }; m.append(b);
-    } else {
-      const kept = await saveToLibrary(last.pb);
-      say("note", `${last.pb.meta.title} is ready${kept ? " and kept in Your playground" : ""}. Press Play below.`);
-      runBtn.focus();
-    }
-  } catch (e) {
-    if (wrote) { pbBox.value = prev; }
-    setBusy(false); refresh();
-    if (e && e.code === "cancelled") bubble.textContent = "Stopped. Your playbook is as it was.";
-    else { bubble.remove(); say("err", COPY[e && e.code] || "Something went wrong talking to Claude. Your playbook is as it was; try again."); }
-  } finally { ctl = null; }
-}
-// a <form> would be blocked by the artifact sandbox, so Send and Enter are plain handlers
-sendBtn.onclick = () => send(askEl.value);
-askEl.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(askEl.value); } });
-stopBtn.onclick = () => ctl && ctl.abort();
 
 // ---------- start ----------
 // The address names a playbook as #<id> (the saved copy, else a bundled one, else the one with that id in a repo) or #<repo>:<id>.
@@ -533,15 +531,6 @@ window.addEventListener("popstate", openHash);   // Back, Forward, or the person
   if (here) play(here);
   else { showIndex(); if (t) playFromRepoHash(t); }
 }
-(async () => {
-  try { sample = await window.claude?.use?.("sample"); } catch (e) { sample = null; }
-  if (!sample) {
-    askEl.disabled = true; sendBtn.disabled = true; $("bar").hidden = true;
-    $("chat").classList.add("off");
-    HELLO.className = "msg note"; HELLO.innerHTML = 'In Claude Code, ask for a playbook of your story, for example:<span class="eg">“Make a sim-xp playbook: a cache stampede after a deploy takes the database down.”</span>Claude saves it as a <code>.json</code> file.';
-  }
-  else { askEl.disabled = busy; $("wayInstall").hidden = true; }   // in the Claude artifact the chat writes playbooks, no skill to install
-})();
 
 // the sim-xp name in the header: back to the top of the index (a new tab with a modifier key, as a link)
 $("brandHome").onclick = (e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return; e.preventDefault(); showIndex(); try { scrollTo({ top: 0 }); } catch (err) { /* old browser */ } };

@@ -39,6 +39,20 @@ Then give it a story in Claude Code:
 Open the file in the [player](https://smarchone.github.io/sim-xp/v3/) (drop it on the page, or *Open file…* in
 the side panel) and press Space.
 
+## Or simulate by chat (local)
+
+Clone this repo and run the local server, then start the worker in Claude Code:
+
+```sh
+node v3/server.js     # http://127.0.0.1:3470
+claude                # in this repo, in another terminal
+> /simxp
+```
+
+Describe a story in the chat under **Local server**; Claude writes the playbook into `v3/playbooks/` and it shows up
+ready to play, while the server records its narration in the background. In the player, **Chat** asks for changes to the open playbook, and the player
+reloads it in place. The chat only exists on the local server (GitHub Pages has none).
+
 ## Share your playbook library
 
 A library of playbooks can be hosted as a public Github repo.<br>

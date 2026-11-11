@@ -30,7 +30,8 @@ const CHROME = process.env.CHROME || "/Applications/Google Chrome.app/Contents/M
 if (!existsSync(join(PBDIR, "index.json"))) die(`no index.json in ${PBDIR}`);
 const raw = JSON.parse(readFileSync(join(PBDIR, "index.json"), "utf8")), index = Array.isArray(raw) ? raw : raw.playbooks || [];
 const want = args;
-const items = want.length ? want.map((id) => index.find((x) => x.id === id) || die(`no playbook "${id}" in ${PBDIR}/index.json`)) : index;
+// a playbook named by id may be newer than index.json (just written): <id>.json in the folder is enough
+const items = want.length ? want.map((id) => index.find((x) => x.id === id) || (/^[\w.-]+$/.test(id) && existsSync(join(PBDIR, id + ".json")) ? { id, file: id + ".json" } : die(`no playbook "${id}" in ${PBDIR}`))) : index;
 function die(msg) { console.error("gen-audio: " + msg); process.exit(1); }
 if (!existsSync(CHROME)) die(`Chrome not found at ${CHROME} (set CHROME=/path/to/chrome)`);
 
