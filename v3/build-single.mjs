@@ -64,7 +64,9 @@ const script = [
 const fonts = `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Roboto+Mono:wght@400;500&display=swap">`;
 const themeBoot = `<script>try{var t=localStorage.getItem("sim-xp.theme")||"dark";if(t!=="system")document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme="dark"}</script>`;
 
-const page = `<title>sim-xp</title>
+// the charset comes first: served without one (python -m http.server, a file opened from disk) the browser would guess Latin-1
+const page = `<meta charset="utf-8">
+<title>sim-xp</title>
 <meta name="description" content="Watch a system in motion. Ask Claude for a playbook, then watch it run.">
 ${fonts}
 <style>

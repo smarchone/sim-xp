@@ -459,6 +459,12 @@ body{padding:0}
 .vrow .menu{top:auto;bottom:calc(100% + 8px);right:0}
 .vtoggle{color:var(--muted);display:inline-flex;align-items:center}
 .vtoggle[aria-pressed="true"]{color:var(--fg);box-shadow:inset 0 -2px 0 #e5484d}
+.app.speaking #vVoice{animation:vspeak 1.1s ease-in-out infinite}
+@keyframes vspeak{50%{color:#e5484d}}
+#vVoice.loading{color:var(--muted);font-variant-numeric:tabular-nums}
+.seg button:disabled{opacity:.4;cursor:default}
+#vNarrSel{max-width:170px;font:inherit;font-size:var(--s);background:var(--panel);color:var(--fg);border:1px solid var(--line2);border-radius:6px;padding:2px 4px}
+@media (prefers-reduced-motion:reduce){.app.speaking #vVoice{animation:none;color:#e5484d}}
 .vtoggle.news::after{content:"";width:6px;height:6px;border-radius:50%;background:#e5484d;margin-left:6px;display:inline-block;vertical-align:middle}
 @media (min-width:1000px) and (min-height:600px){
   .sim{border:1px solid var(--line);border-radius:8px;background:var(--bg)}
@@ -809,6 +815,7 @@ html:has(.app.fs),body:has(.app.fs){overflow:hidden}
         <span class="vchap" id="vchap"></span>
         <span class="spacer"></span>
         <button class="vresult" id="vResult" hidden>Read the result ↓</button>
+        <button class="vb vtxt vtoggle" id="vVoice" aria-pressed="false" title="Voice: a narrator explains each key moment aloud (v)">Voice</button>
         <button class="vb vtxt vtoggle" id="vFeed" aria-pressed="false" title="Show live events: the team’s chat, logs and alerts (e)">Events</button>
         <button class="vb vtxt" id="vSpeed" title="Playback speed (+ / −)">1×</button>
         <div class="hud">
@@ -822,6 +829,7 @@ html:has(.app.fs),body:has(.app.fs){overflow:hidden}
           <span><kbd>J</kbd> <kbd>L</kbd></span><span>back / forward 10 s</span>
           <span><kbd>F</kbd></span><span>full screen, just the player (no feed)</span>
           <span><kbd>E</kbd></span><span>show / hide the event feed</span>
+          <span><kbd>V</kbd></span><span>voice: the narrator explains each key moment and carries on</span>
           <span><kbd>←</kbd><kbd>→</kbd></span><span>previous / next key moment</span>
           <span><kbd>R</kbd></span><span>report</span>
           <span><kbd>−</kbd><kbd>+</kbd></span><span>slower / faster</span>
@@ -839,6 +847,9 @@ html:has(.app.fs),body:has(.app.fs){overflow:hidden}
         <button class="mi" id="introBtn" role="menuitem" hidden>Show intro <kbd>I</kbd></button>
         <div class="row"><span class="small" style="flex:1">Speed</span><div class="seg" id="speedSeg"><button data-speed="2">0.5×</button><button data-speed="4">1×</button><button data-speed="8">2×</button><button data-speed="16">4×</button></div></div>
         <div class="row" id="detailRow" hidden><span class="small" style="flex:1" title="Hardcore shows the deeper layer of the same run: more charts, raw logs and commands, and a deep dive in the report">Detail <kbd>H</kbd></span><div class="seg" id="detailSeg"><button data-detail="standard">Standard</button><button data-detail="hardcore">Hardcore</button></div></div>
+        <div class="row" id="vEngineRow" title="Natural: a neural voice that runs on your GPU (about 330 MB, downloaded once, then cached). System: your computer's own voices."><span class="small" style="flex:1">Voice <kbd>V</kbd></span><div class="seg" id="vEngineSeg"><button data-engine="natural">Natural</button><button data-engine="system">System</button></div></div>
+        <div class="row" id="vNatRow"><span class="small" style="flex:1">Narrator</span><div class="seg" id="vNatSeg"><button data-nat="af_heart">Heart</button><button data-nat="am_michael">Michael</button><button data-nat="bf_emma">Emma</button></div></div>
+        <div class="row" id="vNarrRow" title="The voices installed on this computer. Premium and Enhanced ones sound the most natural (on a Mac, add them in System Settings, Accessibility, Spoken Content)."><span class="small" style="flex:1">Narrator <kbd>V</kbd></span><select id="vNarrSel" aria-label="Narrator voice"></select></div>
       </div>
       </div>
         <button class="vb" id="vFull" aria-label="Full screen (f)" title="Full screen (f)">⛶</button>
@@ -1594,7 +1605,7 @@ function renderBar() {
   scrub.setAttribute("aria-valuemax", String(Math.round(VT(D)))); scrub.setAttribute("aria-valuenow", String(Math.round(VT(playT))));
 }
 function vflash(ic) { const f = $("#vflash"); f.textContent = ic; f.classList.remove("go"); void f.offsetWidth; f.classList.add("go"); }
-function startPlaying() { $("#poster").hidden = true; if (!introStarted) { introStarted = true; seek(0); $("#start").textContent = "Back to the simulation ▼"; } }
+function startPlaying() { $("#poster").hidden = true; if (!introStarted) { introStarted = true; seek(0); $("#start").textContent = "Back to the simulation ▼"; narrateIntro(); } }
 let scrubbing = false;
 scrub.addEventListener("pointerdown", e => { e.preventDefault(); scrub.setPointerCapture(e.pointerId); scrubbing = true; scrub.classList.add("drag"); startPlaying(); const was = playing; scrub._was = was; setPlaying(false); seek(tAtX(e.clientX)); });
 scrub.addEventListener("pointermove", e => {
@@ -1620,6 +1631,220 @@ function setFeed(on, persist) {
 }   // the board's ResizeObserver re-lays the charts when the column appears or goes
 setFeed(feedOn, false);
 $("#vFeed").onclick = () => setFeed(!feedOn, true);
+/* ===================== Voice: a narrator reads each key moment aloud, then the run carries on ===================== */
+// The narrator, best first: Natural, Kokoro's Heart voice (a neural text-to-speech model, 82M parameters, full precision, run
+// on the GPU with WebGPU in a worker so the charts stay smooth; ~330 MB downloaded once, then cached by the browser); then the
+// browser's own speech, Google UK English Female where the browser has it (Chrome); then the best other system voice. The
+// system voice also speaks while the model downloads, and takes over where it cannot run. Voice is off by default; the
+// choices made in the ⚙ are remembered.
+var VOICE_KEY = "sim-xp.voice", VENGINE_KEY = "sim-xp.voice-engine", VNAT_KEY = "sim-xp.voice-natural", VNARR_KEY = "sim-xp.voice-narrator";
+var tts = "speechSynthesis" in window && window.SpeechSynthesisUtterance ? window.speechSynthesis : null;
+var canNatural = !!navigator.gpu && typeof Worker === "function" && !!(window.AudioContext || window.webkitAudioContext);
+var voiceOn = false, ttsVoice = null, vNarr = "", vNat = "af_heart", vEngine = canNatural ? "natural" : "system", sayId = 0, sayGo = 0, introHold = false;
+const NATURALS = { af_heart: "Heart", am_michael: "Michael", bf_emma: "Emma" };
+try {
+  voiceOn = (canNatural || !!tts) && localStorage.getItem(VOICE_KEY) === "on"; vNarr = localStorage.getItem(VNARR_KEY) || "";
+  const e = localStorage.getItem(VENGINE_KEY); if (e === "system" && tts || e === "natural" && canNatural) vEngine = e;
+  const n = localStorage.getItem(VNAT_KEY); if (NATURALS[n]) vNat = n;
+} catch (e) { /* storage blocked */ }
+// system voices: English, the most natural first (Premium, Enhanced and Natural ones are neural voices a system may have)
+const voiceRank = v => (/^google uk english female$/i.test(v.name) ? 32 : 0) + (/premium|natural|neural|enhanced/i.test(v.name) ? 8 : 0) + (/samantha|ava|allison|zoe|daniel|aria|jenny|serena|google/i.test(v.name) ? 4 : 0) + (/^en[-_]US/i.test(v.lang) ? 2 : 0) + (v.default ? 1 : 0);
+const enVoices = () => tts.getVoices().filter(v => /^en([-_]|$)/i.test(v.lang) && !/eloquence|novelty|bells|bubbles|cellos|organ|whisper|zarvox|trinoids|albert|bahh|boing|jester|superstar|wobble|grandma|grandpa|rocko|shelley|sandy|flo|reed|eddy|bad news|good news|junior|fred|ralph|kathy|princess|hysterical|deranged|pipe organ|victoria/i.test(v.name)).sort((a, b) => voiceRank(b) - voiceRank(a));
+function pickVoice() {
+  const vs = enVoices(); ttsVoice = vs.find(v => v.voiceURI === vNarr) || vs[0] || null;
+  const sel = $("#vNarrSel");
+  sel.innerHTML = vs.map(v => `<option value="${esc(v.voiceURI)}">${esc(v.name.replace(/\s*\(English \([^)]*\)\)/, ""))} · ${esc(v.lang)}</option>`).join("");
+  if (ttsVoice) sel.value = ttsVoice.voiceURI;
+  voiceMenu();
+}
+// written text to spoken text: units, percentiles and code names read the way an engineer would say them
+const ORD = n => n + (/1[123]$/.test(n) ? "th" : { 1: "st", 2: "nd", 3: "rd" }[n.slice(-1)] || "th");
+const UNITS = { ms: "milliseconds", "µs": "microseconds", us: "microseconds", ns: "nanoseconds", s: "seconds", sec: "seconds", min: "minutes", h: "hours", hr: "hours",
+  "KB/s": "kilobytes per second", "MB/s": "megabytes per second", "GB/s": "gigabytes per second", KB: "kilobytes", MB: "megabytes", GB: "gigabytes", TB: "terabytes",
+  rps: "requests per second", RPS: "requests per second", qps: "queries per second", QPS: "queries per second", "/s": "per second", k: "thousand", K: "thousand", M: "million" };
+function spoken(t) {
+  return String(t || "")
+    .replace(/[`*_]{1,2}(?=\S)|(?<=\S)[`*_]{1,2}/g, "")
+    .replace(/\be\.g\.,?/gi, "for example,").replace(/\bi\.e\.,?/gi, "that is,").replace(/\betc\./gi, "and so on.").replace(/\bvs\.?(?=\s)/gi, "versus")
+    .replace(/\bp50\b/gi, "median").replace(/\bp(99)(9)\b/gi, "99.9th percentile").replace(/\bp(\d{2})\b/gi, (_, n) => ORD(n) + " percentile")
+    .replace(/(\d[\d,.]*)\s?(KB\/s|MB\/s|GB\/s|µs|us|ns|ms|sec|min|hr|KB|MB|GB|TB|rps|RPS|qps|QPS|\/s|[shkKM])(?![\w.]*\d)\b/g, (_, n, u) => n + " " + (n === "1" ? UNITS[u].replace(/s(?= per|$)/, "") : UNITS[u]))
+    .replace(/\b(KB|MB|GB)\/s\b/g, (_, u) => UNITS[u + "/s"]).replace(/(\d+)(?:\/(\d+))+/g, m => m.split("/").join(", ")).replace(/\s*=\s*/g, " equals ")
+    .replace(/(\d)\s?\/s\b/g, "$1 per second").replace(/(\d)\s?%/g, "$1 percent")
+    .replace(/#(\d)/g, "number $1").replace(/\s*&\s*/g, " and ").replace(/<\s?(?=\d)/g, "under ").replace(/>\s?(?=\d)/g, "over ")
+    .replace(/\b[a-z][a-z0-9]*(?:[._][a-z][a-z0-9]*)+\b/gi, w => w.replace(/\.(ms|s)$/i, "").replace(/[._]/g, " "))   // max.poll.interval.ms: "max poll interval"
+    .replace(/\s*→\s*/g, " to ").replace(/(\d)\s*×/g, "$1 times").replace(/×/g, " times ").replace(/\s*[≈~]\s*(?=\d)/g, " about ")
+    .replace(/\s*[—–]\s*/g, ", ").replace(/\s*\(([^)]*)\)/g, ", $1,").replace(/,\s*([.!?;:])/g, "$1").replace(/,\s*,/g, ",").replace(/\s{2,}/g, " ").trim();
+}
+const sentence = t => { t = String(t || "").trim(); return !t || /[.!?…:]$/.test(t) ? t : t + "."; };
+
+// --- the natural engine: a worker that loads Kokoro on the GPU and turns one sentence at a time into audio, in order
+const KOKORO_JS = "https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/dist/kokoro.web.js";
+const KWORKER = `let tts, q = Promise.resolve(), voice = null;
+const run = async m => {
+  if (m.type === "load") {
+    if (!navigator.gpu || !(await navigator.gpu.requestAdapter())) throw new Error("no WebGPU adapter");
+    const { KokoroTTS } = await import(${JSON.stringify(KOKORO_JS)});
+    const seen = {};
+    tts = await KokoroTTS.from_pretrained("onnx-community/Kokoro-82M-v1.0-ONNX", { dtype: "fp32", device: "webgpu",
+      progress_callback: p => { if (p.status === "progress" && p.total) { seen[p.file] = [p.loaded, p.total]; const v = Object.values(seen); self.postMessage({ type: "progress", pct: 100 * v.reduce((a, x) => a + x[0], 0) / v.reduce((a, x) => a + x[1], 0) }); } } });
+    await tts.generate("Ready.", { voice: "af_heart" });   // warm up, so the first real sentence is not the slow one
+    self.postMessage({ type: "ready" });
+  } else {
+    if (voice && m.voice !== voice) throw new Error("dropped: the narrator changed");   // queued for the old narrator: skip it
+    const a = await tts.generate(m.text, { voice: m.voice, speed: 1 });
+    self.postMessage({ type: "audio", id: m.id, pcm: a.audio, rate: a.sampling_rate }, [a.audio.buffer]);
+  }
+};
+self.onmessage = ({ data: m }) => { if (m.type === "voice") { voice = m.voice; return; } q = q.then(() => run(m)).catch(e => self.postMessage({ type: "error", id: m.id, load: m.type === "load", error: String(e && e.message || e) })); };`;
+let kw = null, kState = "off", kPct = 0, kReq = 0, actx = null, kSrc = null;
+const kWait = new Map(), kCache = new Map();
+function audioCtx() { if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === "suspended") actx.resume().catch(() => {}); return actx; }
+["pointerdown", "keydown"].forEach(ev => addEventListener(ev, () => { if (voiceOn && vEngine === "natural") audioCtx(); }, { capture: true, passive: true }));   // audio may start only after a gesture
+function kLoad() {
+  if (kw || kState === "failed") return;
+  kState = "loading"; kPct = 0; voiceMenu();
+  try { kw = new Worker(URL.createObjectURL(new Blob([KWORKER], { type: "text/javascript" })), { type: "module" }); } catch (e) { return kFail(e); }
+  kw.onmessage = ({ data: m }) => {
+    if (m.type === "progress") { kPct = m.pct; voiceMenu(); }
+    else if (m.type === "ready") { kState = "ready"; voiceMenu(); prefetchNext(); }
+    else if (m.type === "audio") { const w = kWait.get(m.id); kWait.delete(m.id); if (w) w.res(m); }
+    else if (m.type === "error") { if (m.load) kFail(m.error); else { const w = kWait.get(m.id); kWait.delete(m.id); if (w) w.rej(new Error(m.error)); } }
+  };
+  kw.onerror = e => kFail(e.message || "worker failed");
+  kw.postMessage({ type: "load" });
+}
+function kFail(err) {   // the model cannot run here (no GPU, offline, blocked): the system voice takes over
+  console.warn("sim-xp: natural voice unavailable, using the system voice:", err);
+  kState = "failed"; if (kw) kw.terminate(); kw = null;
+  kWait.forEach(w => w.rej(new Error("natural voice unavailable"))); kWait.clear(); kCache.clear();
+  vEngine = "system"; voiceMenu();
+  if (voiceOn) { if (tts) flash("natural voice unavailable: system voice"); else { setVoice(false, false); flash("voice unavailable here"); } }
+}
+function synth(text) {   // one sentence to audio; cached, so a prefetched key moment plays at once
+  const key = vNat + "|" + text;
+  if (!kCache.has(key)) {
+    const p = new Promise((res, rej) => { const id = ++kReq; kWait.set(id, { res, rej }); kw.postMessage({ type: "say", id, text, voice: vNat }); });
+    p.catch(() => kCache.delete(key)); kCache.set(key, p);
+  }
+  return kCache.get(key);
+}
+function playPCM(m, id) {
+  return new Promise(res => {
+    if (id !== sayId) return res(false);
+    const ctx = audioCtx(), buf = ctx.createBuffer(1, m.pcm.length, m.rate); buf.copyToChannel(m.pcm, 0);
+    const src = ctx.createBufferSource(); src.buffer = buf; src.connect(ctx.destination);
+    src.onended = () => { if (kSrc === src) kSrc = null; res(id === sayId); };
+    kSrc = src; src.start();
+  });
+}
+const naturalReady = () => voiceOn && vEngine === "natural" && kState === "ready";
+
+// --- speaking, with either engine. done() runs when it finished, never when it was cut off.
+const beatLines = e => [`Key moment ${beats.indexOf(e) + 1}.`, sentence(e.title), ...toPoints(e.beat.hint), ...(HC && e.beat.deep ? toPoints(e.beat.deep) : [])];
+function introLines() { const W = watchList(); return [sentence(PB.meta.title), ...(W.length ? [`Keep an eye on ${W.map((w, i) => `chart ${i + 1}, ${w.label}`).join("; and ")}.`] : [])]; }
+function prefetchNext() {   // while the run plays, the intro and the next key moment are turned into audio ahead of time
+  if (!naturalReady()) return;
+  const nb = activeBeat ? beats[beats.indexOf(activeBeat) + 1] : beats.find(b => b.t > playT + 0.01);
+  [...(introStarted ? [] : introLines()), ...(nb ? beatLines(nb) : [])].map(spoken).filter(Boolean).forEach(s => synth(s).catch(() => {}));
+}
+function hush() {
+  sayId++; clearTimeout(sayGo); introHold = false;
+  if (tts && (tts.speaking || tts.pending)) tts.cancel();
+  if (kSrc) { try { kSrc.onended = null; kSrc.stop(); } catch (e) { /* already stopped */ } kSrc = null; }
+  $("#app").classList.remove("speaking");
+}
+function say(lines, done) {
+  if (!voiceOn) return;
+  hush(); const id = sayId, parts = lines.map(spoken).filter(Boolean);
+  if (!parts.length) return;
+  if (vEngine === "natural") kLoad();
+  $("#app").classList.add("speaking");
+  const finish = () => { if (id !== sayId) return; $("#app").classList.remove("speaking"); if (done) sayGo = setTimeout(() => { if (id === sayId) done(); }, 700); };
+  const natural = () => {
+    const audio = parts.map(s => synth(s));   // all queued at once, so the next sentence is ready while this one plays
+    (async () => {
+      for (let i = 0; i < audio.length; i++) {
+        let m; try { m = await audio[i]; } catch (e) { if (id === sayId) system(); return; }
+        if (!(await playPCM(m, id))) return;
+        if (i < audio.length - 1) await new Promise(r => setTimeout(r, 300));
+      }
+      finish(); prefetchNext();
+    })();
+  };
+  const system = () => {
+    if (!tts) return finish();
+    // Chrome can jam when speak() follows cancel() at once, so it waits a moment; and a watchdog moves on if it never ends
+    setTimeout(() => {
+      if (id !== sayId) return;
+      const words = parts.join(" ").split(/\s+/).length;
+      const dog = setTimeout(() => { if (id !== sayId) return; tts.cancel(); finish(); }, 4000 + words * 600);
+      parts.forEach((p, i) => {
+        const u = new SpeechSynthesisUtterance(p);
+        if (ttsVoice) { u.voice = ttsVoice; u.lang = ttsVoice.lang; }
+        u.rate = 0.98;
+        if (i === parts.length - 1) u.onend = () => { clearTimeout(dog); finish(); };
+        u.onerror = e => { if (id === sayId && e.error !== "interrupted" && e.error !== "canceled") { clearTimeout(dog); finish(); } };
+        tts.speak(u);
+      });
+    }, 120);
+  };
+  if (vEngine !== "natural" || kState === "failed") return system();
+  if (kState === "ready") return natural();
+  // the natural voice is loading: give it a few seconds (from the cache it is quick), then the system voice speaks this one
+  const t0 = performance.now();
+  (function wait() {
+    if (id !== sayId) return;
+    if (kState === "ready") return natural();
+    if (kState === "failed" || performance.now() - t0 > 4000) return system();
+    setTimeout(wait, 100);
+  })();
+}
+const simVisible = () => focusOn || (() => { const r = $("#simSec").getBoundingClientRect(); return Math.min(r.bottom, innerHeight) - Math.max(r.top, 0) > Math.min(r.height, innerHeight) / 2; })();   // at least half the player shows
+function narrateBeat(e) { say(beatLines(e), () => { if (activeBeat === e && !playing && simVisible()) primaryAction(); }); }   // then carry on, like a narrated video
+function narrateIntro() {   // the run holds at the start while the intro is spoken, so the first key moment does not cut it off
+  if (!voiceOn) return;
+  say(introLines(), () => { introHold = false; lastFrame = performance.now(); });
+  introHold = true;
+}
+function voiceMenu() {
+  const b = $("#vVoice"), loading = voiceOn && vEngine === "natural" && kState === "loading";
+  b.textContent = loading ? `Voice ${Math.floor(kPct)}%` : "Voice"; b.classList.toggle("loading", loading);
+  if (loading) b.title = "Downloading the natural voice (once, then cached). The system voice speaks until it is ready.";
+  document.querySelectorAll("#vEngineSeg [data-engine]").forEach(x => { x.setAttribute("aria-pressed", String(x.dataset.engine === vEngine)); x.disabled = x.dataset.engine === "natural" ? !canNatural || kState === "failed" : !tts; });
+  document.querySelectorAll("#vNatSeg [data-nat]").forEach(x => x.setAttribute("aria-pressed", String(x.dataset.nat === vNat)));
+  $("#vEngineRow").hidden = !canNatural;
+  $("#vNatRow").hidden = vEngine !== "natural";
+  $("#vNarrRow").hidden = vEngine === "natural" || !tts || !$("#vNarrSel").options.length;
+}
+function setVoice(on, persist) {
+  voiceOn = (canNatural || !!tts) && on;
+  const b = $("#vVoice"); b.hidden = !canNatural && !tts; b.setAttribute("aria-pressed", String(voiceOn));
+  b.title = voiceOn ? "Voice on: the narrator explains each key moment, then the run carries on (v)" : "Voice: a narrator explains each key moment aloud (v)";
+  if (persist) try { localStorage.setItem(VOICE_KEY, voiceOn ? "on" : "off"); } catch (e) { /* storage blocked */ }
+  if (!voiceOn) hush();
+  else {
+    if (vEngine === "natural") { kLoad(); if (persist) audioCtx(); }
+    if (persist) { if (activeBeat) narrateBeat(activeBeat); else say(["Voice on."]); }
+  }
+  voiceMenu();
+}
+const sample = () => { if (!voiceOn) setVoice(true, true); else if (activeBeat) narrateBeat(activeBeat); else say([`Hi, I'm ${vEngine === "natural" ? NATURALS[vNat] : ttsVoice ? ttsVoice.name.split(/[\s(]/)[0] : "your narrator"}.`]); };
+if (tts) { pickVoice(); tts.addEventListener && tts.addEventListener("voiceschanged", pickVoice); }
+setVoice(voiceOn, false);
+$("#vVoice").onclick = () => { setVoice(!voiceOn, true); flash(voiceOn ? "voice on" : "voice off"); };
+$("#vEngineSeg").onclick = e => {
+  const b = e.target.closest("[data-engine]"); if (!b || b.disabled) return;
+  vEngine = b.dataset.engine; try { localStorage.setItem(VENGINE_KEY, vEngine); } catch (err) { /* storage blocked */ }
+  if (vEngine === "natural") { kLoad(); audioCtx(); }
+  voiceMenu(); sample();
+};
+$("#vNatSeg").onclick = e => {
+  const b = e.target.closest("[data-nat]"); if (!b || b.dataset.nat === vNat) return; vNat = b.dataset.nat;
+  if (kw) kw.postMessage({ type: "voice", voice: vNat });   // the worker drops what it queued for the old narrator, so the new one speaks at once
+  try { localStorage.setItem(VNAT_KEY, vNat); } catch (err) { /* storage blocked */ } voiceMenu(); audioCtx(); sample();
+};
+$("#vNarrSel").onchange = e => { vNarr = e.target.value; try { localStorage.setItem(VNARR_KEY, vNarr); } catch (err) { /* storage blocked */ } pickVoice(); sample(); };
+addEventListener("pagehide", hush);
 let lastAlertSeen = 0;
 function markFeedNews() {   // a new alert while the feed is hidden: a small red dot on Events, nothing more
   if (feedOn) return;
@@ -1683,6 +1908,7 @@ function renderHud(v) {
 function flash(text) { hudFlash = { text, until: performance.now() + 1400 }; renderHud(viewT()); setTimeout(() => renderHud(viewT()), 1450); }
 function setPlaying(p) {
   playing = p && playT < D;
+  if (!p) hush();   // pausing silences the narrator
   $("#app").classList.toggle("playing", playing);
   if (playing && $("#poster")) $("#poster").hidden = true;
   lastFrame = performance.now();
@@ -1732,6 +1958,7 @@ function showBeat(e) {
   revealFocusedPanels(e);
   renderHud(viewT()); markFilter();
   const b = $("#caption"); b.classList.remove("arrive"); void b.offsetWidth; b.classList.add("arrive");   // slide in with a glow, once
+  narrateBeat(e);
 }
 
 // the explanation as points: one per sentence (a full stop, ! or ? followed by a space and a capital, digit or quote)
@@ -1786,7 +2013,7 @@ function endBrief() {
   $("#app").classList.remove("focus-mode"); $("#caption").classList.remove("open"); $("#beatGo").tabIndex = -1;
 }
 function hideBeat() {
-  endBrief(); $("#caption").classList.remove("arrive");   // the arrival glow plays once, on the way in only
+  endBrief(); $("#caption").classList.remove("arrive"); hush();   // the arrival glow plays once, on the way in only
   if (!activeBeat) return;
   setTimeout(markFilter, 0);
   activeBeat = null; panels.forEach(P => P.note && P.note.classList.remove("show")); $("#app").classList.remove("focus-mode"); $("#caption").classList.remove("open"); $("#beatGo").tabIndex = -1; fitAboveSheet(false);
@@ -1799,11 +2026,11 @@ function frame(now) {
   else shownT = want;
   const eased = shownT !== before;
   if (playing) {
-    const prev = playT; playT = Math.min(D, playT + Math.max(0, (now - lastFrame) / 1000) * speed); lastFrame = Math.max(lastFrame, now);
+    const prev = playT; if (!introHold) playT = Math.min(D, playT + Math.max(0, (now - lastFrame) / 1000) * speed); lastFrame = Math.max(lastFrame, now);
     const b = beats.find(e => e.t > prev && e.t <= playT);
     if (playing && hoverT == null) shownT = playT;
     if (b) { playT = b.t; shownT = playT; render(); showBeat(b); } else render();
-    if (playT >= D) { setPlaying(false); render(); emit("end", { t: D }); if (!reportSeen) { reportSeen = true; unlockResult(); } }
+    if (playT >= D) { setPlaying(false); render(); emit("end", { t: D }); say(["That is the whole run.", "The result is below the player."]); if (!reportSeen) { reportSeen = true; unlockResult(); } }
   } else if (eased) render();
   requestAnimationFrame(frame);
 }
@@ -1816,7 +2043,7 @@ function primaryAction(fromBar) {
   if (!activeBeat && !briefing) { setPlaying(!playing); vflash(playing ? "▶" : "❚❚"); render(); return; }
   if (isOpen($("#intro"))) return startRun();
   if (isOpen($("#scrim"))) return watchAgain();
-  if (activeBeat || briefing) { hideBeat(); setPlaying(true); render(); return; }
+  if (activeBeat || briefing) { hideBeat(); setPlaying(true); render(); prefetchNext(); return; }
   if (playT >= D) { seek(0); setPlaying(true); return; }
   setPlaying(!playing); render();
 }
@@ -1852,6 +2079,7 @@ document.addEventListener("keydown", e => {
   if ((e.key === "j" || e.key === "J" || e.key === "l" || e.key === "L") && simInView()) { startPlaying(); seek(playT + (/l/i.test(e.key) ? 40 : -40)); return; }
   if ((e.key === "f" || e.key === "F") && simInView()) { toggleFull(); return; }
   if ((e.key === "e" || e.key === "E") && simInView() && !focusOn) { setFeed(!feedOn, true); return; }
+  if ((e.key === "v" || e.key === "V") && simInView() && tts) { $("#vVoice").click(); return; }
   if (e.code === "Space" && !simInView()) return;   // reading the brief or the result: Space scrolls as usual
   if (e.code === "Space") { e.preventDefault(); if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); primaryAction(); return; }
   if (e.key === "?") { toggleMenu("help"); return; }
@@ -2046,7 +2274,7 @@ window.player = {
     t: Math.round(playT * 10) / 10, playing, speed: speed / 4,
     key_moment: activeBeat ? beats.indexOf(activeBeat) + 1 : null,
     intro_open: isOpen($("#intro")), report_open: isOpen($("#scrim")), ended: playT >= D,
-    detail: HC ? "hardcore" : "standard", has_deep: hasDeep,
+    detail: HC ? "hardcore" : "standard", has_deep: hasDeep, voice: voiceOn,
   }),
   start() { if (isOpen($("#intro"))) startRun(); else { if (isOpen($("#scrim"))) closeReport(); hideBeat(); setPlaying(true); } },
   pause() { setPlaying(false); render(); },
@@ -2060,6 +2288,7 @@ window.player = {
   report(open) { if (open) openReport(); else if (isOpen($("#scrim"))) closeReport(); },
   restart() { if (isOpen($("#intro"))) hideModal($("#intro")); if (isOpen($("#scrim"))) closeReport(); reportSeen = false; seek(0); setPlaying(true); },
   detail(mode) { if (!["standard", "hardcore"].includes(mode)) throw new Error('detail must be "standard" or "hardcore"'); if (mode === "hardcore" && !hasDeep) throw new Error("this playbook has no deep layer"); setDetail(mode === "hardcore"); },
+  voice(on) { setVoice(on !== false, true); },
   speed(x) { if (!SPEED_X[x]) throw new Error("speed must be 0.5, 1, 2 or 4"); setSpeed(SPEED_X[x]); flash(`speed ${speedLabel(speed)}`); },
 };
 emit("ready", {});
